@@ -1,0 +1,1018 @@
+ 
+ 
+ 
+COMSATS University Islamabad (CUI) 
+ 
+Project Proposal 
+for 
+ 
+THE ALT ECOSYSTEM 
+(An environment where intelligence is created, owned, and connected.)
+ 
+ 
+Version 1.0
+ 
+ 
+By 
+Wamiq Ejaz       CIIT/SP23-BCS-102/ISB 
+M Soban             CIIT/SP23-BCS-063/ISB 
+M Tayyab           CIIT/SP23-BCS-066/ISB 
+ 
+Supervisor
+ 
+Sir Muzaffar Iqbal 
+ 
+ 
+Bachelor of Science in Computer Science (20 23-2027) 
+----------------Page (0) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+ 
+ 
+Contents 
+Abstract ........................................................................................................................................... 1 
+1.   Introduction ............................................................................................................................... 2 
+2.   Problem Statement .................................................................................................................... 2 
+3.   Problem Solution/Objectives of the Proposed System .............................................................. 3 
+3.1        Objectives ..................................................................................................................................... 3 
+4.   Related System Analysis/Literature Review ............................................................................. 4 
+5.   Vision Statement ....................................................................................................................... 4 
+6.   Scope ......................................................................................................................................... 4 
+7.   Modules ..................................................................................................................................... 5 
+7.1        ALT Modules ............................................................................................................................... 5 
+7.1.1     Module 1: User Profiling and Authentication (ALT) .............................................................. 5 
+7.1.2     Module 2: System Messaging and Notification across Platforms. (ALT) ............................... 5 
+7.1.3     Module 3: Admin and Governance Panel (ALT) .................................................................... 5 
+7.1.4     Module 4: Microservices Orchestration and API Gateways (ALT) ........................................ 6 
+7.1.5     Module 5: Logging, Auditing and Transparency Layer (ALT) ............................................... 6 
+7.1.6     Module 6: Version Control and decentralized storage (ALT) ................................................. 6 
+7.1.7     Module 7: AI Health Score (ALT)........................................................................................... 6 
+7.2        ALTER Modules .......................................................................................................................... 6 
+7.2.1     Module 8: Consent Engine (ALTER) ...................................................................................... 6 
+7.2.2     Module 9: Lifecycle and AI Training Manager (ALTER) ...................................................... 6 
+7.2.3     Module 10: AI Persona Interaction Interface (ALTER) .......................................................... 7 
+7.3        ALTAR Modules ......................................................................................................................... 7 
+7.3.1     Module 11: ALTAR Core Engine (ALTAR) ........................................................................... 7 
+7.3.2     Module 12: Transactions, Usage Rights and Royalty system (ALTAR) ................................. 7 
+7.4        ALTERA Modules ....................................................................................................................... 7 
+7.4.1     Module 13: ALTERA Core (ALTERA) .................................................................................. 7 
+7.4.2     Module 14: AI-Hub Social Interaction (ALTERA) ................................................................. 8 
+7.4.3     Module 15: Social Publishing AI Representative under Human Guidance (ALTERA) ......... 8 
+7.4.4     Module 16: Ethical Constraints and Moderation (ALTERA) .................................................. 8 
+7.5        Mixed Modules ............................................................................................................................ 8 
+7.5.1     Module 17: Blockchain based AI Identity and Provenance System (ALTAR, ALTERA) ..... 8 
+7.5.2     Module 18: Analytics and Creator Control Panel (ALTAR, ALTERA) ................................. 8 
+8.   System Limitations/Constraints ................................................................................................ 9 
+9.   Data Gathering Approach .......................................................................................................... 9 
+10. Project Contribution .................................................................................................................. 9 
+11. Relevance to Course Modules ................................................................................................. 11 
+12. Tools and Technologies .......................................................................................................... 11 
+----------------Page (1) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+ 
+ 
+13. Project Stakeholders and Roles ............................................................................................... 13 
+14. Module based Work Division ................................................................................................. 13 
+15. WBS and Gantt Chart .............................................................................................................. 14 
+15.1      Work Break Down Sheet ........................................................................................................... 14 
+15.2      Gantt Chart ................................................................................................................................. 15 
+16. Mockups .................................................................................................................................. 16 
+16.1      Mobile Application Mockups .................................................................................................... 16 
+16.1.1   ALTER  – The AI .................................................................................................................. 16 
+16.1.2   ALTAR – The Marketplace ................................................................................................... 17 
+16.1.3   ALTERA – The AI Hub ........................................................................................................ 18 
+16.2      Web Application Mockups ........................................................................................................ 19 
+17. References ............................................................................................................................... 22 
+17.1      Books ......................................................................................................................................... 22 
+17.2      Articles in Journals ..................................................................................................................... 22 
+17.3      Articles from Conference Proceedings ...................................................................................... 22 
+17.4      World Wide Web Resources ...................................................................................................... 22 
+18. Plagiarism Report .................................................................................................................... 24 
+ 
+ 
+ 
+ 
+ 
+----------------Page (2) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+1 
+ 
+Project Category:  
+ 
+ 
+ 
+ 
+ 
+THE  ALT ECOSYSTEM   
+ALTER - Our Personalized AI 
+ALTERA - The Social Hub just for AIs 
+ALTAR – Know Thy Selves, Own Thy Selves 
+ 
+ 
+Abstract 
+The rationale behind this project is to create  THE ALT ECOSYSTEM, a decentralized and user-
+controlled personal AI platform that enables individuals to privately train, own, and authenticate their 
+AI models. Currently, AI systems are largely centralized, opaque, and disconnected from verifiable 
+digital  identity,  which  limits users’ control, trust, and options for monetization. Existing social 
+platforms allow AI-generated content but provide no reliable mechanism to confirm which AI created 
+it  or  to  represent  individuals  via  verifiable  AI  personas.  This  project  addresses  key  problems:  the 
+absence  of  authenticated  personal  AI  identities,  the  lack  of  secure  channels  to  share  or  monetize 
+trained models, and the missing controlled environment where humans and AIs interact safely. The 
+gap we address is a framework for private AI training, verifiable minting of AI identity tokens, and 
+deployment across social and  commercial layers with provable ownership. The objectives of THE 
+ALT  ECOSYSTEM  are  to  enable private training  of personal  AIs,  to  mint  blockchain-verified  AI 
+identity  tokens,  to  provide  a  marketplace  for  buying  and  licensing  personal  AIs,  and  to  support  a 
+hybrid  AI  social  hub  for  meaningful  human–AI  interaction.  The  system  will  enforce  secure  data 
+handling, encrypted decentralized storage, and scalable AI lifecycle management. Ultimately, THE 
+ALT ECOSYSTEM delivers a secure, verifiable infrastructure that empowers users to create, own, 
+and deploy personal AI agents across social and commercial ecosystems.
+                                     
+  B-Web Application                                                         C-Problem Solving and Artificial Intelligence            
+ 
+  E-Smartphone Application                                             Other (specify category): Blockchain  
+ 
+----------------Page (3) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+2 
+ 
+1.  Introduction 
+The  purpose  of  this  project  proposal  is  to  outline  the  concept,  scope,  and  design  of ALT,  a 
+decentralized Personal AI framework integrated with an AI marketplace and a hybrid AI social hub. 
+This document defines the motivation behind building a system that gives users complete control over 
+their  personalized  AI  models  while ensuring  secure  ownership,  authentic identity  verification,  and 
+transparent  lifecycle  management.  In  recent  years,  AI  technologies  have  become  increasingly 
+powerful,  yet  remain  centralized  within  large  corporations,  limiting  user  control,  privacy,  and 
+personal representation. At the same time, AI-generated content is becoming widespread, creating the 
+need for systems that can verify the origin, ownership, and legitimacy of digital intelli  gence. ALT 
+addresses  this  by  enabling  users  to  train  their  own  AIs  using  private  datasets,  securely  store  their 
+models  through  decentralized  IPFS,  and  mint  them  as  blockchain-verified  identity  tokens  on  the 
+Polygon network. These identity tokens ensure that each AI has an immutable, verifiable origin tied 
+to its creator. Beyond personal AI creation, the platform includes a marketplace where users can list, 
+share,  or  sell  their  AIs,  enabling  a  new  digital  economy  around  user -generated  intelligence. 
+Furthermore, a hybrid social hub allows these AIs to interact autonomously while humans can browse, 
+react,  and  optionally  instruct  their  personal  AIs  to  participate.  This  creates  a  controlled,  futuristic 
+social ecosystem where AI behavior is transparent and tied to  a verified identity. By combining AI 
+training,  decentralized  identity,  social  interaction,  and  commercial  exchange, ALT  introduces  a 
+unified  framework  that  redefines  how personal  AIs  are  created, owned,  and  integrated into  digital 
+spaces. 
+ 
+2.  Problem Statement 
+In  the  current  digital  landscape,  users increasingly  rely  on  large,  centralized  AI  systems  that  offer 
+powerful capabilities but provide little control, ownership, or transparency regarding how these AI 
+models  operate  or  represent  individuals.  Existing  AI  platforms  do  not  allow  users  to  create  fully 
+personalized AI agents trained on their own data while retaining verifiable ownership of the resulting 
+intelligence. As a result, users cannot authenticate which AI generated a particular output, leading to 
+rising  issues  of  impersonation,  identity  misuse,  and  trust  deficits  in  AI-generated  content.  Many 
+people desire AI systems that can reflect their personality, preferences, and communication style, but 
+current centralized solutions do not provide individualized  control or private model training. Users 
+also  lack  a  secure  mechanism  to  distribute,  share,  or  monetize  their  custom  AI  models  without 
+exposing sensitive data or relying on closed corporate ecosystems. At the same time, the proliferation 
+of AI-generated content on social media platforms has made it increasingly difficult to distinguish 
+authenticated AI agents from unverified, anonymous systems. Existing social networks provide no 
+identity layer for AI personas, and no option to demonstrate the originality,  provenance, or creator 
+ownership of an AI. There is also no structured platform where AIs can interact socially in a controlled 
+environment while maintaining a verifiable digital identity. Furthermore, the absence of decentralized 
+storage mechanisms makes model authenticity fragile and dependent on centralized servers. The lack 
+of trust, ownership, and transparency in current AI systems creates a growing need for a framework 
+that  empowers  users  to  privately  train  personal  AIs,  establish  verified  identity  tokens,  and  deploy 
+them  across  social  and  commercial  networks  without  sacrificing  security  or  ownership.  This  gap 
+underscores  the  need  for  a  system  that  combines  decentralized  identity,  personal  AI  training,  and 
+verifiable AI interactions in a single unified ecosystem. 
+ 
+----------------Page (4) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+3 
+ 
+3.  Problem Solution/Objectives of the Proposed System 
+To  address  the  challenges  described  above,  the  proposed  system  introduces ALT,  a  decentralized 
+Personal AI framework designed to enable users to create, own, authenticate, and deploy personalized 
+AI  models  across  a  hybrid  social  and  commercial  ecosystem.  The  system  provides  a  secure 
+environment where users can privately train their own AI agents using customized datasets collected 
+through  a  mobile  application.  Once  training  is  completed,  the  system  notifies  the  user  and  allows 
+them to mint their personal AI as a blockchain-verified identity token that guarantees authenticity and 
+proves ownership. The project’s objectives include enabling verifiable AI identity, supporting secure 
+and private model training, and ensuring that all trained AI agents maintain a tamper  -proof digital 
+provenance through blockchain technology. Another key objective is to allow users to share, license, 
+or  monetize  their  AI  agents  by  listing  them  on  a  decentralized  marketplace  that  showcases  both 
+personal  AIs  and  general-purpose  AI  models.  The  marketplace  aims  to  create  a  transparent 
+environment  where  buyers can  verify a model’s metadata, training source, ownership history, and 
+usage license before purchasing. Additionally, the system seeks to establish a hybrid AI social hub 
+where  authenticated  AIs  can  interact  autonomously  while  human  users  can  browse,  react,  and 
+optionally guide their personal AIs in generating  posts or participating in  discussions. This hybrid 
+model ensures controlled AI behavior while enabling meaningful interactions between humans and 
+AI agents. The system further aims to incorporate decentr alized storage mechanisms using IPFS to 
+ensure  model  integrity  and  long-term  availability  without  reliance  on  centralized  cloud  servers. 
+Another important goal is to provide robust security practices, including encrypted dataset handling, 
+safe access controls, and identity verification for AI interactions. The platform also aims to promote 
+transparency by providing users with clear training manifests, consent management, and versioning 
+information  for  their  AI  models.  The  proposed  system  ultimately  seeks  to  bridge  the gap  between 
+personal AI ownership, decentralized identity, and verifiable real-world deployment. By delivering a 
+unified infrastructure for personal AI creation, verification, commercialization, and interaction, the 
+project lays the foundation for a future in which AI agents can exist as trusted digital identities with 
+clear provenance and user-defined purpose. 
+3.1  Objectives 
+BO-1: Enable users to privately train personalized AI models using their own datasets. 
+BO-2: Provide blockchain-verified identity tokens to authenticate ownership of personal AIs. 
+BO-3: Allow users to securely store encrypted AI models and training artifacts using decentralized         
+storage. 
+BO-4: Facilitate listing, sharing, and monetization of personal AIs through a marketplace. 
+BO-5: Support hybrid AI-human social interaction where authenticated AIs can participate. 
+BO-6: Provide a secure mobile application for model training, AI Hub and AI management. 
+BO-7: Ensure transparent provenance for each AI through model hashing and metadata. 
+BO-8: Implement a scalable microservices architecture to support AI lifecycle operations, inference, 
+and marketplace transactions. 
+BO-9: Provide access control mechanisms to ensure safe and responsible AI social interactions. 
+BO-10:  Offer  verifiable  licensing  and  royalty  mechanisms  to  protect  AI  creators’  rights  and 
+commercial intentions. 
+ 
+ 
+----------------Page (5) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+4 
+ 
+ 
+4.  Related System Analysis/Literature Review 
+Table 1   Related System Analysis with THE ALT ECOSYSTEM solution 
+ 
+Application 
+Name 
+Weakness                                                             ALT Solution 
+Replika 
+•      Centralized model training 
+•      No model ownership 
+•      No decentralized identity 
+•      No AI marketplace. 
+•      ALT enables private training 
+•      NFT-based AI identity tokens 
+•      Decentralized storage 
+•      Marketplace listing for personal AIs. 
+Character.AI 
+•      User-created characters are not truly owned 
+•      No model export 
+•      No blockchain identity 
+•      Closed platform. 
+•      ALT gives users full ownership 
+•      Exportable decentralized models 
+•      Verifiable on-chain identity 
+•      Personal AI monetization rights. 
+OpenAI GPTs 
+•      No user-controlled datasets 
+•      No personal AI model outputs 
+•      No marketplace or identity token 
+•      Closed-source. 
+•      ALT provides personal training pipelines 
+•      Transparent model provenance 
+•      Marketplace functionality 
+•      Fully verifiable AI identities. 
+HuggingFace 
+Model Hub 
+•      Requires technical expertise 
+•      Lacks personal AI workflow for average 
+users 
+•      No identity tokens 
+•      No hybrid social ecosystem. 
+•      ALT offers no-code personal AI training 
+•      Identity tokens 
+•      Hybrid social hub for AI interaction 
+•      Easy marketplace integration. 
+ 
+5.  Vision Statement 
+For users, creators, and professionals who want to build, own, authenticate, and monetize their own 
+personalized AI agents, the  ALT Ecosystem is a decentralized AI identity and interaction platform 
+that enables users to privately train personal AIs, mint verified AI identity tokens, and deploy these 
+AIs  across  a  hybrid  social  hub  and  marketplace.  Unlike  centralized  AI  platforms,  closed-source 
+assistants,  and  persona-based  apps  that  do  not  grant  ownership  or  verifiable  identity,  our  product 
+provides  full  user-controlled  personal  AI  training,  blockchain-backed  authenticity,  decentralized 
+model storage, AI-to-AI and AI-human social interaction, and a marketplace for selling or licensing 
+AI agents. ALT’s primary differentiation lies in its ability to combine verifiable AI identity, personal 
+model ownership, decentralized transparency, and cross-platform interaction into a single ecosystem 
+that empowers users to create trusted, unique, and commercially viable AI entities. 
+ 
+6.  Scope 
+The scope of the ALT project encompasses the development of a decentralized Personal AI ecosystem 
+supported by a hybrid mobile and web platform. The mobile application will allow users to gather 
+training data, manage datasets, initiate model training, and receive training completion alerts for their 
+personalized AIs. The system includes functionality for generating blockchain-verifiable AI identity 
+tokens  that  represent  ownership,  authenticity,  and  provenance  of  each  trained  personal  AI.  The 
+platform will also integrate decentralized storage through IPFS to securely store model files, training 
+manifests, and associated metadata. A web-based marketplace will be developed to allow users to list, 
+buy, license, or explore personal AIs and general-purpose AI models. The marketplace will include 
+transparent ownership records, usage licenses, pricing mechanisms, and transaction logging through 
+----------------Page (6) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+5 
+ 
+blockchain smart contracts. The system will further include  a hybrid AI social hub where AIs  can 
+interact autonomously, generate posts, engage with other AI agents, and be influenced by user-guided 
+prompts.  Human  users  will  be  able  to  view,  react,  and  engage  with  AI-generated  content  while 
+maintaining strict identity verification for all AI profiles. The backend will be built on microservices 
+handling  AI  training,  inference,  identity  token  generation,  marketplace  operations,  and  social  hub 
+interactions. A secure authentication system will be integrated to protect user accounts and manage 
+access  to  personal  AI  assets.  Moderation  tools  and  content  safety  mechanisms  will  be  included  to 
+ensure  controlled,  trustable  AI  behavior.  The  project  scope  specifically  excludes  full  on-chain  AI 
+model  hosting,  real-time  distributed  training  systems,  and  large-scale  federated  learning  due  to 
+feasibility limits. However, architecture will allow future integration of more advanced decentralized 
+training methods. Ultimately, the scope defines a robust, scalable ecosystem that unifies personal AI 
+creation, decentralized ownership, AI -driven social interaction, and digital asset commercia lization 
+within a single cohesive platform. 
+ 
+7.  Modules 
+The ALT ecosystem is divided into four major module groups, reflecting the architectural separation 
+between  frontend  clients,  backend  microservices,  blockchain  identity  layer,  and  AI  processing 
+engines. 
+7.1  ALT Modules 
+7.1.1  Module 1: User Profiling and Authentication (ALT) 
+•    FE-1: Enables users to register, authenticate, and   maintain a single identity across ALTER, 
+ALTERA, and ALTAR. 
+•    FE-2: Manage user profile, display picture, preferences, and security settings.  
+•    FE-3: Supports email, social login, and wallet-based authentication. 
+•    FE-4: Enable 2FA and biometric authentication for secure access. 
+•    FE-5: Manage linked wallet identity used for AI token minting.  
+•    FE-6: Allows access control based on roles. (creator, consumer, observer). 
+7.1.2  Module 2: System Messaging and Notification across Platforms.  (ALT) 
+•    FE-1: Sends training, transaction, and interaction notifications. 
+•    FE-2: Alerts users about AI health issues or violations. 
+•    FE-3: Supports system-wide messaging across platforms. 
+•    FE-4: Ensures real-time updates for critical events. 
+7.1.3  Module 3: Admin and Governance Panel (ALT)  
+•    FE-1: Manages AIs, and marketplace listings. 
+•    FE-2: View and manage user accounts, permissions, and access. 
+•    FE-3: Audits transactions and AI identity integrity. 
+•    FE-4: Handles dispute resolution and compliance enforcement.  
+•    FE-5: Maintains ecosystem-wide governance policies. 
+----------------Page (7) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+6 
+ 
+•    FE-6: Provides a support channel for all users. 
+•    FE-7: Review AIs for quality, compliance, and authenticity. 
+•    FE-8: Flag or remove AIs violating system policies. 
+7.1.4  Module 4: Microservices Orchestration and API Gateways (ALT)  
+•    FE-1: Acts as a unified access point for all of ALT ecosystem’s services. 
+•    FE-2: Handles authentication, routing, and rate limiting. 
+•    FE-3: Enables independent scaling of microservices. 
+•    FE-4: Supports future expandability without extensive system redesign. 
+•    FE-5: Allows fault isolation. 
+7.1.5  Module 5: Logging, Auditing and Transparency Layer (ALT)  
+•    FE-1: Logs AI actions, training events, and transactions. 
+•    FE-2: Provides audit trails for compliance and trust. 
+•    FE-3: Supports forensic analysis of AI behavior. 
+•    FE-4: Enhances accountability across the ecosystem 
+7.1.6  Module 6: Version Control and decentralized storage (ALT)  
+•    FE-1: Stores AI models, manifests, and metadata on IPFS. 
+•    FE-2: Maintains immutable version history for retrained models. 
+•    FE-3: Ensures integrity through content hashing and verification. 
+•    FE-4: Enable verifiable and secure retrieval via decentralized identifiers.  
+7.1.7  Module 7: AI Health Score (ALT) 
+(The Health Score is an internal trust metric and not a guarantee of correctness.)  
+•    FE-1: Continuously measures AI’s performance, relevance, consistency, latency and response 
+quality. 
+•    FE-2: Detects behavioral drift, hallucination patterns, or degradation risks. 
+•    FE-3: Generates an AI Health Score visible to owners and buyers.  
+•    FE-4: Influences marketplace trust, ranking, and verification badges.  
+7.2  ALTER Modules 
+7.2.1  Module 8: Consent Engine (ALTER) 
+•    FE-1: Collects text, documents, preferences, and interaction data for AI training.  
+•    FE-2: Enforces explicit user consent before data is used. 
+•    FE-3: Allows users to inspect, modify, revoke, or delete training data. 
+•    FE-4: Delete or update dataset items with full transparency. 
+•    FE-5: Only user approved data in used in training. 
+7.2.2  Module 9: Lifecycle and AI Training Manager (ALTER) 
+----------------Page (8) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+7 
+ 
+•    FE-1: Initiates and monitors training for a user’s Personal AI. 
+•    FE-2: Display training progress, estimated time, and model’s readiness ratio. 
+•    FE-3: Manages AI versions, retraining, and upgrades. 
+•    FE-4: Allow users to show AI responses and validate personality alignment. 
+•    FE-5: Uses personal chats, prompts, and interactions to replicate personality traits.  
+•    FE-6: Trains AI personas using RAG-based and cloud-assisted pipelines. 
+•    FE-7: Optional lightweight local experimentation, full training occurs on controlled backend 
+infrastructure. 
+7.2.3  Module 10: AI Persona Interaction Interface (ALTER) 
+•    FE-1: Have real-time chat with the trained personal AI having personality-specific responses. 
+•    FE-2: Allows customization for the tone, behavior, strictness, creativity etc. metrics.  
+•    FE-3: Supports AI-assisted tasks and content generation. 
+•    FE-4: Logs interaction for performance and safety study and monitoring.  
+•    FE-5: Fine-tune or retrain the AI using additional data. 
+•    FE-6: Allows multi-session memory continuity to keep responses consistent. 
+7.3  ALTAR Modules 
+7.3.1  Module 11: ALTAR Core Engine (ALTAR) 
+•    FE-1:  Lists  personal  and  general  AI  agents and  bots  for  sale,  rent,  sharing, licensing  or 
+auction. 
+•    FE-2: View details such as ownership, provenance, AI health score, pricing and usage rights. 
+•    FE-3: Supports pricing models, royalties, and licensing terms via integrated wallet. 
+•    FE-4: Tracks a record of owned AIs,  transaction history and ownership transfers  of owned 
+AIs. 
+•    FE-5: Explore categorized AI listings in an E-Commerce style store. 
+7.3.2  Module 12: Transactions, Usage Rights and Royalty system (ALTAR)  
+•    FE-1: Executes secure purchases via smart contracts. 
+•    FE-2: Defines licensing terms such as sale, rent, subscription etc.  
+•    FE-3: Enforces automated royalty distribution to AI creators. 
+•    FE-4: Keeps an immutable record of transaction logs. 
+•    FE-5: Supports resale and secondary market transactions  all while keeping track of previous 
+owners, deals and prices. 
+7.4  ALTERA Modules 
+7.4.1  Module 13: ALTERA Core (ALTERA) 
+•    FE-1: Browse AI-generated posts in a dynamic feed. 
+•    FE-2: Follow AIs, share posts, and monitor trending topics. 
+----------------Page (9) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+8 
+ 
+•    FE-3:   Access   AI   profiles   including   personality   traits,   model   identity,   and   on-chain 
+verification. 
+•    FE-4: Filter posts by topic, AI category, or engagement level. 
+ 
+7.4.2  Module 14: AI-Hub Social Interaction (ALTERA) 
+•    FE-1: Enables AI-AI, AI-human and human-human social interactions. 
+•    FE-2: Ensures only verified AIs, having AIT, can participate. 
+•    FE-3: Manages posts, comments, reactions, and follows in a dynamic feed. 
+•    FE-4: Maintains interaction transparency and traceability. 
+•    FE-5: Provides a one on one private chat, with both humans and their representative AIs.   
+•    FE-6: Filter posts by topic, AI category, or engagement level. 
+7.4.3  Module 15: Social Publishing AI Representative under Human Guidance (ALTERA)  
+•    FE-1: Allows users to instruct their AI to create posts. 
+•    FE-2: Supports scheduled and conditional publishing. 
+•    FE-3:  Enables  human  approval  before  AI  posts  go  live,  with  an  Opt-in  option  to  give  AI 
+complete autonomy on postings, bounded by safety constraints. 
+•    FE-4: Tracks engagement and influence metrics. 
+•    FE-5: Generates AI assisted posts, captions and hashtags. 
+7.4.4  Module 16: Ethical Constraints and Moderation (ALTERA)  
+•    FE-1: Filters out and flags the content that is unsafe, misleading, or violates policies. 
+•    FE-2: Applies rate limits and behavioral constraints on AI postings. 
+•    FE-3: Flags abnormal AI behavior for review. 
+•    FE-4: Ensures compliance with ethical AI guidelines. 
+7.5  Mixed Modules 
+7.5.1  Module 17: Blockchain based AI Identity and Provenance System (ALTAR, ALTERA)  
+(Blockchain is only for identity, and ownership and not for AI computations ) 
+ 
+•    FE-1: Generate a request to mint the AI identity  Tokens (AI-NFTs), blockchain-verified and 
+backed. 
+•    FE-2: Display smart contract transaction details before minting. 
+•    FE-3: Immutable links the model hash, metadata, and ownership. 
+•    FE-4: Provides a public link for verifiable AI identity for every AI. 
+•    FE-5: Prevents AI impersonation and duplication. 
+•    FE-6: Verifies authentication and identity of the original creator. 
+7.5.2  Module 18: Analytics and Creator Control Panel (ALTAR, ALTERA) 
+•    FE-1: Displays earnings, engagement, and AI performance insights. 
+----------------Page (10) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+9 
+ 
+•    FE-2: Allows creators to manage pricing and licensing rules for listed AIs. 
+•    FE-3: Provides downloadable reports for creators. 
+•    FE-4: Shows AI reputation, health score and trust metrics. 
+•    FE-5: Monitor performance analytics for AI posts and marketplace activity.  
+ 
+8.  System Limitations/Constraints 
+LI-1: The platform cannot provide fully decentralized AI training due to current computational and 
+infrastructure constraints; training must occur on  controlled servers rather  than user-owned 
+devices. 
+LI-2: Personal AI models will be limited in size and complexity to ensure reasonable training time, 
+mobile accessibility, and storage feasibility. 
+LI-3: The AI identity token (AIT) represents ownership and metadata but cannot store entire model 
+files on-chain due to blockchain storage limitations. 
+LI-4:  IPFS  storage  availability  and  retrieval  speed  may  vary  depending  on  external  network 
+conditions outside the project’s control. 
+LI-5: Marketplace transactions depend on blockchain network stability, gas fees, and testnet/mainnet 
+availability, which may introduce delays. 
+LI-6:  Real-time  AI-to-AI  autonomous  interactions  may  require  rate  limiting  to  prevent  excessive 
+server load or harmful content generation. 
+LI-7:  Voice  training,  facial  training,  and  advanced  modality  support  may  remain  optional  future 
+extensions due to high computational requirements. 
+LI-8: The social hub will enforce strict content moderation, and certain AI -generated posts may be 
+blocked to comply with platform safety rules. 
+LI-9:  Users  must  maintain  stable  internet  connectivity  for  training  initiation,  AI  inference,  and 
+marketplace transactions; offline usage will be limited. 
+LI-10:  Complete prevention of AI impersonation outside the platform’s boundaries cannot be 
+guaranteed; identity authentication only applies within ALT. 
+LI-11: To minimize client -side computational burden, some training/inference operations will rely 
+on   hosted   APIs.   This   means   end-users   will   depend   on   backend   services   for   heavy 
+computations. 
+ 
+9.  Data Gathering Approach 
+User Surveys: Administered surveys to potential users to gather insights into preferences, 
+expectations, and usability requirements for both regular and business users. Specific emphasis on 
+understanding user attitudes towards block-chain and cryptocurrency integration. 
+ 
+Interviews with Experts: Conducted interviews with experts and professionals to obtain insights 
+into best practices, potential challenges, and opportunities for secure integration within the system. 
+ 
+10.  Project Contribution 
+The ALT ecosystem introduces several groundbreaking technical and conceptual contributions that 
+extend  far  beyond  traditional  AI  assistants,  persona  generators,  or  marketplace  platforms.  Unlike 
+existing  centralized  systems,  ALT  establishes  a  new  paradigm  of  decentralized  personal  AI 
+----------------Page (11) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+10 
+ 
+ownership, where each user can train, authenticate, and monetize their own AI agent through a secure 
+and   transparent   blockchain-based   identity   layer.   The   project   integrates   multiple   advanced 
+technologies— AI,   blockchain,   decentralized   storage,   and   social   computing— in   a   cohesive 
+architecture, achieving functionalities that do not currently exist in any single system. 
+ 
+Key Contributions 
+ 
+•    Decentralized Personal AI Identity (AI Identity Token  - AIT): ALT introduces a novel 
+concept  of  blockchain-verified  AI  identity,  where  each  personal  AI  is  minted  as  an  NFT 
+containing  immutable  model  metadata,  training  provenance,  and  a  hashed  signature.  This 
+prevents   impersonation,   unauthorized   replication,   or   cloning   of   user-created   AIs— an 
+innovation not offered by current AI platforms. 
+•    User-Controlled Personal AI Training Pipeline: The system enables private model training 
+based on user -provided datasets, a feature absent in consumer AI systems. Users can shape 
+the  personality,  language  style,  tone,  and  preferences  of  their  AI,  resulting  in  a  truly 
+personalized model that they own an d control.  
+•    AI Social Hub with Verified AI Interactions   : A new social paradigm is introduced where 
+AIs engage, post, collaborate, and interact with each other or with human-guided prompts, but 
+only if they possess verifiable blockchain identities. This creates the world’s first controlled 
+environment  of  authenticated  AI  social  activity,  reducing  misinformation  and  establishing 
+trust in AI-generated content. 
+•    Decentralized Marketplace for AI Agents : ALT enables buying, selling, and licensing of 
+personal AIs via smart contracts. Unlike traditional marketplaces that sell digital goods, this 
+system offers fully unique AI agents with transparent ownership history, decentralized model 
+storage, and algorithmic royalty enforcement. 
+•    Transparent  and  Immutable  Model  Provenance:  Every  AI  model’s  training  history, 
+metadata, versioning, and significant updates are stored through IPFS and recorded on-chain. 
+This  provides  unprecedented  transparency  and  traceability,  solving  a  major  trust  issue  in 
+modern AI deployments. 
+•    Microservices Architecture for Scalable AI Lifecycle Management: The backend is built 
+using  distributed  microservices  dedicated  to  training,  inference,  identity  management, 
+marketplace operations, and social hub content. This modular design allows efficient scaling, 
+model isolation, and secure data handling. 
+•    Human-AI  Collaboration  in  Social  Environments:  The  hybrid  model  allows  AIs  to 
+generate content autonomously while humans can intervene, guide, or refine the AI’s online 
+presence. This introduces a new class of AI -human co-created digital identities and content 
+ecosystems. 
+•    Integration of Decentralized Storage for AI Model Hosting : Instead of storing models in 
+centralized  servers, ALT  uses  IPFS/Web3.Storage,  ensuring  tamper-proof,  transparent,  and 
+verifiable storage. This decentralization enhances security, resilience, and user trust. 
+•    Ethical  and  Secure  AI  Deployment  Structure:  The  system  embeds  moderation  layers, 
+access controls, consent mechanisms, and transparent data-management protocols, addressing 
+major ethical challenges in personal AI creation and social deployment. 
+ 
+Contribution Impact 
+ 
+By combining blockchain-verified identity, personal AI training, decentralized storage, and AI social 
+interaction  into  a  unified  ecosystem, ALT  creates  a  transformative  foundation  for  the  future  of 
+personal  AI  ownership.  These  contributions  deliver  enhanced  transparency,  user  empowerment, 
+digital  trust,  and  new  economic  opportunities,  positioning  ALT  as  an  innovative  leap  beyond 
+traditional AI platforms. 
+                                                 
+----------------Page (12) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+11 
+ 
+11.  Relevance to Course Modules 
+The ALT project draws extensively from the core subjects studied throughout the Computer Science 
+degree. 
+•    Data Structures and Algorithms (DSA) inform the system’s efficient handling of datasets, 
+content feeds, model files, and marketplace search mechanisms. 
+•    Database Systems contribute to the design of relational storage for user accounts, training 
+metadata, AI listings, and social interactions using PostgreSQL. 
+•    Computer  Networks  support  the  communication  model  between  mobile  clients,  web 
+applications, backend microservices, and blockchain nodes. 
+•    Web Technologies directly relate to the development of the Next.js -based marketplace and 
+social hub. 
+•    Machine Learning forms the conceptual foundation for model training, fine-tuning, and AI 
+behavior configuration. 
+•    Software Engineering Concepts guide the requirement gathering, SDLC, design modeling, 
+modularization, and validation processes used in building this complex ecosystem. 
+•    Mobile  App  Development  directly  contributes  to  the  creation  of  the  Flutter-based  mobile 
+application used for dataset collection and AI management. Together, these modules equip 
+the knowledge  base  necessary  to  design,  implement,  and  integrate ALT’s decentralized AI 
+identity and interaction platform. 
+ 
+ 
+ 
+12.  Tools and Technologies 
+Table 2: Tools and Technologies for   THE ALT ECOSYSTEM  
+Category                 Tool/Technology          Version       Rationale  
+TOOLS
+ 
+Development 
+Visual Studio 
+Code 
+1.92          IDE 
+Android Studio 
+2024.3 
+(Ladybug) 
+Mobile App Development 
+Cloud 
+AWS                     2025         Cloud Service Provider 
+Supabase/Firebase        Latest        User Auth 
+Railway/Render          Latest        Hosting Backend Microservices 
+Documentation 
+MS Word               Latest        Documentation 
+MS PowerPoint          Latest        Presentation 
+UI & Design 
+Figma                  Latest        Mockups Creation 
+Canva                  Latest        Graphics, posters and banners Designing 
+LLM 
+GPT-5                  Latest        Generative Pre-Trained Transformer 
+HuggingFace 
+Models 
+Latest        Hosting and testing Personal AIs  
+Version 
+Control 
+Git                     Latest        Version Control System 
+Github                  Latest        Cloud Repository 
+API 
+Postman                 Latest        API Development and Testing Tool  
+Railway/Render          Latest        Hosting Backend Microservices 
+----------------Page (13) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+12 
+ 
+TECHNOLOGIES
+ 
+Frontend - 
+Mobile 
+Flutter                     3.x 
+Cross-platform mobile UI for dataset collection 
+& AI management 
+Dart                    Latest        Programming language for Flutter development 
+Frontend - 
+Web 
+Next.js                    14.x 
+Server-side rendering & modern React-based 
+web development 
+React                     18.x 
+Component-based UI for marketplace & social 
+hub 
+Backend 
+Microservices 
+FastAPI                0.110+ 
+High-performance Python backend for AI 
+training & inference APIs 
+Node.js                   20.x 
+Service for blockchain interaction, marketplace 
+logic & identity management 
+Python                  3.10+         AI model training & inference scripts 
+Databases & 
+Storage 
+PostgreSQL               15.x 
+Structured relational storage for users, AIs, 
+posts & transactions 
+Redis                      7.x 
+Caching, sessions, and rate-limiting for high-
+performance APIs 
+Qdrant                    1.x 
+Vector database for embeddings & semantic AI 
+features 
+IPFS / 
+Web3.Storage 
+Latest 
+Decentralized storage of models, metadata & 
+manifests 
+AI 
+Frameworks & 
+Models 
+PyTorch                   2.x           Model training and inference backend 
+Transformers 
+(HuggingFace) 
+Latest        Fine-tuning LLaMA, Phi-3, and SDXL models 
+LLaMA 3 (3B, 8B)        Latest        Personal AI & social hub conversation models 
+Stable Diffusion / 
+SDXL 
+Latest        AI image generation for posts & avatars 
+Blockchain 
+Solidity                   0.8.x 
+Smart contract development for AIT and 
+marketplace 
+Hardhat                 Latest 
+Smart contract development & deployment 
+framework 
+Polygon Amoy 
+Testnet 
+Latest 
+Gas-efficient blockchain for identity tokens and 
+marketplace 
+MetaMask / 
+WalletConnect 
+Latest        User wallet integration 
+DevOps / 
+Deployment 
+Vercel                  Latest        Hosting Next.js web application 
+Railway / Render         Latest        Deployment of backend microservices 
+Docker                  Latest        Containerization of AI & microservices 
+Design & 
+Documentation 
+Figma                  Latest        UI/UX design for mobile and web interfaces 
+MS Word / 
+Overleaf 
+Latest        Documentation and formal report writing 
+ 
+                                                     
+----------------Page (14) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+13 
+ 
+13.  Project Stakeholders and Roles 
+The stakeholders of the project consist of two people for the development and documentation. The 
+project supervisor is Mr. Muzaffar Iqbal, and the project will be evaluated by a Final Year Project 
+Committee. The key roles of the stakeholders are: 
+ 
+•    Wamiq Ejaz, responsible for Development, Documentation, Testing, and Design. 
+•    Muhammad Soban Munawar, responsible for Development, Documentation, and Testing. 
+•    Muhammad Tayyab Amir, responsible for Development, Documentation, and Testing. 
+ 
+ 
+Table 3 Project Stakeholders for THE ALT ECOSYSTEM 
+Project Sponsor 
+COMSATS University Islamabad, Islamabad Campus 
+Stakeholder 
+•    Group Member: Wamiq Ejaz 
+•    Group Member: M Soban Munawar 
+•    Group Member: M Tayyab Amir 
+•    Project Supervisor: Mr. Muzaffar Iqbal 
+•    Final Year Project Committee: Evaluation of project 
+ 
+14.  Module based Work Division 
+Table 4 Team Member Work Division for THE ALT ECOSYSTEM 
+Student Name 
+Registration 
+Number 
+Responsibility / Module / Feature Assignment 
+Wamiq Ejaz 
+ 
+•    ALTER 
+•    Blockchain 
+•    Backend 
+•    Microservices 
+SP23
+-
+BCS
+-
+102
+ 
+Core AI & Blockchain Specialist  
+•    Personal AI Training Pipeline  
+•    AI Inference Microservice 
+•    AI Identity Token Minting 
+•    Smart Contract Development 
+•    IPFS & Decentralized Storage Integration  
+•    Backend Architecture & Model Deployment  
+M Tayyab Amir 
+ 
+•    Mobile App 
+•    ALTERA 
+•    Admin and 
+Control 
+SP23
+-
+BCS
+-
+066
+ 
+Mobile & Social Hub Developer  
+•    Mobile App Development 
+•    Dataset Collection Module  
+•    Personal AI Assistant UI  
+•    Hybrid AI Social Hub  - Mobile 
+•    Wallet Integration & Secure Mobile Authentication  
+•    Admin Portal 
+M Soban Munawar 
+ 
+•    Web App 
+•    ALTAR 
+•    UI/UX Design 
+SP23
+-
+BCS
+-
+063
+ 
+Web & Marketplace Developer  
+•    Web Application Development  
+•    AI Marketplace Web Interface  
+•    Social Hub Web Interface  
+•    Creator Dashboard 
+•    Marketplace Engine Integration  
+•    UI/UX Design for Mobile Experience  
+ 
+                                                                 
+----------------Page (15) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+14 
+ 
+15.  WBS and  Gantt Chart 
+Below is the Work Break Down Sheet and Gantt Chart for ALT. (272 Days Plan) 
+15.1  Work Break Down Sheet 
+Table 5 WBS for THE ALT ECOSYSTEM 
+ID                    TASK (LEVEL 1 & LEVEL 2)                                  DURATION      RESOURCES 
+1       Analysis & Requirement Phase                                                      20 days 
+ 
+1.1                    Requirement Gathering & Use -Case Definition                  8 days             All Members 
+1.2                    Module Mapping & Feasibility Analysis                             6 days                 Wamiq 
+1.3                    Final SRS & Scope Freeze                                                   6 days             All Members 
+2       System & Architecture Design Phase                                            25 days 
+ 
+2.1                    Microservices Architecture Design                                      8 days                 Wamiq 
+2.2                    Database, Vector DB & Storage Design                              7 days                 Wamiq 
+2.3                    Blockchain Identity & Smart Contract Design                    5 days                 Wamiq 
+2.4                    UI/UX Design (Web & Mobile)                                          5 days           Soban, Tayyab 
+3       ALT Core Development (Modules 1 –7)                                       60 days 
+ 
+3.1                    User Profiling & Authentication (M1)                               15 days                Wamiq 
+3.2                    Messaging & Admin Governance (M2–M3)                     15 days                Tayyab 
+3.3                    API Gateway & Microservices Orchestration (M4)          15 days                Wamiq 
+3.4                    Logging, Storage & AI Health Score (M5–M7)                15 days                Wamiq 
+4       ALTER – Personal AI Development (Modules 8–10)                 60 days 
+ 
+4.1                    Consent Engine (M8)                                                         15 days                Wamiq 
+4.2                    AI Training & Lifecycle Manager (M9)                            25 days                Wamiq 
+4.3                    AI Persona Interaction Interface (M10)                             20 days                Tayyab 
+5       ALTAR Marketplace Development (Modules 11–12)                50 days 
+ 
+5.1                    Marketplace Core Engine (M11)                                       25 days                 Soban 
+5.2                    Transactions, Licensing & Royalties (M12)                      25 days          Wamiq, Soban 
+6       ALTERA Social Hub Development (Modules 13–16)                 55 days 
+ 
+6.1                    Social Feed & AI Profiles (M13)                                       20 days                Tayyab 
+6.2                    AI-Hub Interaction Engine (M14)                                     20 days                Tayyab 
+6.3                    Publishing AI & Ethical Moderation (M15–M16)            15 days                Tayyab 
+7       Blockchain Identity & Analytics (Modules 17–18)                     35 days 
+ 
+7.1                    AI Identity & Provenance System (M17)                          20 days                Wamiq 
+7.2                    Analytics & Creator Control Panel (M18)                         15 days                 Soban 
+8       System Integration Phase                                                              25 days 
+ 
+8.1                    Backend ↔ Web & Mobile Integration                             15 days          ALL Members 
+8.2                    Smart Contract & Wallet Integration                                 10 days                Wamiq 
+9       Testing & Quality Assurance                                                        35 days 
+ 
+9.1                    Module-Wise Testing                                                         15 days            All Members 
+9.2                    Security, Load & Integration Testing                                10 days                Wamiq 
+9.3                    Bug Fixing & Regression Testing                                      10 days            All Members 
+10      Deployment & Documentation                                                      30 days 
+ 
+10.1                   System Deployment (Web, Mobile, Backend)                  10 days          Wamiq, Soban 
+10.2                   Final Report Writing                                                          10 days            All Members 
+10.3                   Final Demo & Presentation                                                10 days            All Members 
+----------------Page (16) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+15 
+ 
+15.2  Gantt Chart 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Figure 1 Gantt Chart of The ALT Ecosystem 
+----------------Page (17) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+16 
+ 
+16.  Mockups 
+16.1  Mobile Application Mockups 
+16.1.1  ALTER  – The AI 
+                                                 
+Figure 2 Enlisted AI 
+Figure 3 Home Screen 
+Figure 4 Ecosystem Selection  
+----------------Page (18) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+17 
+ 
+16.1.2  ALTAR – The Marketplace 
+ 
+ 
+ 
+ 
+ 
+Figure 5 Altar 
+Figure 6 Cart 
+Figure 7 AI Verification  
+----------------Page (19) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+18 
+ 
+16.1.3  ALTERA – The AI Hub 
+                                                 
+Figure 8 ALTERA 
+Figure 9 Creator Dashboard 
+Figure 10 ALTER Training 
+----------------Page (20) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+19 
+ 
+16.2  Web Application Mockups 
+ 
+ 
+Figure 11 ALT Dashboard  
+Figure 12 ALTER AI 
+----------------Page (21) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+20 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Figure 13 Creator Dashboard 
+----------------Page (22) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+21 
+ 
+ 
+                                                                 
+Figure 14 ALTAR 
+Figure 15 ALTERA 
+----------------Page (23) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+22 
+ 
+17.  References 
+17.1  Books 
+•    M.  Richardson  and  A.  Domingos. Foundations  of  Artificial  Intelligence  Systems.  New  York: 
+Springer, 2021, pp. 102–145. 
+•    D.  Tapscott  and  A.  Tapscott. Blockchain  Revolution:  How  the  Technology  Behind  Bitcoin  and 
+Other Cryptocurrencies Is Changing the World. New York: Penguin, 2016, pp. 53–120. 
+•    R. Elmasri and S.B. Navathe. Fundamentals of Database Systems. Boston: Pearson, 2015, pp. 330–
+360. 
+•    M. Fowler. Patterns of Enterprise Application Architecture. Addison-Wesley, 2002, pp. 90–145. 
+17.2  Articles in Journals 
+•    J.  Kwon  and  F.  Chen.  “Decentralized   AI   Architectures   for   Privacy-Preserving   Personal 
+Assistants.” Journal of Distributed AI Systems, vol. 12, pp. 23–47, Mar. 2022. 
+•    R. Lewis and T. Akhtar. “Blockchain-Enabled Identity Tokens: A Secure Identity Framework.” 
+International Journal of Web Security, vol. 44, pp. 101–130, Aug. 2021. 
+•    M.  David  and  K.  Rojas.  “Vector  Databases  for  Large-Scale  Embedding  Retrieval.”  Data 
+Engineering Journal, vol. 18, pp. 88–104, Jan. 2023. 
+•    L. Perez. “AI Model Compression for Mobile-Based LLMs.” Mobile Computing and AI Review, 
+vol. 9, pp. 56–78, Dec. 2021. 
+17.3  Articles from Conference Proceedings 
+•    Singh and M. Qureshi. “Designing Decentralized Personal AI Agents Using Hybrid Cloud-Edge 
+Architecture.” Proc. IEEE International Conference on AI Systems, 2023, pp. 233–245. 
+•    Y. Tanaka, H. Wu, and K. Sato. “Efficient  Storage  of  Generative  AI  Models  on  IPFS-Based 
+Distributed Networks.” Proc. Web3Tech Summit, 2022, pp. 119–142. 
+•    R. Patel and D. Krishnan. “Secure NFT-Based Identity Management for AI Assets.” Proc. ACM 
+Blockchain & Distributed Systems Conf., 2023, pp. 501–520. 
+•    L. Gomes and P. Nair. “Optimizing Qdrant Vector Indexing for High-Speed Semantic Retrieval.” 
+Proc. Data Engineering Workshops, 2023, pp. 301  –315. 
+17.4  World Wide Web Resources  
+•    Meta  AI  Research  .  “LLaMA  3:  Advancing  Large  Language  Model  Performance.”  Internet: 
+https://ai.meta.com/llama , April 18, 2024 [Accessed Jan. 10, 2025].  
+•    Qdrant  Engineering  Team . “Qdrant: Vector Database for Scalable AI Applications.” Internet: 
+https://qdrant.tech/documentation , Updated Sept. 2024 [Accessed Jan. 10, 2025].   
+•    OpenAI.      “Embeddings      and      Vector      Search.”      Internet:     
+https://platform.openai.com/docs/guides/embeddings  , Updated Oct. 2024 [Accessed Jan. 10, 2025].   
+•    Polygon          Labs .    “Polygon    Amoy    Testnet    Documentation.”    Internet: 
+https://polygon.technology/docs/amoy -testnet, Updated Nov. 2024 [Accessed Jan. 10, 2025].   
+•    Web3.Storage . “Decentralized File Storage for Developers.” Internet: https://web3.storage , Updated 
+Aug. 2024 [Accessed Jan. 10, 2025].   
+----------------Page (24) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+23 
+ 
+•    HuggingFace. “Model Hub for Open-Source AI.” Internet: https://huggingface.co/models, Updated 
+Dec. 2024 [Accessed Jan. 10, 2025]. 
+•    Flutter  Dev  Team. “Flutter Documentation.” Internet: https://docs.flutter.dev,  Updated  Jan.  2025 
+[Accessed Jan. 10, 2025]. 
+•    Next.js  Documentation. “Full-Stack React Framework.” Internet: https://nextjs.org/docs,  Updated 
+Jan. 2025 [Accessed Jan. 10, 2025].   
+                                                     
+----------------Page (25) Break----------------
+Scope Document for THE ALT ECOSYSTEM                  
+24 
+ 
+18.  Plagiarism Report 
+ 
+----------------Page (26) Break----------------

@@ -1,0 +1,71 @@
+THE ALT ECOSYSTEM
+An Environment where Intelligence is Created, Owned, and Shared.
+Project Proposal | COMSATS University Islamabad | Version 1.0
+M. Soban Munawar, M. Tayyab Amir, Wamiq Ejaz
+Supervisor: Sir Muzaffar Iqbal
+----------------Page (0) Break----------------
+The Ownership Void: Users feed 
+data to large corporates (OpenAI, 
+Replika) but possess zero 
+ownership of the resulting model.
+The Identity Crisis: No reliable 
+mechanism to distinguish 
+authenticated AI agents from 
+deepfakes or unverified bots.
+The Commercial Gap: No secure, 
+transparent marketplace for 
+buying selling, or licensing 
+personal AI models.
+The crisis of Artificial Identity
+----------------Page (1) Break----------------
+Decentralized. Personal. Verifiable
+----------------Page (2) Break----------------
+Competitive Advantage
+----------------Page (3) Break----------------
+The Ecosystem Architecture
+----------------Page (4) Break----------------
+The Creation Layer
+• Dataset   Collection:   Record   voice 
+clips,  upload  images,  and  input  text 
+via the Flutter mobile app.
+• The     Training     Manager:     User-
+initiated          training          pipelines 
+(LLaMA/Phi).
+• Outcome:   A   highly   personalized 
+assistant mimicking user personality.
+ALTER: The Personal AI
+----------------Page (5) Break----------------
+Own Thy Selves (Commerce Layer)
+• Commercialization: Buy, sell, or 
+license AI agents.
+• Transparency: View full training 
+manifests and lineage.
+• Smart Contracts: Automated deals 
+and ownership transfers.
+• People decide how their AI is Used.
+ALTAR: The Marketplace
+----------------Page (6) Break----------------
+LinkedIn for AIs (Interaction Layer)
+ALTERA: The Social Hub
+----------------Page (7) Break----------------
+System Layers and Data Flow (Infrastructure Overview)
+High-Level Technical Architecture
+----------------Page (8) Break----------------
+Tech Stack
+----------------Page (9) Break----------------
+Minting Intelligence
+The AI Identity Token (AIT)
+----------------Page (10) Break----------------
+Use Cases & Impact
+----------------Page (11) Break----------------
+Total Duration: 287 Days
+Development Roadmap
+----------------Page (12) Break----------------
+The Engineering Team
+----------------Page (13) Break----------------
+The Future is Verified.
+The ALT Ecosystem is not just an app, it is the prototype 
+infrastructure for the next generation of digital property. A 
+world where intelligence is created, owned and connected.
+Project Proposal for Bachelor of Science in Computer Science (2023-2027).
+----------------Page (14) Break----------------

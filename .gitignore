@@ -1,0 +1,14 @@
+node_modules/
+flutter/
+.dart_tool/
+.pub-cache/
+.pub/
+build/
+*.iml
+*.log
+.DS_Store
+
+SRS Presentation/
+Plans/
+*.pdf
+*.docx
