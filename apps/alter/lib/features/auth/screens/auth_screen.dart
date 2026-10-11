@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/alt/alt_session.dart';
-import '../../../core/theme/colors.dart';
-import '../../../core/theme/gradients.dart';
-import '../../../core/theme/typography.dart';
-import '../../../shared/widgets/gradient_background.dart';
+import '../../../core/theme/ds.dart';
+import '../../../shared/ui/ui.dart';
 
 /// Sign in to (or create) the ALT account. The same account works in ALTERA and ALTAR.
 class AuthScreen extends StatefulWidget {
@@ -35,7 +33,7 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) => toast(context, message);
 
   Future<void> _run(Future<void> Function() action) async {
     if (!(_form.currentState?.validate() ?? false)) return;
@@ -144,61 +142,64 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? ALTColors.darkBgSurface01 : ALTColors.lightBgPage;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: GradientBackground(
-        baseColor: isDark ? ALTColors.darkBgPage : ALTColors.lightBgPage,
-        layers: isDark ? ALTGradients.alterDark : ALTGradients.alterLight,
-        animate: true,
-        child: SafeArea(
+    return Backdrop(
+      animate: true,
+      intensity: 1,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(Icons.psychology_alt_rounded, size: 56, color: ALTColors.irisViolet),
-                    const SizedBox(height: 12),
-                    const Text('ALTER', textAlign: TextAlign.center, style: ALTTypography.displayMedium),
-                    const SizedBox(height: 6),
-                    Text(
-                      _creating ? 'Create your ALT account and your personal AI.' : 'Sign in with your ALT account.',
-                      textAlign: TextAlign.center,
-                      style: ALTTypography.bodyMedium,
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: surface.withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: isDark ? ALTColors.darkBorderSubtle : ALTColors.lightBorderSubtle),
-                      ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const Center(child: AlterMark(size: 64)),
+                  const SizedBox(height: 18),
+                  Center(child: Text('ALTER', style: Ds.overline.copyWith(fontSize: 13, letterSpacing: 7, color: Ds.textSecondary))),
+                  const SizedBox(height: 28),
+                  Text(_creating ? 'Create your\ndigital twin.' : 'Your digital twin,\nverified.', textAlign: TextAlign.center, style: Ds.display),
+                  const SizedBox(height: 12),
+                  Text(
+                    _creating ? 'One ALT account for ALTER, ALTERA and ALTAR.' : 'Sign in with your ALT account.',
+                    textAlign: TextAlign.center,
+                    style: Ds.callout,
+                  ),
+                  const SizedBox(height: 32),
+                  AnimatedSize(
+                    duration: Ds.calm,
+                    curve: Ds.ease,
+                    child: Glass(
+                      padding: const EdgeInsets.all(18),
+                      radius: Ds.r4 - 4,
                       child: Form(
                         key: _form,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: _creating ? _createFields() : _signInFields(),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _creating ? _createFields() : _signInFields()),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Center(
+                    child: Pressable(
+                      onTap: _busy ? null : () => setState(() => _creating = !_creating),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: _creating ? 'Already have an ALT account?  ' : 'New to ALT?  ', style: Ds.callout),
+                            TextSpan(text: _creating ? 'Sign in' : 'Create an account', style: Ds.callout.copyWith(color: Ds.text, fontWeight: FontWeight.w600)),
+                          ]),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: _busy ? null : () => setState(() => _creating = !_creating),
-                      child: Text(_creating ? 'I already have an ALT account' : 'New here? Create an ALT account'),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'One ALT account works in ALTER, ALTERA and ALTAR.',
-                      textAlign: TextAlign.center,
-                      style: ALTTypography.bodySmall.copyWith(color: isDark ? ALTColors.darkTextMuted : ALTColors.lightTextMuted),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 28),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.lock_outline_rounded, size: 13, color: Ds.textTertiary),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text('One account · ALTER · ALTERA · ALTAR', textAlign: TextAlign.center, style: Ds.caption.copyWith(color: Ds.textTertiary))),
+                  ]),
+                ]),
               ),
             ),
           ),
@@ -210,7 +211,10 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _passwordField() => TextFormField(
         controller: _password,
         obscureText: _obscure,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) => _busy ? null : (_creating ? _createAccount() : _signIn()),
         enabled: !_busy,
+        style: Ds.body,
         validator: (v) {
           if (v == null || v.isEmpty) return 'Required';
           if (_creating && (v.length < 8 || !RegExp(r'[A-Za-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v))) {
@@ -219,24 +223,18 @@ class _AuthScreenState extends State<AuthScreen> {
           return null;
         },
         decoration: InputDecoration(
-          labelText: 'Password',
-          prefixIcon: const Icon(Icons.lock_outline),
+          hintText: 'Password',
+          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
           suffixIcon: IconButton(
-            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
             onPressed: () => setState(() => _obscure = !_obscure),
           ),
         ),
       );
 
   Widget _submit(String label, VoidCallback onPressed) => Padding(
-        padding: const EdgeInsets.only(top: 20),
-        child: FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: ALTColors.irisViolet, padding: const EdgeInsets.symmetric(vertical: 16)),
-          onPressed: _busy ? null : onPressed,
-          child: _busy
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : Text(label),
-        ),
+        padding: const EdgeInsets.only(top: 18),
+        child: Btn(label, expand: true, loading: _busy, onTap: _busy ? null : onPressed),
       );
 
   List<Widget> _signInFields() => [
@@ -244,14 +242,16 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _identifier,
           enabled: !_busy,
           validator: _required,
+          style: Ds.body,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Email or @handle', prefixIcon: Icon(Icons.person_outline)),
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(hintText: 'Email or @handle', prefixIcon: Icon(Icons.person_outline_rounded, size: 20)),
         ),
         const SizedBox(height: 12),
         _passwordField(),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton(onPressed: _busy ? null : _forgotPassword, child: const Text('Forgot password?')),
+          child: TextButton(onPressed: _busy ? null : _forgotPassword, child: Text('Forgot password?', style: Ds.caption.copyWith(color: Ds.textSecondary))),
         ),
         _submit('Sign in', _signIn),
       ];
@@ -261,23 +261,25 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _name,
           enabled: !_busy,
           validator: _required,
-          decoration: const InputDecoration(labelText: 'Your name', prefixIcon: Icon(Icons.badge_outlined)),
+          style: Ds.body,
+          decoration: const InputDecoration(hintText: 'Your name', prefixIcon: Icon(Icons.badge_outlined, size: 20)),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _handle,
           enabled: !_busy,
-          validator: (v) =>
-              RegExp(r'^[A-Za-z0-9_.]{3,30}$').hasMatch(v?.trim() ?? '') ? null : '3-30 letters, numbers, _ or .',
-          decoration: const InputDecoration(labelText: 'Handle', prefixText: '@', prefixIcon: Icon(Icons.alternate_email)),
+          style: Ds.body,
+          validator: (v) => RegExp(r'^[A-Za-z0-9_.]{3,30}$').hasMatch(v?.trim() ?? '') ? null : '3-30 letters, numbers, _ or .',
+          decoration: const InputDecoration(hintText: 'Handle', prefixIcon: Icon(Icons.alternate_email_rounded, size: 20)),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _email,
           enabled: !_busy,
+          style: Ds.body,
           keyboardType: TextInputType.emailAddress,
           validator: (v) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v?.trim() ?? '') ? null : 'Enter a valid email',
-          decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline)),
+          decoration: const InputDecoration(hintText: 'Email', prefixIcon: Icon(Icons.mail_outline_rounded, size: 20)),
         ),
         const SizedBox(height: 12),
         _passwordField(),

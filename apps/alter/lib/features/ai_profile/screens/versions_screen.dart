@@ -9,6 +9,7 @@ import '../../../core/alt/alt_session.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
+import '../../../shared/ui/ui.dart';
 import '../../../shared/widgets/gradient_background.dart';
 
 /// Every version of your AI: when it was built, what went into it, its public manifest on IPFS
@@ -87,7 +88,7 @@ class _VersionsScreenState extends State<VersionsScreen> {
       animate: false,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Version history', style: ALTTypography.headlineMedium), backgroundColor: Colors.transparent, elevation: 0),
+        appBar: topBar(context, title: 'Version history'),
         body: RefreshIndicator(
           onRefresh: _load,
           child: ListView(

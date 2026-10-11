@@ -6,6 +6,7 @@ import '../../../core/alt/alt_session.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
+import '../../../shared/ui/ui.dart';
 import '../../../shared/widgets/gradient_background.dart';
 
 /// What your AI remembers about you (Module 10 FE-6). Suggestions from chats wait for your approval;
@@ -131,19 +132,12 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
         initialIndex: suggested.isNotEmpty ? 0 : 1,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            title: const Text('Memories', style: ALTTypography.headlineMedium),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            bottom: TabBar(tabs: [Tab(text: 'Suggested (${suggested.length})'), Tab(text: 'Remembered (${kept.length})')]),
+          appBar: topBar(
+            context,
+            title: 'Memories',
+            bottom: TabBar(tabs: [Tab(text: 'Suggested · ${suggested.length}'), Tab(text: 'Remembered · ${kept.length}')]),
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            backgroundColor: ALTColors.irisViolet,
-            foregroundColor: Colors.white,
-            onPressed: _aiId == null ? null : _teach,
-            icon: const Icon(Icons.add),
-            label: const Text('Teach it something'),
-          ),
+          floatingActionButton: Btn('Teach it something', icon: Icons.add_rounded, onTap: _aiId == null ? null : _teach),
           body: _all == null
               ? Center(
                   child: _error == null
@@ -202,7 +196,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
         onRefresh: _load,
         child: items.isEmpty
             ? ListView(children: [Padding(padding: const EdgeInsets.only(top: 64), child: empty)])
-            : ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 96), children: [for (final m in items) tile(m)]),
+            : ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 110), children: [for (final m in items) Padding(padding: const EdgeInsets.only(bottom: 10), child: tile(m))]),
       );
 }
 

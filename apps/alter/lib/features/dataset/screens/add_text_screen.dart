@@ -2,11 +2,8 @@ import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/alt/ai_api.dart';
-import '../../../core/theme/colors.dart';
-import '../../../core/theme/gradients.dart';
-import '../../../core/theme/typography.dart';
-import '../../../shared/widgets/alt_button.dart';
-import '../../../shared/widgets/gradient_background.dart';
+import '../../../core/theme/ds.dart';
+import '../../../shared/ui/ui.dart';
 
 /// Write something for your AI to learn from. Pops `true` when saved.
 class AddTextScreen extends StatefulWidget {
@@ -55,36 +52,37 @@ class _AddTextScreenState extends State<AddTextScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GradientBackground(
-      baseColor: isDark ? ALTColors.darkBgPage : ALTColors.lightBgPage,
-      layers: isDark ? ALTGradients.alterDark : ALTGradients.alterLight,
+    return Backdrop(
       animate: false,
+      intensity: 0.35,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Write something', style: ALTTypography.headlineMedium), backgroundColor: Colors.transparent, elevation: 0),
+        appBar: topBar(context, title: 'Write something'),
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(Ds.gutter, 8, Ds.gutter, 16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. My weekends')),
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, children: [
+              TextField(controller: _title, style: Ds.title2.copyWith(fontSize: 20), decoration: const InputDecoration(hintText: 'Title, e.g. My weekends')),
+              const SizedBox(height: 14),
+              Text('THIS IS ABOUT', style: Ds.overline),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final e in _categories.entries)
                   ChoiceChip(label: Text(e.value), selected: _category == e.key, onSelected: (_) => setState(() => _category = e.key)),
               ]),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Expanded(
                 child: TextField(
                   controller: _body,
                   maxLines: null,
                   expands: true,
+                  style: Ds.body,
                   textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(hintText: 'Write in your own words. Your AI uses this to sound and think like you.', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(hintText: 'Write in your own words. Your AI uses this to sound and think like you.'),
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(width: double.infinity, child: ALTButton(label: 'Save', isLoading: _saving, onPressed: _saving ? null : _save)),
+              const SizedBox(height: 16),
+              Btn('Save', loading: _saving, expand: true, onTap: _saving ? null : _save),
             ]),
           ),
         ),

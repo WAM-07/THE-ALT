@@ -7,8 +7,10 @@ import 'dart:async';
 
 import '../../../shared/widgets/gradient_background.dart';
 import '../../../shared/widgets/alt_button.dart';
+import '../../../shared/ui/ui.dart';
 import '../../../shared/widgets/alt_card.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/ds.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/models/persona.dart';
@@ -335,15 +337,14 @@ class _Stage3AuthSplash extends StatefulWidget {
 }
 
 class _Stage3AuthSplashState extends State<_Stage3AuthSplash> {
-  final List<String> phrases = ["to grow", "to do life", "to be sovereign"];
-  final List<Color> colors = [ALTColors.irisViolet, ALTColors.jadeSurge, ALTColors.solarEmber];
+  final List<String> phrases = ['digital twin.', 'second self.', 'verified AI.'];
   int currentIndex = 0;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 2), (t) {
+    _timer = Timer.periodic(const Duration(milliseconds: 2200), (t) {
       if (mounted) setState(() => currentIndex = (currentIndex + 1) % phrases.length);
     });
   }
@@ -357,35 +358,34 @@ class _Stage3AuthSplashState extends State<_Stage3AuthSplash> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32.0),
+      padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Your space", style: ALTTypography.displayMedium),
+          const AlterMark(size: 52),
+          const SizedBox(height: 36),
+          Text('Meet your', style: Ds.display.copyWith(fontSize: 40)),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 500),
-            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(animation), child: child)),
-            child: Text(
-              phrases[currentIndex],
-              key: ValueKey(currentIndex),
-              style: ALTTypography.displayMedium.copyWith(color: colors[currentIndex]),
+            duration: const Duration(milliseconds: 700),
+            // The old phrase leaves before the new one arrives, so they never overlap.
+            switchInCurve: const Interval(0.45, 1, curve: Curves.easeOutCubic),
+            switchOutCurve: const Interval(0.55, 1, curve: Curves.easeIn),
+            layoutBuilder: (current, previous) => Stack(alignment: Alignment.centerLeft, children: [...previous, if (current != null) current]),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero).animate(animation), child: child),
             ),
+            child: AuroraText(phrases[currentIndex], key: ValueKey(currentIndex), style: Ds.display.copyWith(fontSize: 40)),
           ),
-          const SizedBox(height: 64),
-          SizedBox(
-            width: double.infinity,
-            child: ALTButton(label: "Get Started", onPressed: widget.onComplete),
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: TextButton(
-              onPressed: widget.onComplete,
-              child: const Text("I already have an account", style: TextStyle(color: ALTColors.lightTextMuted)),
-            ),
-          ),
+          const SizedBox(height: 18),
+          Text('An AI that speaks like you, learns only what you allow, and carries a verified identity wherever it goes.', style: Ds.callout.copyWith(fontSize: 15)),
+          const SizedBox(height: 44),
+          Btn('Create my AI', expand: true, onTap: widget.onComplete),
+          const SizedBox(height: 14),
+          Center(child: Text('Takes about two minutes · you can change everything later', style: Ds.caption.copyWith(color: Ds.textTertiary))),
         ],
-      ).animate().fadeIn(),
+      ).animate().fadeIn(duration: Ds.calm),
     );
   }
 }

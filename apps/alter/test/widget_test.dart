@@ -37,7 +37,10 @@ void main() {
     expect(find.byType(AuthScreen), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
 
-    await tester.tap(find.text('New here? Create an ALT account'));
+    final create = find.textContaining('Create an account', findRichText: true);
+    await tester.ensureVisible(create);
+    await tester.pump();
+    await tester.tap(create);
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Create account'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());

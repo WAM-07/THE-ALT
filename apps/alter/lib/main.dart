@@ -53,7 +53,7 @@ class _AlterAppState extends State<AlterApp> {
       scaffoldMessengerKey: _messengerKey,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       routerConfig: goRouter,
     );
   }

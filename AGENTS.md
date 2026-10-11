@@ -61,7 +61,8 @@ npx tsc --noEmit    # inside services/core or services/gateway
 - **Audit:** record security-relevant actions with `audit(client, …)` inside the same transaction. Announce changes other services care about with `publish(client, topic, payload)`, the outbox.
 - **Notifications:** tell a person something with `notify(client, …)` from `services/core/src/lib/notify.ts`, inside the same transaction as the event. Other services use `POST /internal/notifications` with the service key (see `core_client.notify` in ALTERA). Apps show them with `AltInbox` and `AltInboxScreen` from `alt_account`; never build a separate inbox.
 - **API paths behind the gateway:** `/core/...`, `/altera/...`, `/altar/...`. Inside a service, routes have no prefix.
-- **Flutter:** Riverpod and go_router (ALTER). Use the existing theme files. No hard-coded URLs; use the dart-define config.
+- **Flutter:** Riverpod and go_router (ALTER). No hard-coded URLs; use the dart-define config.
+- **ALTER's look ("Obsidian"):** take every colour, font and spacing from `Ds` (`apps/alter/lib/core/theme/ds.dart`) and build screens from `apps/alter/lib/shared/ui/ui.dart` (`AltPage`, `Glass`, `Btn`, `ListRow`, `Group`, `Pill`, `AiIdentityCard`…). ALTER is dark-only by design. Don't style Material widgets one by one, and check new screens at 320px width (narrow phones).
 - **Commits:** imperative summary line, then what and why. One logical change per commit.
 
 ## When you finish a task

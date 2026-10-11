@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../client.dart';
+import '../media.dart';
 import '../errors.dart';
 import '../handoff.dart';
 import '../models.dart';
@@ -253,17 +254,21 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  ListTile(
-                    leading: CircleAvatar(
-                      radius: 28,
-                      backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+                  _Group([
+                    ListTile(
+                      contentPadding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                      leading: CircleAvatar(
+                        radius: 28,
+                        // ALT's file links name the server's public address; make them reachable from this device.
+                        backgroundImage: user.avatarUrl != null ? NetworkImage(altMediaUrl(user.avatarUrl!, _client.apiUrl)) : null,
                       child: user.avatarUrl == null ? Text(user.displayName.characters.first.toUpperCase()) : null,
                     ),
                     title: Text(user.displayName, style: Theme.of(context).textTheme.titleMedium),
                     subtitle: Text('@${user.handle}${user.email != null ? '\n${user.email}' : ''}'),
                     isThreeLine: user.email != null,
-                    trailing: IconButton(icon: const Icon(Icons.edit_outlined), tooltip: 'Edit profile', onPressed: () => _editProfile(user)),
-                  ),
+                      trailing: IconButton(icon: const Icon(Icons.edit_outlined), tooltip: 'Edit profile', onPressed: () => _editProfile(user)),
+                    ),
+                  ]),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: Text(
@@ -272,16 +277,19 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                     ),
                   ),
                   const _Section('Your ALT apps'),
-                  for (final app in [AltPlatform.alter, AltPlatform.altera, AltPlatform.altar])
-                    ListTile(
+                  _Group([
+                    for (final app in [AltPlatform.alter, AltPlatform.altera, AltPlatform.altar])
+                      ListTile(
                       leading: Icon(_appIcon(app), color: scheme.primary),
                       title: Text(app.label),
                       subtitle: Text(app == _client.platform ? 'You are here' : app.tagline),
                       trailing: app == _client.platform
                           ? const Icon(Icons.check_circle_outline)
                           : TextButton(onPressed: () => _openApp(app), child: const Text('Open')),
-                    ),
+                      ),
+                  ]),
                   const _Section('Security'),
+                  _Group([
                   ListTile(
                     leading: const Icon(Icons.password_outlined),
                     title: Text(user.hasPassword ? 'Change password' : 'Set a password'),
@@ -294,10 +302,12 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                     value: user.twoFactorEnabled,
                     onChanged: (on) => on ? _enableTwoFactor() : _disableTwoFactor(),
                   ),
+                  ]),
                   const _Section('Signed-in devices'),
                   if (_sessions == null)
                     const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
                   else
+                    _Group([
                     for (final s in _sessions!)
                       ListTile(
                         leading: Icon(_appIcon(s.platform)),
@@ -314,7 +324,9 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                                 }, success: 'Device signed out'),
                               ),
                       ),
+                    ]),
                   const _Section('Wallets'),
+                  _Group([
                   for (final w in user.wallets)
                     ListTile(
                       leading: Icon(w.isCustodial ? Icons.account_balance_wallet_outlined : Icons.link),
@@ -329,14 +341,16 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                         },
                       ),
                     ),
+                  ]),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
                     child: Text(
                       'Your AI identity tokens are held by your primary wallet. Link MetaMask from ALTAR on the web.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
-                  const Divider(),
+                  const SizedBox(height: 12),
+                  _Group([
                   ListTile(
                     leading: const Icon(Icons.logout),
                     title: const Text('Sign out'),
@@ -350,7 +364,8 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                     title: Text('Sign out everywhere', style: TextStyle(color: scheme.error)),
                     onTap: _signOutEverywhere,
                   ),
-                  const SizedBox(height: 24),
+                  ]),
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -376,13 +391,34 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
   }
 }
 
+/// Rows on one card (the app's card theme), separated by inset dividers.
+class _Group extends StatelessWidget {
+  const _Group(this.children);
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const Divider(height: 1, indent: 56),
+              children[i],
+            ],
+          ]),
+        ),
+      );
+}
+
 class _Section extends StatelessWidget {
   const _Section(this.title);
   final String title;
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
         child: Text(title.toUpperCase(),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.primary, letterSpacing: 0.8)),
       );

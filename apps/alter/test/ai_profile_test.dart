@@ -1,5 +1,6 @@
 import 'package:alter/core/alt/ai_api.dart';
 import 'package:alter/features/ai_profile/screens/ai_profile_screen.dart';
+import 'package:alter/shared/ui/ui.dart';
 import 'package:alter/shared/widgets/offline_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,7 +15,7 @@ void main() {
         ),
       ),
     ));
-    expect(find.text('Traits (1/2)'), findsOneWidget);
+    expect(find.text('TRAITS · 1/2'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), '  calm ');
     await tester.testTextInput.receiveAction(TextInputAction.done);

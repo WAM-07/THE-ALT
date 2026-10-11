@@ -1,9 +1,9 @@
 import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/alt/alt_session.dart';
-import '../../core/theme/colors.dart';
 import '../../features/ai_profile/screens/ai_profile_screen.dart';
 import '../../features/ai_profile/screens/memories_screen.dart';
 import '../../features/ai_profile/screens/versions_screen.dart';
@@ -14,6 +14,7 @@ import '../../features/persona_interface/screens/chat_screen.dart';
 import '../../features/persona_interface/screens/home_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/training_manager/screens/training_screen.dart';
+import '../ui/ui.dart';
 import '../widgets/offline_screen.dart';
 import 'scaffold_with_nav_bar.dart';
 
@@ -48,8 +49,13 @@ final goRouter = GoRouter(
     GoRoute(path: '/', builder: (context, state) => const SizedBox.shrink()),
     GoRoute(
       path: '/splash',
-      builder: (context, state) => const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: ALTColors.irisViolet)),
+      builder: (context, state) => Backdrop(
+        intensity: 0.9,
+        child: Center(
+          child: const AlterMark(size: 72)
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scale(begin: const Offset(0.94, 0.94), end: const Offset(1.04, 1.04), duration: 1100.ms, curve: Curves.easeInOut),
+        ),
       ),
     ),
     GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),

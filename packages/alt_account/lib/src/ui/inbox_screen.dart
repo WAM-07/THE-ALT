@@ -132,13 +132,14 @@ class _AltInboxScreenState extends State<AltInboxScreen> {
                       if (s.metrics.pixels > s.metrics.maxScrollExtent - 200) _more();
                       return false;
                     },
-                    child: ListView.separated(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                       itemCount: _items!.length + (_loadingMore ? 1 : 0),
-                      separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, i) {
                         if (i == _items!.length) return const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
                         final n = _items![i];
-                        return ListTile(
+                        final tile = ListTile(
+                          contentPadding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
                           onTap: () => _tap(n),
                           leading: CircleAvatar(
                             backgroundColor: (n.category == 'security' || n.category == 'moderation' ? scheme.errorContainer : scheme.primaryContainer),
@@ -148,6 +149,10 @@ class _AltInboxScreenState extends State<AltInboxScreen> {
                           subtitle: Text([if (n.body != null) n.body!, '${n.platform.toUpperCase()} · ${_ago(n.createdAt)}'].join('\n')),
                           isThreeLine: n.body != null,
                           trailing: n.read ? null : Icon(Icons.circle, size: 10, color: scheme.primary),
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Card(margin: EdgeInsets.zero, clipBehavior: Clip.antiAlias, child: tile),
                         );
                       },
                     ),

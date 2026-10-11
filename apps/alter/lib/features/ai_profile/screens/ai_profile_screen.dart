@@ -5,10 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
-import '../../../core/theme/colors.dart';
-import '../../../core/theme/gradients.dart';
-import '../../../core/theme/typography.dart';
-import '../../../shared/widgets/gradient_background.dart';
+import '../../../core/theme/ds.dart';
+import '../../../shared/ui/ui.dart';
 
 /// Your AI's profile: picture, name and bio (shown on ALTERA straight away) and its personality
 /// (saved to the draft; it reaches ALTERA with the next published version).
@@ -58,7 +56,7 @@ class _AiProfileScreenState extends State<AiProfileScreen> {
   }
 
   void _toast(String text) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    if (mounted) toast(context, text);
   }
 
   Future<void> _run(Future<AltAi> Function() action, String done) async {
@@ -111,174 +109,108 @@ class _AiProfileScreenState extends State<AiProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final card = (isDark ? ALTColors.darkBgSurface01 : ALTColors.lightBgSurface01).withValues(alpha: 0.92);
-    final muted = isDark ? ALTColors.darkTextSecondary : ALTColors.lightTextSecondary;
-    return GradientBackground(
-      baseColor: isDark ? ALTColors.darkBgPage : ALTColors.lightBgPage,
-      layers: isDark ? ALTGradients.alterDark : ALTGradients.alterLight,
-      animate: false,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Your AI', style: ALTTypography.headlineMedium), backgroundColor: Colors.transparent, elevation: 0),
-        body: ValueListenableBuilder<AltAi?>(
-          valueListenable: currentAi,
-          builder: (context, ai, _) {
-            if (ai == null) return const Center(child: CircularProgressIndicator(color: ALTColors.irisViolet));
-            _fill(ai);
-            final next = switch (ai.status) {
-              'verified' => null,
-              'minting' => ('Its identity token is being minted…', 'Deploy', '/training'),
-              'ready' => ('Version built. Finish the checks and deploy it.', 'Deploy', '/training'),
-              _ => ('Add data about you, chat with it, then build a version.', 'Add data', '/dataset'),
-            };
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-              children: [
-                Center(
-                  child: Stack(children: [
-                    AiAvatar(ai: ai, radius: 52),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: IconButton.filled(
-                        tooltip: 'Change picture',
-                        style: IconButton.styleFrom(backgroundColor: ALTColors.irisViolet),
-                        onPressed: _busy ? null : () => _pickAvatar(ai),
-                        icon: const Icon(Icons.photo_camera_outlined, color: Colors.white, size: 20),
-                      ),
+    return ValueListenableBuilder<AltAi?>(
+      valueListenable: currentAi,
+      builder: (context, ai, _) {
+        if (ai == null) return AltPage(appBar: topBar(context), children: const [Loading()]);
+        _fill(ai);
+        final next = switch (ai.status) {
+          'verified' => null,
+          'minting' => ('Its identity token is being minted…', 'Identity', '/training'),
+          'ready' => ('Version built. Finish the checks and deploy it.', 'Deploy', '/training'),
+          _ => ('Teach it about you, chat with it, then build a version.', 'Studio', '/dataset'),
+        };
+        return AltPage(
+          appBar: topBar(context),
+          bottomInset: 48,
+          children: [
+            Center(
+              child: Stack(clipBehavior: Clip.none, children: [
+                AiAvatar(ai: ai, size: 108),
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Pressable(
+                    onTap: _busy ? null : () => _pickAvatar(ai),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: Ds.text, border: Border.all(color: Ds.bg, width: 3)),
+                      child: const Icon(Icons.photo_camera_rounded, size: 18, color: Ds.bg),
                     ),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-                Center(child: Text(ai.name, style: ALTTypography.headlineMedium)),
-                Center(child: Text('@${ai.handle}', style: ALTTypography.bodyMedium.copyWith(color: muted))),
-                const SizedBox(height: 8),
-                Center(
-                  child: Chip(
-                    avatar: Icon(ai.verified ? Icons.verified : Icons.edit_note, size: 18, color: ai.verified ? ALTColors.jadeSurge : ALTColors.solarEmber),
-                    label: Text(ai.verified ? 'Verified · identity token #${ai.token?.tokenId} · v${ai.currentVersion ?? 1} live' : 'Not deployed yet (${ai.status})'),
                   ),
                 ),
-                if (next != null) ...[
-                  const SizedBox(height: 8),
-                  _Section(
-                    color: card,
-                    child: Row(children: [
-                      const Icon(Icons.flag_outlined, color: ALTColors.irisViolet),
-                      const SizedBox(width: 12),
-                      Expanded(child: Text(next.$1, style: ALTTypography.bodySmall)),
-                      TextButton(onPressed: () => context.go(next.$3), child: Text(next.$2)),
-                    ]),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                _Section(
-                  color: card,
-                  child: Column(children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.psychology_alt_outlined, color: ALTColors.irisViolet),
-                      title: const Text('Memories'),
-                      subtitle: Text('${ai.count('memories')} remembered'
-                          '${ai.count('proposedMemories') > 0 ? ' · ${ai.count('proposedMemories')} waiting for you' : ''}'),
-                      trailing: ai.count('proposedMemories') > 0 ? Badge(label: Text('${ai.count('proposedMemories')}')) : const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/ai/memories'),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.history, color: ALTColors.irisViolet),
-                      title: const Text('Version history'),
-                      subtitle: Text(ai.latestVersion == null ? 'No versions yet' : 'Latest v${ai.latestVersion!['version']}${ai.currentVersion != null ? ' · v${ai.currentVersion} live' : ''}'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/ai/versions'),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 16),
-                Text('Profile', style: ALTTypography.labelLarge.copyWith(color: ALTColors.irisViolet)),
-                const SizedBox(height: 4),
-                Text(ai.verified ? 'Name, picture and bio update on ALTERA straight away.' : 'How your AI introduces itself.', style: ALTTypography.bodySmall.copyWith(color: muted)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            Center(child: Text(ai.name, textAlign: TextAlign.center, style: Ds.title1)),
+            const SizedBox(height: 4),
+            Center(child: Text('@${ai.handle}', style: Ds.callout)),
+            const SizedBox(height: 12),
+            Center(
+              child: ai.verified
+                  ? Pill('Verified · token #${ai.token?.tokenId} · v${ai.currentVersion ?? 1} live', color: Ds.mint, icon: Icons.verified_rounded)
+                  : Pill('Not deployed yet · ${ai.status}', color: Ds.amber, icon: Icons.edit_note_rounded),
+            ),
+            if (next != null) ...[
+              const SizedBox(height: 18),
+              Glass(
+                onTap: () => context.go(next.$3),
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                child: Row(children: [
+                  const IconBadge(Icons.flag_outlined, size: 36),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(next.$1, style: Ds.caption.copyWith(color: Ds.text))),
+                  Text('${next.$2} →', style: Ds.caption.copyWith(color: Ds.iris, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Group(children: [
+              ListRow(
+                icon: Icons.psychology_alt_outlined,
+                color: Ds.mint,
+                title: 'Memories',
+                subtitle: '${ai.count('memories')} remembered${ai.count('proposedMemories') > 0 ? ' · ${ai.count('proposedMemories')} waiting for you' : ''}',
+                trailing: ai.count('proposedMemories') > 0 ? Pill('${ai.count('proposedMemories')}', color: Ds.rose) : null,
+                onTap: () => context.push('/ai/memories'),
+              ),
+              ListRow(
+                icon: Icons.layers_outlined,
+                color: Ds.amber,
+                title: 'Version history',
+                subtitle: ai.latestVersion == null ? 'No versions yet' : 'Latest v${ai.latestVersion!['version']}${ai.currentVersion != null ? ' · v${ai.currentVersion} live' : ''}',
+                onTap: () => context.push('/ai/versions'),
+              ),
+            ]),
+            SectionLabel('Profile'),
+            Text(ai.verified ? 'Name, picture and bio update on ALTERA within seconds.' : 'How your AI introduces itself.', style: Ds.caption),
+            const SizedBox(height: 12),
+            Glass(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                TextField(controller: _name, maxLength: 80, style: Ds.body, decoration: const InputDecoration(labelText: 'Name')),
+                const SizedBox(height: 6),
+                TextField(controller: _bio, maxLength: 500, maxLines: 4, minLines: 2, style: Ds.body, decoration: const InputDecoration(labelText: 'Bio')),
                 const SizedBox(height: 8),
-                _Section(
-                  color: card,
-                  child: Column(children: [
-                    TextField(controller: _name, maxLength: 80, decoration: const InputDecoration(labelText: 'Name')),
-                    TextField(controller: _bio, maxLength: 500, maxLines: 3, minLines: 1, decoration: const InputDecoration(labelText: 'Bio')),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton(onPressed: _busy ? null : () => _saveProfile(ai), child: const Text('Save profile')),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 16),
-                Text('Personality', style: ALTTypography.labelLarge.copyWith(color: ALTColors.irisViolet)),
-                const SizedBox(height: 4),
-                Text(
-                  'Saved to the draft; chat with it to try it. It reaches ALTERA when you build and publish a version. '
-                  'Tone and creativity are in Chat → Personality.',
-                  style: ALTTypography.bodySmall.copyWith(color: muted),
-                ),
-                const SizedBox(height: 8),
-                _Section(
-                  color: card,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    TextField(controller: _about, maxLength: 1000, maxLines: 5, minLines: 2, decoration: const InputDecoration(labelText: 'About you (in your words)')),
-                    const SizedBox(height: 8),
-                    TagEditor(label: 'Traits', hint: 'e.g. curious', values: _traits, max: 12, maxLength: 40, onChanged: (v) => setState(() => _traits = v)),
-                    TagEditor(label: 'Interests', hint: 'e.g. Flutter', values: _interests, max: 20, maxLength: 40, onChanged: (v) => setState(() => _interests = v)),
-                    TagEditor(
-                      label: 'Boundaries',
-                      hint: 'e.g. Never discuss my family',
-                      values: _boundaries,
-                      max: 20,
-                      maxLength: 200,
-                      onChanged: (v) => setState(() => _boundaries = v),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton(onPressed: _busy ? null : () => _savePersona(ai), child: const Text('Save personality')),
-                    ),
-                  ]),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({required this.color, required this.child});
-  final Color color;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
-        child: child,
-      );
-}
-
-/// The AI's picture, or its initial when it has none.
-class AiAvatar extends StatelessWidget {
-  const AiAvatar({super.key, required this.ai, this.radius = 24});
-  final AltAi ai;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = ai.avatarUrl;
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: ai.verified ? ALTColors.jadeSurge : ALTColors.irisViolet,
-      foregroundImage: url == null ? null : NetworkImage(url),
-      child: Text(ai.name.isEmpty ? '?' : ai.name.characters.first.toUpperCase(),
-          style: TextStyle(color: Colors.white, fontSize: radius * 0.8, fontWeight: FontWeight.w700)),
+                Align(alignment: Alignment.centerRight, child: Btn('Save profile', compact: true, loading: _busy, onTap: _busy ? null : () => _saveProfile(ai))),
+              ]),
+            ),
+            SectionLabel('Personality'),
+            Text('Saved to your draft, so you can try it in Chat. It reaches ALTERA when you build and publish a version. Tone and creativity live in Chat → Personality.', style: Ds.caption),
+            const SizedBox(height: 12),
+            Glass(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                TextField(controller: _about, maxLength: 1000, maxLines: 6, minLines: 3, style: Ds.body, decoration: const InputDecoration(labelText: 'About you, in your words')),
+                const SizedBox(height: 10),
+                TagEditor(label: 'Traits', hint: 'e.g. curious', values: _traits, max: 12, maxLength: 40, onChanged: (v) => setState(() => _traits = v)),
+                TagEditor(label: 'Interests', hint: 'e.g. Flutter', values: _interests, max: 20, maxLength: 40, onChanged: (v) => setState(() => _interests = v)),
+                TagEditor(label: 'Boundaries', hint: 'e.g. Never discuss my family', values: _boundaries, max: 20, maxLength: 200, onChanged: (v) => setState(() => _boundaries = v)),
+                Align(alignment: Alignment.centerRight, child: Btn('Save personality', compact: true, loading: _busy, onTap: _busy ? null : () => _savePersona(ai))),
+              ]),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -319,8 +251,8 @@ class _TagEditorState extends State<TagEditor> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${widget.label} (${widget.values.length}/${widget.max})', style: ALTTypography.labelMedium),
-        const SizedBox(height: 4),
+        Text('${widget.label.toUpperCase()} · ${widget.values.length}/${widget.max}', style: Ds.overline),
+        const SizedBox(height: 10),
         Wrap(spacing: 6, runSpacing: 6, children: [
           for (final v in widget.values) InputChip(label: Text(v), onDeleted: () => widget.onChanged([...widget.values]..remove(v))),
         ]),

@@ -1,139 +1,260 @@
 import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
-import '../../../core/theme/colors.dart';
-import '../../../core/theme/gradients.dart';
-import '../../../core/theme/typography.dart';
-import '../../../shared/widgets/gradient_background.dart';
-import '../../ai_profile/screens/ai_profile_screen.dart';
+import '../../../core/theme/ds.dart';
+import '../../../shared/ui/ui.dart';
 
-class HomeScreen extends ConsumerWidget {
+/// Home: your AI at a glance, the one thing to do next, and what happened recently.
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
-  Future<void> _open(BuildContext context, AltPlatform app) async {
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<AltNotification>? _recent;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+    altInbox.incoming.listen((_) => _loadRecent());
+  }
+
+  Future<void> _loadRecent() async {
     try {
-      if (!await altHandoff.open(app)) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${app.label} is not installed on this device.')));
-        }
-      }
-    } on AltApiException catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      final items = await altInbox.list(limit: 3);
+      if (mounted) setState(() => _recent = items);
+    } catch (_) {
+      if (mounted) setState(() => _recent ??= []);
     }
   }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final card = (isDark ? ALTColors.darkBgSurface01 : ALTColors.lightBgSurface01).withValues(alpha: 0.9);
-    final muted = isDark ? ALTColors.darkTextSecondary : ALTColors.lightTextSecondary;
+  Future<void> _refresh() async {
+    await Future.wait([refreshCurrentAi().catchError((_) => null), _loadRecent()]);
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: GradientBackground(
-        baseColor: isDark ? ALTColors.darkBgPage : ALTColors.lightBgPage,
-        layers: isDark ? ALTGradients.alterDark : ALTGradients.alterLight,
-        animate: true,
-        child: SafeArea(
-          child: ValueListenableBuilder<AltUser?>(
-            valueListenable: altAccount.currentUser,
-            builder: (context, user, _) => ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                Row(children: [
-                  Expanded(child: Text('Hi, ${user?.displayName.split(' ').first ?? 'there'}', style: ALTTypography.headlineLarge)),
-                  AltInboxButton(inbox: altInbox, onPressed: () => context.push('/inbox')),
+  Future<void> _open(AltPlatform app) async {
+    try {
+      if (!await altHandoff.open(app) && mounted) toast(context, '${app.label} is not installed on this device.');
+    } on AltApiException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
+  static String _greeting() {
+    final h = DateTime.now().hour;
+    return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  }
+
+  /// The single most useful next step for where the AI is in its life.
+  ({String title, String body, String cta, IconData icon, VoidCallback onTap, bool hero})? _next(AltAi ai) {
+    final latest = ai.latestVersion;
+    if (ai.status == 'minting') {
+      return (title: 'Minting its identity', body: 'Writing your AI’s identity token to the blockchain. This takes a few seconds.', cta: 'View', icon: Icons.hourglass_top_rounded, onTap: () => context.go('/training'), hero: false);
+    }
+    if (ai.verified && latest != null && latest['published'] == false) {
+      return (title: 'Version ${latest['version']} is ready', body: 'Publish it so ALTERA and ALTAR use what your AI learned since.', cta: 'Publish', icon: Icons.rocket_launch_outlined, onTap: () => context.go('/training'), hero: true);
+    }
+    if (ai.verified) {
+      return (title: 'Your twin is live', body: 'It can post, comment and reply on ALTERA under its identity token.', cta: 'Open ALTERA', icon: Icons.public_rounded, onTap: () => _open(AltPlatform.altera), hero: false);
+    }
+    if (ai.status == 'ready') {
+      return (title: 'Ready for its identity', body: 'Finish the checks and mint the token that proves it is yours.', cta: 'Deploy', icon: Icons.fingerprint_rounded, onTap: () => context.go('/training'), hero: true);
+    }
+    if (ai.count('datasets') == 0) {
+      return (title: 'Teach it who you are', body: 'Write a few lines about yourself: how you talk, what you know, what you love.', cta: 'Start', icon: Icons.edit_note_rounded, onTap: () => context.go('/dataset'), hero: true);
+    }
+    return (title: 'Talk to it', body: 'Chat a little, then build its first version from what it knows.', cta: 'Chat', icon: Icons.chat_bubble_outline_rounded, onTap: () => context.go('/chat'), hero: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AltPage(
+      onRefresh: _refresh,
+      children: [
+        ValueListenableBuilder<AltUser?>(
+          valueListenable: altAccount.currentUser,
+          builder: (context, user, _) => Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 22),
+            child: Row(children: [
+              _UserAvatar(user: user),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_greeting(), style: Ds.caption),
+                  Text(user?.displayName.split(' ').first ?? '', style: Ds.title2),
                 ]),
-                const SizedBox(height: 4),
-                Text('@${user?.handle ?? ''}', style: ALTTypography.bodyMedium.copyWith(color: muted)),
-                const SizedBox(height: 24),
-                ValueListenableBuilder<AltAi?>(
-                  valueListenable: currentAi,
-                  builder: (context, ai, _) {
-                    final (status, next, _) = switch (ai?.status) {
-                      'verified' => ('Verified · identity token #${ai!.token?.tokenId}', 'It can now appear on ALTERA and ALTAR.', '/training'),
-                      'minting' => ('Minting its identity token…', 'This takes a few seconds.', '/training'),
-                      'ready' => ('Version v${ai!.latestVersion?['version']} built', 'Finish the checks and deploy it.', '/training'),
-                      _ => ('Draft', 'Add data about you and chat with it.', '/dataset'),
-                    };
-                    return _Card(
-                      color: card,
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: ai == null
-                            ? const CircleAvatar(backgroundColor: ALTColors.irisViolet, child: Icon(Icons.psychology_alt_rounded, color: Colors.white))
-                            : AiAvatar(ai: ai),
-                        title: Text(ai?.name ?? 'Your personal AI', style: ALTTypography.headlineSmall),
-                        subtitle: Text('$status\n$next', style: ALTTypography.bodySmall.copyWith(color: muted)),
-                        isThreeLine: true,
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.push('/ai'),
-                      ),
-                    );
-                  },
+              ),
+              ValueListenableBuilder<int>(
+                valueListenable: altInbox.unread,
+                builder: (context, n, _) => RoundIconButton(
+                  icon: Icons.notifications_none_rounded,
+                  tooltip: 'ALT inbox',
+                  size: 44,
+                  onTap: () => context.push('/inbox'),
+                  badge: n == 0
+                      ? null
+                      : Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          constraints: const BoxConstraints(minWidth: 18),
+                          decoration: BoxDecoration(color: Ds.rose, borderRadius: BorderRadius.circular(9), border: Border.all(color: Ds.bg, width: 2)),
+                          child: Text(n > 9 ? '9+' : '$n', textAlign: TextAlign.center, style: Ds.caption.copyWith(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                        ),
                 ),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: FilledButton.tonalIcon(onPressed: () => context.go('/chat'), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: FilledButton.tonalIcon(onPressed: () => context.go('/dataset'), icon: const Icon(Icons.add), label: const Text('Add data'))),
-                ]),
-                const SizedBox(height: 16),
-                _Card(
-                  color: card,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Your ALT account', style: ALTTypography.labelLarge.copyWith(color: ALTColors.irisViolet)),
-                      const SizedBox(height: 6),
-                      Text(
-                        'The same account works in ALTERA (social hub) and ALTAR (marketplace). '
-                        'Once your AI is verified with its identity token, it can appear there too.',
-                        style: ALTTypography.bodySmall.copyWith(color: muted),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(spacing: 8, runSpacing: 8, children: [
-                        FilledButton.tonalIcon(
-                          onPressed: () => _open(context, AltPlatform.altera),
-                          icon: const Icon(Icons.forum_outlined),
-                          label: const Text('Open ALTERA'),
-                        ),
-                        FilledButton.tonalIcon(
-                          onPressed: () => _open(context, AltPlatform.altar),
-                          icon: const Icon(Icons.storefront_outlined),
-                          label: const Text('Open ALTAR'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.push('/account'),
-                          icon: const Icon(Icons.manage_accounts_outlined),
-                          label: const Text('Account'),
-                        ),
-                      ]),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ]),
           ),
         ),
-      ),
+        ValueListenableBuilder<AltAi?>(
+          valueListenable: currentAi,
+          builder: (context, ai, _) {
+            if (ai == null) return const Loading();
+            final next = _next(ai);
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              AiIdentityCard(ai: ai, onTap: () => context.push('/ai')).animate().fadeIn(duration: Ds.calm).slideY(begin: 0.04, curve: Ds.ease),
+              if (next != null) ...[
+                const SizedBox(height: 14),
+                Glass(
+                  onTap: next.onTap,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+                  child: Row(children: [
+                    IconBadge(next.icon, color: next.hero ? Ds.iris : Ds.mint, size: 44),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(next.title, style: Ds.headline),
+                        const SizedBox(height: 3),
+                        Text(next.body, style: Ds.caption),
+                        const SizedBox(height: 8),
+                        Text('${next.cta}  →', style: Ds.caption.copyWith(color: next.hero ? Ds.iris : Ds.mint, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  ]),
+                ).animate().fadeIn(delay: 80.ms, duration: Ds.calm),
+              ],
+              const SectionLabel('Your AI'),
+              GridView(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                physics: const NeverScrollableScrollPhysics(),
+                // A fixed height (not a ratio) keeps the text inside the tiles on narrow phones.
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, mainAxisExtent: 122),
+                children: [
+                  _Action(icon: Icons.chat_bubble_outline_rounded, color: Ds.iris, title: 'Chat', subtitle: 'Talk to your twin', onTap: () => context.go('/chat')),
+                  _Action(icon: Icons.auto_awesome_outlined, color: Ds.sky, title: 'Teach', subtitle: '${ai.count('datasets')} things it knows', onTap: () => context.go('/dataset')),
+                  _Action(
+                    icon: Icons.psychology_alt_outlined,
+                    color: Ds.mint,
+                    title: 'Memories',
+                    subtitle: ai.count('proposedMemories') > 0 ? '${ai.count('proposedMemories')} waiting for you' : '${ai.count('memories')} remembered',
+                    highlight: ai.count('proposedMemories') > 0,
+                    onTap: () => context.push('/ai/memories'),
+                  ),
+                  _Action(icon: Icons.layers_outlined, color: Ds.amber, title: 'Versions', subtitle: ai.currentVersion != null ? 'v${ai.currentVersion} live' : 'None live yet', onTap: () => context.push('/ai/versions')),
+                ],
+              ).animate().fadeIn(delay: 140.ms, duration: Ds.calm),
+            ]);
+          },
+        ),
+        SectionLabel('Recent', action: 'See all', onAction: () => context.push('/inbox')),
+        if (_recent == null)
+          const Loading(padding: 24)
+        else if (_recent!.isEmpty)
+          Glass(child: Text('Nothing yet. News about your AI and your account appears here.', style: Ds.callout))
+        else
+          Group(children: [
+            for (final n in _recent!)
+              ListRow(
+                icon: _iconFor(n.category),
+                color: _colorFor(n.category),
+                title: n.title,
+                subtitle: '${n.platform.toUpperCase()} · ${_ago(n.createdAt)}',
+                trailing: n.read ? null : Container(width: 8, height: 8, decoration: const BoxDecoration(color: Ds.iris, shape: BoxShape.circle)),
+                onTap: () => context.push('/inbox'),
+              ),
+          ]),
+        const SectionLabel('Across ALT'),
+        Group(children: [
+          ListRow(icon: Icons.forum_outlined, color: Ds.sky, title: 'ALTERA', subtitle: 'The social hub, signed in already', onTap: () => _open(AltPlatform.altera)),
+          ListRow(icon: Icons.storefront_outlined, color: Ds.amber, title: 'ALTAR', subtitle: 'The AI marketplace', onTap: () => _open(AltPlatform.altar)),
+          ListRow(icon: Icons.manage_accounts_outlined, color: Ds.iris, title: 'ALT Account', subtitle: 'Security, devices and wallets', onTap: () => context.push('/account')),
+        ]),
+      ],
     );
+  }
+
+  static IconData _iconFor(String category) => switch (category) {
+        'security' => Icons.shield_outlined,
+        'ai' => Icons.auto_awesome_outlined,
+        'transaction' => Icons.fingerprint_rounded,
+        'moderation' => Icons.flag_outlined,
+        _ => Icons.campaign_outlined,
+      };
+  static Color _colorFor(String category) => switch (category) {
+        'security' => Ds.amber,
+        'moderation' => Ds.rose,
+        'transaction' => Ds.mint,
+        _ => Ds.iris,
+      };
+  static String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'now';
+    if (d.inHours < 1) return '${d.inMinutes}m ago';
+    if (d.inDays < 1) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
   }
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.color, required this.child});
+class _Action extends StatelessWidget {
+  const _Action({required this.icon, required this.color, required this.title, required this.subtitle, required this.onTap, this.highlight = false});
+  final IconData icon;
   final Color color;
-  final Widget child;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool highlight;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(18)),
-        child: child,
+  Widget build(BuildContext context) => Glass(
+        onTap: onTap,
+        padding: const EdgeInsets.all(14),
+        border: highlight ? color.withValues(alpha: 0.5) : null,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          IconBadge(icon, color: color, size: 34),
+          const Spacer(),
+          Text(title, style: Ds.bodyStrong),
+          const SizedBox(height: 1),
+          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.caption.copyWith(color: highlight ? color : Ds.textSecondary)),
+        ]),
       );
+}
+
+class _UserAvatar extends StatelessWidget {
+  const _UserAvatar({required this.user});
+  final AltUser? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = user?.avatarUrl == null ? null : media(user!.avatarUrl!);
+    return Pressable(
+      onTap: () => context.push('/account'),
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Ds.hairlineStrong), color: Ds.glassStrong),
+        clipBehavior: Clip.antiAlias,
+        child: url != null
+            ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _initial())
+            : _initial(),
+      ),
+    );
+  }
+
+  Widget _initial() => Center(child: Text((user?.displayName.isNotEmpty ?? false) ? user!.displayName[0].toUpperCase() : '·', style: Ds.headline));
 }

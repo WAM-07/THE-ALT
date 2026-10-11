@@ -1,83 +1,70 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/colors.dart';
 
+import '../../core/theme/ds.dart';
+
+/// The floating glass dock. Five places: Home, Chat, Studio (what your AI learns), Identity (its
+/// versions and on-chain token) and Settings.
 class ScaffoldWithNavBar extends StatelessWidget {
+  const ScaffoldWithNavBar({super.key, required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
-  const ScaffoldWithNavBar({
-    super.key,
-    required this.navigationShell,
-  });
+  static const _tabs = [
+    (Icons.home_outlined, Icons.home_rounded, 'Home'),
+    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chat'),
+    (Icons.auto_awesome_outlined, Icons.auto_awesome, 'Studio'),
+    (Icons.fingerprint_rounded, Icons.fingerprint_rounded, 'Identity'),
+    (Icons.tune_rounded, Icons.tune_rounded, 'Settings'),
+  ];
 
-  void _goBranch(int index) {
-    navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
-    );
+  void _go(int index) {
+    HapticFeedback.selectionClick();
+    navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: navigationShell,
-      extendBody: true, // Allows body to go behind the floating nav bar
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            color: isDark ? ALTColors.darkBgSurface01 : ALTColors.lightBgSurface01,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              )
-            ],
-            border: Border.all(
-              color: isDark ? ALTColors.darkBorderSubtle : ALTColors.lightBorderSubtle,
-              width: 1,
+      backgroundColor: Ds.bg,
+      extendBody: true,
+      body: Stack(children: [
+        navigationShell,
+        // Content fades out under the floating dock instead of showing through its edges.
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 120,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x0007070B), Color(0xE607070B), Color(0xFF07070B)], stops: [0, 0.45, 1])),
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavBarIcon(
-                icon: Icons.auto_awesome,
-                label: 'Home',
-                isSelected: navigationShell.currentIndex == 0,
-                onTap: () => _goBranch(0),
+        ),
+      ]),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.only(bottom: 12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Ds.r4),
+            child: BackdropFilter(
+              filter: Ds.blur(28),
+              child: Container(
+                height: 66,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xB3121219),
+                  borderRadius: BorderRadius.circular(Ds.r4),
+                  border: Border.all(color: Ds.hairline),
+                ),
+                child: Row(children: [
+                  for (var i = 0; i < _tabs.length; i++)
+                    Expanded(child: _Tab(icon: _tabs[i].$1, activeIcon: _tabs[i].$2, label: _tabs[i].$3, active: navigationShell.currentIndex == i, onTap: () => _go(i))),
+                ]),
               ),
-              _NavBarIcon(
-                icon: Icons.chat_bubble_outline,
-                label: 'Chat',
-                isSelected: navigationShell.currentIndex == 1,
-                onTap: () => _goBranch(1),
-              ),
-              _NavBarIcon(
-                icon: Icons.storage,
-                label: 'Data',
-                isSelected: navigationShell.currentIndex == 2,
-                onTap: () => _goBranch(2),
-              ),
-              _NavBarIcon(
-                icon: Icons.memory,
-                label: 'Deploy',
-                isSelected: navigationShell.currentIndex == 3,
-                onTap: () => _goBranch(3),
-              ),
-              _NavBarIcon(
-                icon: Icons.settings,
-                label: 'Settings',
-                isSelected: navigationShell.currentIndex == 4,
-                onTap: () => _goBranch(4),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -85,48 +72,44 @@ class ScaffoldWithNavBar extends StatelessWidget {
   }
 }
 
-class _NavBarIcon extends StatelessWidget {
+class _Tab extends StatelessWidget {
+  const _Tab({required this.icon, required this.activeIcon, required this.label, required this.active, required this.onTap});
   final IconData icon;
+  final IconData activeIcon;
   final String label;
-  final bool isSelected;
+  final bool active;
   final VoidCallback onTap;
-
-  const _NavBarIcon({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? ALTColors.irisViolet : (Theme.of(context).brightness == Brightness.dark ? ALTColors.darkTextSecondary : ALTColors.lightTextSecondary);
-    
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? ALTColors.violet100.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: color,
-              ),
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          AnimatedContainer(
+            duration: Ds.calm,
+            curve: Ds.ease,
+            width: active ? 46 : 36,
+            height: 30,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              color: active ? Ds.iris.withValues(alpha: 0.18) : Colors.transparent,
             ),
-          ],
-        ),
+            child: active
+                ? ShaderMask(blendMode: BlendMode.srcIn, shaderCallback: (r) => Ds.aurora.createShader(r), child: Icon(activeIcon, size: 21, color: Colors.white))
+                : Icon(icon, size: 21, color: Ds.textTertiary),
+          ),
+          const SizedBox(height: 3),
+          AnimatedDefaultTextStyle(
+            duration: Ds.quick,
+            style: Ds.caption.copyWith(fontSize: 10.5, color: active ? Ds.text : Ds.textTertiary, fontWeight: active ? FontWeight.w600 : FontWeight.w500),
+            child: Text(label),
+          ),
+        ]),
       ),
     );
   }

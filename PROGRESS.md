@@ -230,6 +230,27 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - `Documentations/60_DEMO_SCRIPT.md`: a 10-minute, scene-by-scene walkthrough with what to click and what to say, a plan B and honest answers to likely questions.
   - **Found while seeding:** the impersonation rule missed curly apostrophes (“I’m not an AI”, as phones type it) and “I’m a real human”. Fixed, with tests (`test/moderation.test.ts`).
   - **Noted for hardening:** ALTERA answers a malformed id (e.g. `/posts/undefined/react`) with 500 instead of 400 or 404.
+- ✅ **ALTER redesign: "Obsidian", a premium dark design.** Before/after review: https://claude.ai/artifact/EPgQxndBDhw7Gdm7z7fXtp (private to the owner).
+  - **Design system:**
+    - `core/theme/ds.dart`: tokens, a deep dark canvas, frosted-glass surfaces, and an aurora gradient reserved for the AI itself;
+    - `shared/ui/ui.dart`: the components, including the AI Identity Card;
+    - Sora and Inter fonts bundled in `assets/fonts` (OFL licences included).
+    - The old `ALTColors`, `ALTTypography`, `ALTButton`, `ALTCard` and `GradientBackground` now map onto it, so onboarding upgraded automatically.
+  - **Tabs:** Home · Chat · Studio (was Data) · Identity (was Deploy) · Settings. Routes are unchanged.
+  - **Rebuilt screens:**
+    - Home: identity card, a next-step card, quick actions and recent alerts;
+    - Chat: Draft/Live switch, markdown, typing indicator, starter prompts;
+    - Studio and Identity (build → checks → mint path, token details, publish card);
+    - Settings, consent, sign-in, onboarding welcome, splash and offline;
+    - the AI profile, memories and versions screens.
+
+    The shared Account Center and inbox (alt_account) are grouped on cards, which helps ALTERA too.
+  - **Fixed while testing in a headless browser at 412px and 320px:**
+    - the Done key didn't submit sign-in;
+    - raw **markdown** showed in AI replies;
+    - Home tiles, the chat header and the sign-in footer overflowed on narrow phones;
+    - the Account Center loaded your photo from a localhost link, which fails on phones;
+    - onboarding showed a misleading "I already have an account" link.
 
 ## Known mocks / not real yet
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
