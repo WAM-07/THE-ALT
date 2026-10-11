@@ -1,14 +1,57 @@
+# dependencies / build output
 node_modules/
-flutter/
+dist/
+build/
+coverage/
 .dart_tool/
 .pub-cache/
 .pub/
-build/
-*.iml
-*.log
-.DS_Store
+.flutter-plugins
+.flutter-plugins-dependencies
 
-SRS Presentation/
-Plans/
+# local state (embedded database, generated dev secrets, uploads, mail)
+.data/
+
+# secrets: only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# vendored Flutter SDK (use FVM or a global install instead)
+ALTER/flutter/
+ALTER/node_modules/
+
+# legacy material kept locally only
+_archive/
+/ALTERA/
+Documentations/**/*.pdf
+Documentations/**/*.docx
+Documentations/**/*.pptx
+Documentations/SRS Presentation/
 *.pdf
 *.docx
+
+# editors / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.log
+
+# contracts
+packages/contracts/cache/
+packages/contracts/artifacts/
+packages/contracts/typechain-types/
+packages/contracts/ignition/deployments/chain-31337/
+
+# kept locally, never pushed: user uploads, personal reference screenshots,
+# one-off legacy scripts (contain machine-specific credentials), generated app config
+services/altera-api/public/uploads/
+services/altera-api/seed-assets/
+services/altera-api/scripts/legacy/
+Documentations/ALTER/Plans/
+apps/*/env/dev.json
+
+# agent scratch folders
+.gemini/
+.claude/

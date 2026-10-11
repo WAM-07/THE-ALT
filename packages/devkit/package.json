@@ -1,0 +1,19 @@
+{
+  "name": "@alt/devkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local development helpers: embedded PostgreSQL, the migration runner and dev secrets.",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "dependencies": {
+    "embedded-postgres": "18.4.0-beta.17",
+    "pg": "^8.16.0"
+  }
+}
