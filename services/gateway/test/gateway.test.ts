@@ -84,3 +84,16 @@ describe('gateway', () => {
     expect(res.services.altera.ok).toBe(false);
   });
 });
+
+describe('browser CORS', () => {
+  it('allows every method the apps use in preflight', async () => {
+    const res = await gateway.inject({
+      method: 'OPTIONS',
+      url: '/core/me',
+      headers: { origin: 'http://localhost:5555', 'access-control-request-method': 'PATCH' },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(res.headers['access-control-allow-methods']).toContain('PATCH');
+    expect(res.headers['access-control-allow-methods']).toContain('DELETE');
+  });
+});

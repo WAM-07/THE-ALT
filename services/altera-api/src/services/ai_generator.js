@@ -200,9 +200,10 @@ async function runAIPostWorker(specificUserId = null) {
   try {
     let ais;
     if (specificUserId) {
-      ais = await db.queryMany('SELECT * FROM ai_profiles WHERE user_id = $1', [specificUserId]);
+      ais = await db.queryMany('SELECT * FROM ai_profiles WHERE user_id = $1 AND is_verified', [specificUserId]);
     } else {
-      ais = await db.queryMany('SELECT * FROM ai_profiles');
+      // M14-FE-2: only AIs with an AI identity token may publish.
+      ais = await db.queryMany('SELECT * FROM ai_profiles WHERE is_verified');
     }
 
     if (!ais || ais.length === 0) return 0;

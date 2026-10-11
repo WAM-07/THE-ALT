@@ -88,6 +88,7 @@ export async function rotateSession(ctx: Ctx, refreshToken: string, ip?: string)
     }
     if (session.prev_refresh_hash && safeEqual(session.prev_refresh_hash, hash)) {
       await client.query(`UPDATE core.sessions SET revoked_at = now(), revoke_reason = 'refresh_reuse' WHERE id = $1`, [session.id]);
+      await announceRevocation(client, { sessionId: session.id, userId: session.user_id });
       await audit(client, {
         action: 'auth.session.reuse_detected',
         actorUserId: session.user_id,
@@ -127,11 +128,21 @@ export async function rotateSession(ctx: Ctx, refreshToken: string, ip?: string)
   });
 }
 
+/**
+ * Tells every ALT service, the moment the transaction commits, that sessions ended
+ * (Postgres NOTIFY is transactional). Services drop cached tokens and close sockets at once.
+ */
+export const SESSIONS_CHANNEL = 'alt_sessions_revoked';
+async function announceRevocation(client: pg.PoolClient, payload: { sessionId?: string; userId?: string }) {
+  await client.query('SELECT pg_notify($1, $2)', [SESSIONS_CHANNEL, JSON.stringify(payload)]);
+}
+
 export async function revokeSession(client: pg.PoolClient, userId: string, sessionId: string, reason: string) {
   const { rowCount } = await client.query(
     `UPDATE core.sessions SET revoked_at = now(), revoke_reason = $3 WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL`,
     [sessionId, userId, reason],
   );
+  if (rowCount) await announceRevocation(client, { sessionId, userId });
   return (rowCount ?? 0) > 0;
 }
 
@@ -141,6 +152,7 @@ export async function revokeAllSessions(client: pg.PoolClient, userId: string, r
       WHERE user_id = $1 AND revoked_at IS NULL AND ($3::uuid IS NULL OR id <> $3::uuid)`,
     [userId, reason, exceptSessionId ?? null],
   );
+  if (rowCount) await announceRevocation(client, { userId });
   return rowCount ?? 0;
 }
 

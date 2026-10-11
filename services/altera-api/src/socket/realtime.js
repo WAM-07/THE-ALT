@@ -81,6 +81,18 @@ function isAudioUrl(mediaUrl) {
 }
 
 function setupSocketIO(io) {
+  // A signed-out session must not keep a live socket.
+  const { onSessionRevoked, isSessionActive } = require('../middleware/auth');
+  onSessionRevoked(async ({ sessionId, userId }) => {
+    for (const socket of io.sockets.sockets.values()) {
+      if (sessionId && socket.sessionId === sessionId) {
+        socket.disconnect(true);
+      } else if (!sessionId && userId && socket.userId === userId && !(await isSessionActive(socket.sessionId, userId))) {
+        socket.disconnect(true);
+      }
+    }
+  });
+
   io.use(async (socket, next) => {
     const token =
       socket.handshake.auth?.token ||
@@ -91,10 +103,11 @@ function setupSocketIO(io) {
     }
 
     try {
-      const { verifyToken, ensureProfile } = require('../middleware/auth');
-      const payload = await verifyToken(token);
+      const { authenticate, ensureProfile } = require('../middleware/auth');
+      const payload = await authenticate(token);
       await ensureProfile(payload.userId);
       socket.userId = payload.userId;
+      socket.sessionId = payload.sessionId;
       next();
     } catch {
       next(new Error('Invalid token'));

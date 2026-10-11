@@ -37,6 +37,18 @@ export async function buildApp(opts: BuildOptions) {
   });
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  // Clients often send "content-type: application/json" on body-less POSTs (logout, 2FA setup).
+  // Treat an empty body as "no body" instead of rejecting the request.
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = typeof body === 'string' ? body : body.toString('utf8');
+    if (text.trim() === '') return done(null, undefined);
+    try {
+      done(null, JSON.parse(text));
+    } catch {
+      done(Object.assign(new Error('The request body is not valid JSON.'), { statusCode: 400, code: 'INVALID_JSON' }), undefined);
+    }
+  });
 
   const db = createPool(config.databaseUrl);
   const ctx: Ctx = {

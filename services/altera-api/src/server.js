@@ -42,6 +42,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 (async () => {
   try {
     await db.initialize();
+    await require('./middleware/auth').startRevocationListener();
     httpServer.listen(PORT, HOST, () => {
       console.log(`ALTERA API listening on http://${HOST}:${PORT}`);
       runAIPostWorker().catch((err) => console.error('[AI WORKER ERROR] Initial run failed:', err.message));
@@ -58,6 +59,7 @@ async function shutdown() {
   clearInterval(scheduler);
   io.close();
   httpServer.close();
+  await require('./middleware/auth').stopRevocationListener();
   await db.close();
   process.exit(0);
 }

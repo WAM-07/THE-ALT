@@ -279,3 +279,56 @@ describe('real-time direct messages over Socket.IO', () => {
     }
   });
 });
+
+describe('signing out reaches ALTERA immediately', () => {
+  it('refuses a still-unexpired access token once its session is signed out everywhere', async () => {
+    const person = await altAccount('altera');
+    expect((await api('GET', '/auth/me', person.token)).status).toBe(200);
+    const out = await core.inject({ method: 'POST', url: '/auth/logout-all', headers: { authorization: `Bearer ${person.token}` } });
+    expect(out.statusCode).toBe(200);
+    require('../src/middleware/auth.js').clearSessionCache();
+    const after = await api('GET', '/auth/me', person.token);
+    expect(after.status).toBe(401);
+    expect(after.body.code).toBe('SESSION_REVOKED');
+  });
+});
+
+describe('instant sign-out across apps', () => {
+  it('drops a cached session the moment ALT Core announces it ended', async () => {
+    const authMod = require('../src/middleware/auth.js');
+    await authMod.startRevocationListener();
+    try {
+      const person = await altAccount('altera');
+      expect((await api('GET', '/auth/me', person.token)).status).toBe(200); // session now cached as active
+      await core.inject({ method: 'POST', url: '/auth/logout-all', headers: { authorization: `Bearer ${person.token}` } });
+      let status = 200;
+      for (let i = 0; i < 20 && status === 200; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        status = (await api('GET', '/auth/me', person.token)).status;
+      }
+      expect(status).toBe(401);
+    } finally {
+      await authMod.stopRevocationListener();
+    }
+  });
+
+  it('keeps the current session after a password change that signs out the others', async () => {
+    const authMod = require('../src/middleware/auth.js');
+    await authMod.startRevocationListener();
+    try {
+      const person = await altAccount('altera');
+      expect((await api('GET', '/auth/me', person.token)).status).toBe(200);
+      const change = await core.inject({
+        method: 'POST',
+        url: '/auth/password/change',
+        headers: { authorization: `Bearer ${person.token}` },
+        payload: { currentPassword: 'good pass 123', newPassword: 'better pass 456' },
+      });
+      expect(change.statusCode).toBe(200);
+      await new Promise((r) => setTimeout(r, 200));
+      expect((await api('GET', '/auth/me', person.token)).status).toBe(200);
+    } finally {
+      await authMod.stopRevocationListener();
+    }
+  });
+});

@@ -79,6 +79,8 @@ export async function buildGateway(config: GatewayConfig, opts: { jwks?: JWTVeri
   await app.register(cors, {
     origin: config.corsOrigins.length ? config.corsOrigins : !config.isProd,
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    maxAge: 600,
   });
 
   app.addHook('onRequest', async (req, reply) => {

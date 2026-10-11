@@ -353,3 +353,17 @@ describe('profile, directory and admin', () => {
     expect(verify.json().checked).toBeGreaterThan(10);
   });
 });
+
+describe('request bodies', () => {
+  it('accepts body-less POSTs that still say content-type: application/json', async () => {
+    const u = await signUp(t);
+    const res = await t.app.inject({ method: 'POST', url: '/auth/logout', headers: { ...auth(u.accessToken), 'content-type': 'application/json' }, payload: '' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects malformed JSON with a clear error', async () => {
+    const res = await t.app.inject({ method: 'POST', url: '/auth/login', headers: { 'content-type': 'application/json' }, payload: '{nope' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('INVALID_JSON');
+  });
+});
