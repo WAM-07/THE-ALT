@@ -55,3 +55,7 @@ apps/*/env/dev.json
 # agent scratch folders
 .gemini/
 .claude/
+
+packages/contracts/coverage/
+packages/contracts/deployments/localhost.json
+packages/contracts/deployments/testchain.json
