@@ -2,6 +2,7 @@ import type pg from 'pg';
 import type { Ctx, Platform } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit } from '../../lib/audit.js';
+import { notify } from '../../lib/notify.js';
 import { randomToken, safeEqual, sha256 } from '../../lib/crypto.js';
 import { unauthorized } from '../../lib/errors.js';
 import { findUserById, touchPlatform, type UserRow } from './users.js';
@@ -58,6 +59,17 @@ export async function startSession(ctx: Ctx, client: pg.PoolClient, user: UserRo
     ip: device.ip ?? null,
     data: { platform: device.platform, method, device: device.deviceName ?? null },
   });
+  // Moving between ALT apps and confirming an email are not "new sign-ins" worth an alert.
+  if (method !== 'email_verification' && method !== 'handoff') {
+    await notify(client, {
+      userId: user.id,
+      category: 'security',
+      type: 'security.new_sign_in',
+      title: `New sign-in to ${device.platform.toUpperCase()}`,
+      body: `${device.deviceName ?? 'A device'} signed in to your ALT account (${method.replace(/_/g, ' ')}). If this wasn't you, sign out everywhere and change your password.`,
+      data: { platform: device.platform, method, sessionId },
+    });
+  }
   return {
     tokenType: 'Bearer',
     accessToken: await accessFor(ctx, user, sessionId, device.platform),
@@ -95,6 +107,14 @@ export async function rotateSession(ctx: Ctx, refreshToken: string, ip?: string)
         entityType: 'session',
         entityId: session.id,
         ip: ip ?? null,
+      });
+      await notify(client, {
+        userId: session.user_id,
+        category: 'security',
+        type: 'security.session_reuse',
+        title: 'We signed out a device to protect you',
+        body: 'An old sign-in token was used again, which can mean it was copied. That device has been signed out.',
+        data: { platform: session.platform },
       });
       return { reused: true as const };
     }

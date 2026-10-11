@@ -4,6 +4,7 @@ import type { GoogleVerifier } from './modules/auth/google.js';
 import type { ChainService } from './lib/chain.js';
 import type { IpfsStore } from './lib/ipfs.js';
 import type { LlmRouter } from './modules/ai/llm.js';
+import type { NotificationHub } from './lib/notify.js';
 import type { Mailer } from './lib/mailer.js';
 import type { TokenService } from './lib/tokens.js';
 
@@ -18,6 +19,8 @@ export interface Ctx {
   chain: ChainService | null;
   ipfs: IpfsStore;
   llm: LlmRouter;
+  /** Pushes committed notifications to people's open streams. */
+  hub: NotificationHub;
 }
 
 export const PLATFORMS = ['alter', 'altera', 'altar', 'admin'] as const;

@@ -10,7 +10,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 2 | ALTERA moves onto ALT Core: one users table, shared login, app-to-app handoff | ✅ Done 2026-10-11 |
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
-| 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ⏳ Next |
+| 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
 | 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ⏸ Paused: waiting for Soban's 30% ALTAR code to decide whether to merge it or build new |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | ☐ |
 
@@ -18,8 +18,8 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 31 · core 50 · gateway 7 · altera-api 15 (real PostgreSQL and a real local chain)
-cd packages/alt_account && C:\flutter\bin\flutter test    # 8 tests
+npm test                        # contracts 31 · core 60 · gateway 7 · altera-api 16 (real PostgreSQL and a real local chain)
+cd packages/alt_account && C:\flutter\bin\flutter test    # 10 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # app boots signed out → sign-in
 npm run dev                     # everything at http://localhost:8080
@@ -188,16 +188,30 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - ✅ **Fixes found during the live check.**
   - The embedded Postgres was created as WIN1252, so emoji, Urdu or curly quotes crashed inserts. Databases are now always UTF-8; a regression test covers this. **Run `npm run dev -- --reset-db` once** to recreate an old local database.
   - The persona engine now sees all of a person's notes when they are short; keyword matching had missed "enjoy" vs "love".
-- ☐ **Cross-platform notifications inbox in Core (M2)**, shown in ALTER and ALTERA.
+- ✅ **One ALT inbox (Module 2)**, shown in ALTER and ALTERA. Verified live through the gateway.
+  - **Storage and API:** table `core.notifications` (migration 0003). Core has list, unread count, mark read and mark all read.
+  - **Live delivery:** `GET /core/notifications/stream` (Server-Sent Events, keep-alive every 10 s, closes on sign-out). Postgres NOTIFY `alt_notifications` fans it out, so it's sent only after the event's transaction commits.
+  - **From Core:**
+    - security: new sign-in (not email confirmations or app handoffs), lockout, password reset or change, 2FA on or off, wallet linked or removed, stolen-token sign-out;
+    - AI: version ready, verified with its token, deploy failed, new version live.
+  - **From ALTERA** through `POST /internal/notifications` (service key): an AI's post or comment blocked by moderation, and reports against an AI. Each item is labelled with the app it came from.
+  - **Admin announcements:** `POST /admin/notifications/broadcast`.
+  - **Flutter (`alt_account`):**
+    - `AltInbox` streams on mobile and desktop and polls every 30 s on the web, because browsers buffer streamed HTTP.
+    - `AltInboxScreen` and `AltInboxButton` (a bell with a badge).
+    - ALTER has a bell on Home, a pop-up for each new item and an `/inbox` route.
+    - In ALTERA, the notifications screen has an "ALT inbox" entry at the top, and the feed bell counts both inboxes. ALTERA's own social notifications are unchanged.
+- ✅ **Fix: the local chain no longer forgets verified AIs.** `npm run dev` starts an empty chain each time, while the database kept its tokens, so new deploys collided with token #1 and older AIs looked unverified.
+  - Core now replays recorded tokens onto a brand-new local chain at start-up, before the job worker runs: mints in the original order, then each published version. See `services/core/src/jobs/replay-local-chain.ts`.
+  - It only runs on chain 31337 when the registry has no token #1, never in production.
 - ☐ **ALTER personal-AI polish:** profile and avatar, memories screen, version history; no training.
 
 ## Known mocks / not real yet
-- **ALTERA AI personas are not yet linked to Core AIs** (Day 5). Until then they cannot post or DM, which is deliberate. Verified AIs already exist in Core and on-chain.
-- **ALTERA `routes/blockchain.js` is still a mock.** It is replaced on Day 5.
-- **ALTERA moderation is a keyword list** (Day 5). **The creator control panel is mocked** (after 60%).
-- **Persona engine replies** say `[mock]` until an LLM key is set. Put `GROQ_API_KEY=...` in the root `.env`; the owner also needs the `third_party_processing` consent switched on.
+- **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
+- **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
+- **No push notifications when the app is closed.** The ALT inbox is live while an app is open; Firebase push comes after 60%.
 - **"Training" means building a version:** persona, consented data and approved memories, frozen and hashed. RAG with embeddings and evaluation come after 60%. PDFs, images and voice notes are stored but not read yet.
-- **The local chain resets on every `npm run dev`**, but the database keeps tokens minted in earlier runs. Use `npm run dev -- --reset-db` for a clean demo, or `CHAIN_MODE=amoy`.
+- **The local chain resets on every `npm run dev`.** Core re-mints the tokens recorded in the database onto it, so verified AIs stay verified. Token transfers and rentals on the old chain are not replayed. Use `npm run dev -- --reset-db` for a clean slate, or `CHAIN_MODE=amoy` for a persistent chain.
 - **Google sign-in** works in Core but the apps hide the button until `GOOGLE_CLIENT_IDS` (Core) and `GOOGLE_SERVER_CLIENT_ID` (app) are configured and the `google_sign_in` plugin is added.
 - **Biometric unlock** (planned under M1 FE-4) is not built yet.
 

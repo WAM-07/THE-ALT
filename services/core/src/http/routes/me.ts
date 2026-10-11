@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { Ctx } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit, publish } from '../../lib/audit.js';
+import { notify } from '../../lib/notify.js';
 import { randomToken } from '../../lib/crypto.js';
 import { badRequest, conflict, notFound, unauthorized } from '../../lib/errors.js';
 import { revokeAllSessions, revokeSession } from '../../modules/accounts/sessions.js';
@@ -251,6 +252,7 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
           [userId, address, req.body.makePrimary],
         );
         await audit(client, { action: 'wallet.linked', actorUserId: userId, entityType: 'wallet', entityId: address, ip: req.ip, data: { primary: req.body.makePrimary } });
+        await notify(client, { userId, category: 'security', type: 'security.wallet_linked', title: 'A wallet was linked to your account', body: address, data: { address } });
         await publish(client, 'user.wallets_changed', { userId });
       });
       return (await loadMe(ctx.db, await current(userId))).wallets;
@@ -298,6 +300,7 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
           await client.query(`UPDATE core.wallets SET is_primary = true WHERE user_id = $1 AND kind = 'custodial'`, [userId]);
         }
         await audit(client, { action: 'wallet.unlinked', actorUserId: userId, entityType: 'wallet', entityId: req.params.address, ip: req.ip });
+        await notify(client, { userId, category: 'security', type: 'security.wallet_unlinked', title: 'A wallet was removed from your account', body: req.params.address });
         await publish(client, 'user.wallets_changed', { userId });
       });
       return (await loadMe(ctx.db, await current(userId))).wallets;

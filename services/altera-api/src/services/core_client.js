@@ -43,6 +43,8 @@ module.exports = {
   assist: (instruction, callerUserId) => call('POST', '/internal/assist', { instruction, ...(callerUserId ? { callerUserId } : {}) }),
   /** ALT's safety rules (Module 16). */
   moderate: (text) => call('POST', '/internal/moderate', { text }),
+  /** Puts a notification in a person's ALT inbox (shown in every ALT app). Never throws. */
+  notify: (notification) => call('POST', '/internal/notifications', notification).catch((err) => console.error('[core notify]', err.message)),
   /** Independent check of an AI identity token: chain record + IPFS manifest. */
   verifyToken: (tokenId) => call('GET', `/verify/token/${encodeURIComponent(tokenId)}`),
 };

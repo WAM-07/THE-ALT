@@ -43,7 +43,10 @@ class HomeScreen extends ConsumerWidget {
             builder: (context, user, _) => ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Text('Hi, ${user?.displayName.split(' ').first ?? 'there'}', style: ALTTypography.headlineLarge),
+                Row(children: [
+                  Expanded(child: Text('Hi, ${user?.displayName.split(' ').first ?? 'there'}', style: ALTTypography.headlineLarge)),
+                  AltInboxButton(inbox: altInbox, onPressed: () => context.push('/inbox')),
+                ]),
                 const SizedBox(height: 4),
                 Text('@${user?.handle ?? ''}', style: ALTTypography.bodyMedium.copyWith(color: muted)),
                 const SizedBox(height: 24),

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Ctx, Platform as PlatformT } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit } from '../../lib/audit.js';
+import { notify } from '../../lib/notify.js';
 import { decrypt, encrypt, randomToken, safeEqual, sha256 } from '../../lib/crypto.js';
 import { AppError, badRequest, conflict, unauthorized } from '../../lib/errors.js';
 import { generateTotpSecret, totpUri, verifyTotp } from '../../lib/totp.js';
@@ -75,6 +76,13 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         const until = new Date(Date.now() + LOCKOUT_MS);
         await client.query('UPDATE core.users SET failed_login_count = 0, locked_until = $2 WHERE id = $1', [user.id, until]);
         await audit(client, { action: 'auth.lockout', actorUserId: user.id, entityType: 'user', entityId: user.id, ip, data: { reason } });
+        await notify(client, {
+          userId: user.id,
+          category: 'security',
+          type: 'security.locked',
+          title: 'Your account was locked for 30 minutes',
+          body: 'There were 5 failed sign-in attempts. If this was not you, change your password once you can sign in again.',
+        });
         return until;
       }
       await audit(client, { action: 'auth.login.failed', actorUserId: user.id, entityType: 'user', entityId: user.id, ip, data: { reason } });
@@ -363,6 +371,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         );
         await revokeAllSessions(client, userId, 'password_reset');
         await audit(client, { action: 'account.password_reset', actorUserId: userId, entityType: 'user', entityId: userId, ip: req.ip });
+        await notify(client, { userId, category: 'security', type: 'security.password_reset', title: 'Your password was reset', body: 'All devices were signed out.' });
       });
       return reply.send({ ok: true });
     },
@@ -393,6 +402,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         await client.query('UPDATE core.users SET password_hash = $2 WHERE id = $1', [user.id, hash]);
         const n = await revokeAllSessions(client, user.id, 'password_change', req.auth!.sessionId);
         await audit(client, { action: 'account.password_changed', actorUserId: user.id, entityType: 'user', entityId: user.id, ip: req.ip });
+        await notify(client, { userId: user.id, category: 'security', type: 'security.password_changed', title: 'Your password was changed', body: 'Other devices were signed out.' });
         return n;
       });
       return reply.send({ ok: true, otherSessionsRevoked: revoked });
@@ -429,6 +439,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         );
         const codes = await replaceRecoveryCodes(client, user.id);
         await audit(client, { action: 'account.2fa_enabled', actorUserId: user.id, entityType: 'user', entityId: user.id, ip: req.ip });
+        await notify(client, { userId: user.id, category: 'security', type: 'security.2fa_on', title: 'Two-factor authentication is on', body: 'Signing in now also needs a code from your authenticator app.' });
         return codes;
       });
       return reply.send({ enabled: true, recoveryCodes });
@@ -465,6 +476,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         );
         await client.query('DELETE FROM core.two_fa_recovery_codes WHERE user_id = $1', [user.id]);
         await audit(client, { action: 'account.2fa_disabled', actorUserId: user.id, entityType: 'user', entityId: user.id, ip: req.ip });
+        await notify(client, { userId: user.id, category: 'security', type: 'security.2fa_off', title: 'Two-factor authentication was turned off', body: 'If this was not you, turn it back on and change your password.' });
         return true;
       });
       if (!ok) throw unauthorized('MFA_CODE_INVALID', 'That code is not valid.');

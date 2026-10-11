@@ -21,6 +21,9 @@ final AltAccountClient altAccount = AltAccountClient(
   deviceName: 'ALTER app',
 );
 
+/// The ALT inbox (security alerts, news about the AI), live while someone is signed in.
+final AltInbox altInbox = AltInbox(altAccount);
+
 /// Opens ALTERA / ALTAR already signed in, and receives `alter://handoff?code=...` links.
 final AltHandoff altHandoff = AltHandoff(altAccount);
 

@@ -15,6 +15,8 @@ import { AppError } from './lib/errors.js';
 import { ChainService } from './lib/chain.js';
 import { localIpfs, pinataIpfs, type IpfsStore } from './lib/ipfs.js';
 import { createMailer, type Mailer } from './lib/mailer.js';
+import { NotificationHub } from './lib/notify.js';
+import { notificationRoutes } from './http/routes/notifications.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
 import { createLlmRouter, type LlmProvider, LlmRouter } from './modules/ai/llm.js';
@@ -72,7 +74,11 @@ export async function buildApp(opts: BuildOptions) {
       opts.ipfs ??
       (config.ipfs.mode === 'pinata' ? pinataIpfs(config.ipfs.pinataJwt!, config.ipfs.gatewayUrl) : localIpfs(config.storageDir, config.publicUrl)),
     llm: opts.llmProviders ? new LlmRouter(opts.llmProviders) : createLlmRouter(config.llm),
+    hub: new NotificationHub(config.databaseUrl),
   };
+  app.addHook('onReady', async () => {
+    await ctx.hub.start();
+  });
   const jobs = new JobRunner(ctx);
   app.decorate('jobs', jobs);
   if (opts.jobs ?? config.jobsEnabled) {
@@ -83,6 +89,7 @@ export async function buildApp(opts: BuildOptions) {
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => {
     await jobs.stop();
+    await ctx.hub.stop();
     await db.end();
   });
 
@@ -155,6 +162,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => directoryRoutes(i, ctx));
   await app.register(async (i) => chainRoutes(i, ctx));
   await app.register(async (i) => aiRoutes(i, ctx));
+  await app.register(async (i) => notificationRoutes(i, ctx));
 
   return app;
 }

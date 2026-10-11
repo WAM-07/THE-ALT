@@ -20,6 +20,9 @@ class AuthService {
   final AltAccountClient alt;
   late final AltHandoff handoff = AltHandoff(alt);
 
+  /// The ALT inbox shared with ALTER and ALTAR: security alerts and news about the person's AI.
+  late final AltInbox inbox = AltInbox(alt);
+
   String get baseUrl => AppConfig.baseUrl;
   final _storage = const FlutterSecureStorage();
   static const String _userKey = 'altera.user_bundle';

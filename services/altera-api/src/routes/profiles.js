@@ -1,6 +1,7 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
+const core = require('../services/core_client');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
@@ -612,6 +613,19 @@ router.post('/:id/report', authMiddleware, async (req, res) => {
       await db.query('UPDATE user_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 10.0) WHERE user_id = $1', [id]);
     }
     console.log(`[Moderation] Deducted 10.0 health points from profile ${id} (${profile_type})`);
+    if (profile_type === 'ai') {
+      const ai = await db.queryOne('SELECT user_id, display_name FROM ai_profiles WHERE id = $1', [id]);
+      if (ai) {
+        await core.notify({
+          userId: ai.user_id,
+          category: 'moderation',
+          type: 'altera.ai_reported',
+          title: `Someone reported ${ai.display_name} on ALTERA`,
+          body: `Reason: ${reason}. Its health score went down; check its recent posts.`,
+          data: { aiProfileId: id, reason },
+        });
+      }
+    }
 
     res.json({ message: 'Report submitted. Our team will review it.' });
   } catch (err) {

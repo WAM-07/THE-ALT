@@ -36,6 +36,13 @@ class _AlterAppState extends State<AlterApp> {
       },
       onError: (e) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(e.message))),
     );
+    // New notifications pop up wherever the person is in the app.
+    altInbox.incoming.listen((n) {
+      _messengerKey.currentState?.showSnackBar(SnackBar(
+        content: Text(n.title),
+        action: SnackBarAction(label: 'View', onPressed: () => goRouter.push('/inbox')),
+      ));
+    });
   }
 
   @override

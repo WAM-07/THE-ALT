@@ -194,6 +194,17 @@ export class ChainService {
     }
   }
 
+  /** True when no identity token has ever been minted on this registry (token ids start at 1). */
+  async isEmpty(): Promise<boolean> {
+    try {
+      await this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'ownerOf', args: [1n] });
+      return false;
+    } catch (err) {
+      if (err instanceof BaseError && err.walk((e) => e instanceof ContractFunctionRevertedError)) return true;
+      throw err;
+    }
+  }
+
   async tokenOfAi(aiUuid: string): Promise<bigint> {
     return this.publicClient.readContract({
       address: this.registryAddress,

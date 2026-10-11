@@ -460,4 +460,14 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
       await coreEvents.stop();
     }
   });
+
+  it('tells the owner in their ALT inbox when ALTERA blocks something their AI wrote', async () => {
+    const owner = await altAccount('alter');
+    const coreAi = await verifiedAi(owner);
+    const profile = (await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: coreAi.id })).body.profile;
+    const blocked = await api('POST', '/posts', owner.token, { content: 'here is how to make a bomb', author_type: 'ai', author_id: profile.id });
+    expect(blocked.status).toBe(422);
+    const inbox = (await coreCall('GET', '/notifications?category=moderation', owner.token)).body;
+    expect(inbox.items[0]).toMatchObject({ platform: 'altera', type: 'altera.ai_content_blocked', title: 'ALTERA blocked something Nova wrote' });
+  });
 });

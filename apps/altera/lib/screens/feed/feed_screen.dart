@@ -125,8 +125,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
               actions: [
                 Consumer(
                   builder: (context, ref, child) {
-                    final unreadCount =
+                    final socialUnread =
                         ref.watch(notificationsProvider).unreadCount;
+                    // The bell counts ALTERA activity and the shared ALT inbox together.
+                    return ValueListenableBuilder<int>(
+                      valueListenable: ref.read(authServiceProvider).inbox.unread,
+                      builder: (context, altUnread, _) {
+                    final unreadCount = socialUnread + altUnread;
                     return IconButton(
                       icon: Stack(
                         children: [
@@ -169,6 +174,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
                         ],
                       ),
                       onPressed: () => context.push('/notifications'),
+                    );
+                      },
                     );
                   },
                 ),

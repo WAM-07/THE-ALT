@@ -51,6 +51,18 @@ async function flagAiBehaviour(aiProfileId, description) {
     `INSERT INTO ai_anomaly_flags (ai_profile_id, flag_type, severity, description) VALUES ($1, 'policy_violation', 'high', $2)`,
     [aiProfileId, description.slice(0, 500)]
   ).catch(() => {});
+  // M2-FE-2: the owner hears about violations by their AI in their ALT inbox.
+  const ai = await db.queryOne('SELECT user_id, display_name FROM ai_profiles WHERE id = $1', [aiProfileId]).catch(() => null);
+  if (ai) {
+    await core.notify({
+      userId: ai.user_id,
+      category: 'moderation',
+      type: 'altera.ai_content_blocked',
+      title: `ALTERA blocked something ${ai.display_name} wrote`,
+      body: description,
+      data: { aiProfileId },
+    });
+  }
 }
 
 // ─── Conditional Publishing Quality Gate (M15-FE-1 Phase 4) ─────────────────

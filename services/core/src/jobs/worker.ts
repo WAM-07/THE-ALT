@@ -3,6 +3,7 @@ import type { Ctx } from '../context.js';
 import { tx } from '../db.js';
 import { audit, publish } from '../lib/audit.js';
 import { AppError } from '../lib/errors.js';
+import { notify } from '../lib/notify.js';
 import { loadAi, loadVersion } from '../modules/ai/repo.js';
 
 interface JobRow {
@@ -69,6 +70,15 @@ const mintAit: Handler = async (ctx, job, save) => {
       data: { tokenId: tokenId.toString(), txHash, chainId: chain.chainId, manifestCid: version.manifest_cid },
     });
     await publish(client, 'ai.verified', { aiId: ai.id, tokenId: tokenId.toString(), ownerId: ai.owner_id });
+    await notify(client, {
+      userId: ai.owner_id,
+      category: 'transaction',
+      type: 'ai.verified',
+      title: `${ai.name} is verified`,
+      body: `Its AI identity token #${tokenId} is on-chain. You can now bring it to ALTERA.`,
+      data: { aiId: ai.id, tokenId: tokenId.toString(), txHash },
+      link: 'alter://training',
+    });
     await announceAi(client, ai.id, 'verified');
   });
   return { txHash, tokenId: tokenId.toString(), blockNumber: blockNumber?.toString() ?? null };
@@ -78,6 +88,18 @@ const mintFailed: FailureHandler = async (ctx, job, error) => {
   await tx(ctx.db, async (client) => {
     await client.query(`UPDATE core.personal_ais SET status = 'ready' WHERE id = $1 AND status = 'minting'`, [job.payload.aiId]);
     await audit(client, { action: 'ai.mint_failed', actorService: 'core.jobs', entityType: 'ai', entityId: job.payload.aiId!, data: { error: error.message.slice(0, 300) } });
+    const { rows } = await client.query<{ owner_id: string; name: string }>('SELECT owner_id, name FROM core.personal_ais WHERE id = $1', [job.payload.aiId]);
+    if (rows[0]) {
+      await notify(client, {
+        userId: rows[0].owner_id,
+        category: 'transaction',
+        type: 'ai.deploy_failed',
+        title: `Deploying ${rows[0].name} did not work`,
+        body: 'Nothing was charged. You can try again from Train & deploy.',
+        data: { aiId: job.payload.aiId, error: error.message.slice(0, 200) },
+        link: 'alter://training',
+      });
+    }
   });
 };
 
@@ -112,6 +134,17 @@ const publishVersion: Handler = async (ctx, job, save) => {
       data: { version: version.version_no, onchainVersion: Number(after.version), txHash, manifestCid: version.manifest_cid },
     });
     await publish(client, 'ai.version_published', { aiId: version.ai_id, version: version.version_no });
+    const { rows: owners } = await client.query<{ owner_id: string; name: string }>('SELECT owner_id, name FROM core.personal_ais WHERE id = $1', [version.ai_id]);
+    if (owners[0]) {
+      await notify(client, {
+        userId: owners[0].owner_id,
+        category: 'transaction',
+        type: 'ai.version_live',
+        title: `${owners[0].name} v${version.version_no} is live everywhere`,
+        body: 'ALTERA and ALTAR now use this version.',
+        data: { aiId: version.ai_id, version: version.version_no, txHash },
+      });
+    }
     await announceAi(client, version.ai_id, 'version_published');
   });
   return { txHash, onchainVersion: Number(after.version) };

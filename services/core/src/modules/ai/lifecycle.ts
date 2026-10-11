@@ -4,6 +4,7 @@ import { tx } from '../../db.js';
 import { audit, canonical } from '../../lib/audit.js';
 import { sha256 } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
+import { notify } from '../../lib/notify.js';
 import { moderate } from './moderation.js';
 import { parsePersona } from './persona.js';
 import { approvedMemories, consentState, latestVersion, loadAi, requireConsent, type AiRow, type VersionRow } from './repo.js';
@@ -83,6 +84,16 @@ export async function buildVersion(ctx: Ctx, aiId: string, userId: string) {
         entityType: 'ai',
         entityId: ai.id,
         data: { version: versionNo, manifestCid: pinned.cid, datasets: datasets.length, memories: memories.length },
+      });
+      await notify(client, {
+        userId: ai.owner_id,
+        category: 'ai',
+        type: 'ai.version_built',
+        title: `Version ${versionNo} of ${ai.name} is ready`,
+        body: ai.status === 'verified' ? 'Publish it to update ALTERA and ALTAR.' : 'Finish the checks in ALTER to deploy it.',
+        data: { aiId: ai.id, version: versionNo, manifestCid: pinned.cid },
+        platform: 'alter',
+        link: 'alter://training',
       });
       return rows[0]!;
     });

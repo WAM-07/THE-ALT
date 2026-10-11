@@ -1,3 +1,4 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -55,9 +56,41 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
         ],
       ),
-      body: isLoading && notifications.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : _buildList(notifications),
+      body: Column(children: [
+        _altInboxTile(),
+        const Divider(height: 1),
+        Expanded(
+          child: isLoading && notifications.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : _buildList(notifications),
+        ),
+      ]),
+    );
+  }
+
+  /// Account-wide notifications (security, AI identity, moderation) live in the ALT inbox,
+  /// shared with ALTER and ALTAR; this screen's list is ALTERA's social activity.
+  Widget _altInboxTile() {
+    final auth = ref.read(authServiceProvider);
+    return ValueListenableBuilder<int>(
+      valueListenable: auth.inbox.unread,
+      builder: (context, unread, _) => ListTile(
+        leading: const CircleAvatar(
+          backgroundColor: AppColors.primary,
+          child: Icon(Icons.shield_outlined, color: Colors.white, size: 20),
+        ),
+        title: const Text('ALT inbox', style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: const Text('Security alerts and news about your AI, from every ALT app'),
+        trailing: unread > 0 ? Badge(label: Text('$unread')) : const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => AltInboxScreen(
+            inbox: auth.inbox,
+            onOpen: (n) {
+              if (n.link?.startsWith('alter://') == true) auth.handoff.open(AltPlatform.alter);
+            },
+          ),
+        )),
+      ),
     );
   }
 

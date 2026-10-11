@@ -58,6 +58,18 @@ final goRouter = GoRouter(
         onSignedOut: () => context.go('/auth'),
       ),
     ),
+    // The ALT inbox, shared by every ALT app (Module 2).
+    GoRoute(
+      path: '/inbox',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => AltInboxScreen(
+        inbox: altInbox,
+        onOpen: (n) {
+          final link = n.link;
+          if (link != null && link.startsWith('alter://')) context.go('/${link.substring('alter://'.length)}');
+        },
+      ),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) => ScaffoldWithNavBar(navigationShell: navigationShell),
       branches: [
