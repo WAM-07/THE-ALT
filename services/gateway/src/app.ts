@@ -140,11 +140,23 @@ export async function buildGateway(config: GatewayConfig, opts: { jwks?: JWTVeri
   };
 
   // One failing service must not take the others down: errors become a clear 502/504 for that prefix only.
-  type ProxyReply = { request: { id: string; log: FastifyRequest['log'] }; status(code: number): { send(payload: unknown): unknown } };
+  type ProxyReply = {
+    request: { id: string; log: FastifyRequest['log'] };
+    sent: boolean;
+    raw: { headersSent: boolean; destroy(): void };
+    status(code: number): { send(payload: unknown): unknown };
+  };
   const upstreamError = (name: string) => (reply: ProxyReply, e: unknown): void => {
     const err = ((e as { error?: unknown })?.error ?? e) as Error & { statusCode?: number; code?: string };
     const timedOut = err.statusCode === 504 || /timeout/i.test(err.code ?? '') || /timeout/i.test(err.message ?? '');
     reply.request.log.warn({ err, upstream: name }, 'upstream failed');
+    // The service died part-way through a response (e.g. Core restarting while an app's inbox stream
+    // is open). Too late for an error body: end the client's connection so it reconnects. Sending
+    // here would throw and take the whole gateway down.
+    if (reply.sent || reply.raw.headersSent) {
+      reply.raw.destroy();
+      return;
+    }
     void reply
       .status(timedOut ? 504 : 502)
       .send(errorBody(reply.request, timedOut ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_UNAVAILABLE', `The ${name} service is not responding right now.`));

@@ -1,16 +1,12 @@
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { createWriteStream } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import path from 'node:path';
-import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
 import type { Ctx } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit, publish } from '../../lib/audit.js';
 import { notify } from '../../lib/notify.js';
-import { randomToken } from '../../lib/crypto.js';
+import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media.js';
 import { badRequest, conflict, notFound, unauthorized } from '../../lib/errors.js';
 import { revokeAllSessions, revokeSession } from '../../modules/accounts/sessions.js';
 import { consumeSiwe, createSiweNonce } from '../../modules/accounts/siwe.js';
@@ -18,12 +14,6 @@ import { findUserById, handleTaken, loadMe, touchPlatform } from '../../modules/
 import { requireUser } from '../auth-guard.js';
 import { Address, DisplayName, Handle, Platform, SelfRole } from '../schemas.js';
 
-/** Only pictures served by ALT itself (or its Cloudinary account) may become an avatar: no tracking pixels. */
-function isTrustedMediaUrl(ctx: Ctx, url: string) {
-  return url.startsWith(`${ctx.config.publicUrl}/`) || url.startsWith('https://res.cloudinary.com/');
-}
-
-const AVATAR_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -93,16 +83,8 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
     '/me/avatar',
     { preHandler: authed, schema: { tags: ['account'], summary: 'Upload a profile picture (PNG, JPEG or WebP, up to 5 MB)', consumes: ['multipart/form-data'] } },
     async (req) => {
-      const file = await req.file({ limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
-      if (!file) throw badRequest('FILE_REQUIRED', 'Attach an image file.');
-      const ext = AVATAR_TYPES[file.mimetype];
-      if (!ext) throw badRequest('UNSUPPORTED_TYPE', 'Use a PNG, JPEG or WebP image.');
-      const name = `${req.auth!.userId}-${randomToken(6)}.${ext}`;
-      const dir = path.resolve(ctx.config.storageDir, 'avatars');
-      await mkdir(dir, { recursive: true });
-      await pipeline(file.file, createWriteStream(path.join(dir, name)));
-      if (file.file.truncated) throw badRequest('FILE_TOO_LARGE', 'The image must be 5 MB or smaller.');
-      const url = `${ctx.config.publicUrl}/core/media/avatars/${name}`;
+      const file = await req.file({ limits: { fileSize: AVATAR_MAX_BYTES, files: 1 } });
+      const url = await saveAvatar(ctx, file, req.auth!.userId);
       await tx(ctx.db, async (client) => {
         await client.query('UPDATE core.users SET avatar_url = $2 WHERE id = $1', [req.auth!.userId, url]);
         await publish(client, 'user.updated', { userId: req.auth!.userId, fields: ['avatarUrl'] });

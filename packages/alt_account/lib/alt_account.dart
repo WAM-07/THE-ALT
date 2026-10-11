@@ -11,6 +11,7 @@ export 'src/client.dart';
 export 'src/errors.dart';
 export 'src/handoff.dart';
 export 'src/inbox.dart';
+export 'src/media.dart';
 export 'src/models.dart';
 export 'src/token_store.dart';
 export 'src/ui/account_center.dart';

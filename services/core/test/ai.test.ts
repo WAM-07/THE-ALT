@@ -301,3 +301,38 @@ describe('what the AI knows from your data', () => {
     expect(lastSystemPrompt()).toContain('I love Flutter and blockchain.');
   });
 });
+
+describe('the AI’s picture', () => {
+  const upload = (aiId: string, token: string, type: string, bytes: Buffer) => {
+    const boundary = '----altimg';
+    const payload = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="me.png"\r\nContent-Type: ${type}\r\n\r\n`),
+      bytes,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    return t.app.inject({ method: 'POST', url: `/ais/${aiId}/avatar`, headers: { ...auth(token), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
+  };
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex');
+
+  it('uploads a picture that ALT serves itself', async () => {
+    const u = await signUp(t);
+    const ai = await createAi(u.accessToken);
+    const res = await upload(ai.id, u.accessToken, 'image/png', png);
+    expect(res.statusCode).toBe(200);
+    const url: string = res.json().avatarUrl;
+    expect(url).toMatch(new RegExp(`^${t.config.publicUrl}/core/media/avatars/${ai.id}-.+\.png$`));
+    const served = await t.app.inject({ method: 'GET', url: url.slice(t.config.publicUrl.length).replace(/^\/core/, '') });
+    expect(served.statusCode).toBe(200);
+    expect(served.rawPayload.equals(png)).toBe(true);
+  });
+
+  it('refuses other file types, other people’s AIs and pictures hosted elsewhere', async () => {
+    const u = await signUp(t);
+    const other = await signUp(t);
+    const ai = await createAi(u.accessToken);
+    expect((await upload(ai.id, u.accessToken, 'image/gif', png)).json().error.code).toBe('UNSUPPORTED_TYPE');
+    expect((await upload(ai.id, other.accessToken, 'image/png', png)).statusCode).toBe(404);
+    const res = await call('PATCH', `/ais/${ai.id}`, u.accessToken, { avatarUrl: 'https://tracker.example.com/pixel.png' });
+    expect(res.json().error.code).toBe('UNTRUSTED_AVATAR');
+  });
+});

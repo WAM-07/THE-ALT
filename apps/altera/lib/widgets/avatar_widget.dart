@@ -1,3 +1,4 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -88,8 +89,8 @@ class AvatarWidget extends StatelessWidget {
         }
       }
     }
-    // Otherwise, treat as a network image
-    return NetworkImage(url);
+    // Otherwise, treat as a network image (links to ALT's own files are made reachable from this device)
+    return NetworkImage(altMediaUrl(url, AppConfig.apiUrl));
   }
 
   @override

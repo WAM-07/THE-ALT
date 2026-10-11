@@ -9,6 +9,7 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
 import '../../../shared/widgets/gradient_background.dart';
+import '../../ai_profile/screens/ai_profile_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -53,7 +54,7 @@ class HomeScreen extends ConsumerWidget {
                 ValueListenableBuilder<AltAi?>(
                   valueListenable: currentAi,
                   builder: (context, ai, _) {
-                    final (status, next, route) = switch (ai?.status) {
+                    final (status, next, _) = switch (ai?.status) {
                       'verified' => ('Verified · identity token #${ai!.token?.tokenId}', 'It can now appear on ALTERA and ALTAR.', '/training'),
                       'minting' => ('Minting its identity token…', 'This takes a few seconds.', '/training'),
                       'ready' => ('Version v${ai!.latestVersion?['version']} built', 'Finish the checks and deploy it.', '/training'),
@@ -63,15 +64,14 @@ class HomeScreen extends ConsumerWidget {
                       color: card,
                       child: ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: ai?.verified == true ? ALTColors.jadeSurge : ALTColors.irisViolet,
-                          child: Icon(ai?.verified == true ? Icons.verified : Icons.psychology_alt_rounded, color: Colors.white),
-                        ),
+                        leading: ai == null
+                            ? const CircleAvatar(backgroundColor: ALTColors.irisViolet, child: Icon(Icons.psychology_alt_rounded, color: Colors.white))
+                            : AiAvatar(ai: ai),
                         title: Text(ai?.name ?? 'Your personal AI', style: ALTTypography.headlineSmall),
                         subtitle: Text('$status\n$next', style: ALTTypography.bodySmall.copyWith(color: muted)),
                         isThreeLine: true,
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.go(route),
+                        onTap: () => context.push('/ai'),
                       ),
                     );
                   },

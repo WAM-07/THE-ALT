@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/alt/alt_session.dart';
 import '../../core/theme/colors.dart';
+import '../../features/ai_profile/screens/ai_profile_screen.dart';
+import '../../features/ai_profile/screens/memories_screen.dart';
+import '../../features/ai_profile/screens/versions_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/dataset/screens/dataset_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
@@ -11,6 +14,7 @@ import '../../features/persona_interface/screens/chat_screen.dart';
 import '../../features/persona_interface/screens/home_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/training_manager/screens/training_screen.dart';
+import '../widgets/offline_screen.dart';
 import 'scaffold_with_nav_bar.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -24,10 +28,12 @@ String? _guard(BuildContext context, GoRouterState state) {
     case AiPhase.unknown:
     case AiPhase.loading:
       return loc == '/splash' ? null : '/splash';
+    case AiPhase.error:
+      return loc == '/offline' || loc == '/account' ? null : '/offline';
     case AiPhase.none:
       return loc == '/onboarding' || loc == '/account' ? null : '/onboarding';
     case AiPhase.exists:
-      if (loc == '/auth' || loc == '/splash' || loc == '/' || loc == '/onboarding') return '/home';
+      if (loc == '/auth' || loc == '/splash' || loc == '/' || loc == '/onboarding' || loc == '/offline') return '/home';
       return null;
   }
 }
@@ -57,6 +63,17 @@ final goRouter = GoRouter(
         handoff: altHandoff,
         onSignedOut: () => context.go('/auth'),
       ),
+    ),
+    GoRoute(path: '/offline', builder: (context, state) => const OfflineScreen()),
+    // The personal AI's profile, memories and versions.
+    GoRoute(
+      path: '/ai',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AiProfileScreen(),
+      routes: [
+        GoRoute(path: 'memories', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const MemoriesScreen()),
+        GoRoute(path: 'versions', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const VersionsScreen()),
+      ],
     ),
     // The ALT inbox, shared by every ALT app (Module 2).
     GoRoute(

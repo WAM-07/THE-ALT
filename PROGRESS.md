@@ -18,10 +18,10 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 31 · core 60 · gateway 7 · altera-api 16 (real PostgreSQL and a real local chain)
-cd packages/alt_account && C:\flutter\bin\flutter test    # 10 tests
+npm test                        # contracts 31 · core 62 · gateway 8 · altera-api 16 (real PostgreSQL and a real local chain)
+cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
-cd apps/alter  && C:\flutter\bin\flutter test             # app boots signed out → sign-in
+cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
 npm run dev                     # everything at http://localhost:8080
 ```
 
@@ -204,7 +204,19 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - ✅ **Fix: the local chain no longer forgets verified AIs.** `npm run dev` starts an empty chain each time, while the database kept its tokens, so new deploys collided with token #1 and older AIs looked unverified.
   - Core now replays recorded tokens onto a brand-new local chain at start-up, before the job worker runs: mints in the original order, then each published version. See `services/core/src/jobs/replay-local-chain.ts`.
   - It only runs on chain 31337 when the registry has no token #1, never in production.
-- ☐ **ALTER personal-AI polish:** profile and avatar, memories screen, version history; no training.
+- ✅ **ALTER personal-AI polish (no training).** Checked on the Android emulator and live through the gateway.
+  - **"Your AI" profile** (`/ai`, opened from the Home card):
+    - picture upload (`POST /core/ais/:id/avatar`, PNG, JPEG or WebP, up to 5 MB), plus name and bio; ALTERA shows these within seconds;
+    - personality: about, traits, interests and boundaries, saved to the draft until a version is published;
+    - status and the next step.
+  - **Memories** (`/ai/memories`): approve or dismiss suggestions from chats, teach it something, forget a memory.
+  - **Version history** (`/ai/versions`): every version with its date, data and memory counts, status (built, on-chain or live), IPFS manifest, transaction and publish button. Deploy links to it.
+  - **Offline state:** if ALT can't be reached at start-up, ALTER shows "Try again" instead of sending the person to onboarding, which could have created a second AI.
+- ✅ **Fixes found during this step.**
+  - **The gateway crashed when Core restarted** while an app had a live stream open. It tried to send an error on a response already in progress. It now ends that connection and the app reconnects; a gateway test covers it.
+  - **ALT file links failed on phones.** Avatars and local-IPFS manifests are stored as `http://localhost:8080/...`. `altMediaUrl()` in `alt_account` points them at the app's own API address (`10.0.2.2` on the emulator); ALTER and ALTERA use it.
+  - **AI pictures must now be hosted by ALT** (`UNTRUSTED_AVATAR`), as people's pictures already were.
+  - **A second `npm run dev`** now says THE ALT is already running instead of crashing with "undefined".
 
 ## Known mocks / not real yet
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
@@ -219,6 +231,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Development needs no keys.** Optional settings go in `.env`: `GOOGLE_CLIENT_IDS`, `SMTP_URL` with `MAIL_MODE=smtp`, and `ADMIN_EMAILS`.
 - **Flutter SDK is at `C:\flutter`.** It was moved out of `ALTER/flutter` because Flutter's native-asset build fails when the SDK path contains a space ("C:\THE ALT"). Add `C:\flutter\bin` to PATH.
 - **Android Studio is installed** (SDK 36, Android 16 emulator, licences accepted). Both apps build and run on the emulator. Checked 2026-10-12: sign-in, the ALTER → ALTERA handoff, the verified AI and the shared inbox.
+  - **The emulator's GPU sometimes draws garbage or drops text.** The app content is correct (checked with `adb shell uiautomator dump`). Fix: Device Manager → edit the device → Graphics: Software (or Hardware GLES 2.0), then Cold Boot Now.
   - **Gradle 9.1 is required.** Android Studio bundles Java 25, which Gradle 8.x cannot run on (the build fails with just "25.0.3").
   - Emulator: start `npm run dev`, then `flutter run --dart-define-from-file=env/dev.json` in `apps/alter` or `apps/altera`. The emulator reaches the PC at `10.0.2.2`.
   - Physical phone: `--dart-define=ALT_API_URL=http://<PC LAN IP>:8080` (`npm run dev` prints it).

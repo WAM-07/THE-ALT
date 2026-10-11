@@ -11,6 +11,13 @@ let forged: string;
 beforeAll(async () => {
   // A stand-in service that echoes what it received.
   upstream = Fastify();
+  // Starts a live stream, then dies (as Core does when it restarts with an app's inbox open).
+  upstream.get('/stream-then-die', (req, reply) => {
+    reply.hijack();
+    reply.raw.writeHead(200, { 'content-type': 'text/event-stream' });
+    reply.raw.write('event: ready\ndata: {}\n\n');
+    setTimeout(() => req.raw.socket.resetAndDestroy(), 100); // a killed process resets the connection
+  });
   upstream.all('/*', async (req) => ({ url: req.url, headers: req.headers }));
   upstream.get('/health', async () => ({ status: 'ok' }));
   await upstream.listen({ port: 0, host: '127.0.0.1' });
@@ -95,5 +102,17 @@ describe('browser CORS', () => {
     expect(res.statusCode).toBe(204);
     expect(res.headers['access-control-allow-methods']).toContain('PATCH');
     expect(res.headers['access-control-allow-methods']).toContain('DELETE');
+  });
+
+  it('survives a service dying in the middle of a live stream', async () => {
+    await gateway.listen({ port: 0, host: '127.0.0.1' });
+    const base = `http://127.0.0.1:${(gateway.server.address() as { port: number }).port}`;
+    const res = await fetch(`${base}/core/stream-then-die`);
+    expect(res.status).toBe(200);
+    // The client sees its stream end (and reconnects); the gateway itself keeps running.
+    await res.text().catch(() => '');
+    await new Promise((r) => setTimeout(r, 200));
+    const after = await fetch(`${base}/core/me`, { headers: { authorization: `Bearer ${token}` } });
+    expect(after.status).toBe(200);
   });
 });

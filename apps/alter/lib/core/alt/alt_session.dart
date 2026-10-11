@@ -40,7 +40,8 @@ Future<void> restoreAltSession() async {
 
 // ---------------------------------------------------------------- the person's AI
 
-enum AiPhase { unknown, loading, none, exists }
+/// `error`: ALT Core could not be reached, so we do not know yet whether the person has an AI.
+enum AiPhase { unknown, loading, none, exists, error }
 
 /// Whether the signed-in person already has a personal AI (loaded from ALT Core after sign-in).
 final ValueNotifier<AiPhase> aiPhase = ValueNotifier<AiPhase>(AiPhase.unknown);
@@ -55,8 +56,8 @@ Future<void> loadMyAi() async {
     currentAi.value = list.isEmpty ? null : await aiApi.get(list.first.id);
     aiPhase.value = list.isEmpty ? AiPhase.none : AiPhase.exists;
   } catch (_) {
-    // Offline or server trouble: let the person in; screens retry and show errors.
-    aiPhase.value = currentAi.value == null ? AiPhase.none : AiPhase.exists;
+    // Offline or server trouble. Never treat that as "no AI": onboarding would create a second one.
+    aiPhase.value = currentAi.value == null ? AiPhase.error : AiPhase.exists;
   }
 }
 

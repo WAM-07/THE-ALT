@@ -6,6 +6,7 @@ import { tx } from '../../db.js';
 import { audit, publish } from '../../lib/audit.js';
 import { sha256 } from '../../lib/crypto.js';
 import { AppError, badRequest, conflict, notFound } from '../../lib/errors.js';
+import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
 import { moderate } from '../../modules/ai/moderation.js';
@@ -195,6 +196,9 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       },
     },
     async (req) => {
+      if (req.body.avatarUrl && !isTrustedMediaUrl(ctx, req.body.avatarUrl)) {
+        throw badRequest('UNTRUSTED_AVATAR', 'Upload the picture to ALT first (POST /ais/:id/avatar).');
+      }
       const ai = await tx(ctx.db, async (client) => {
         const ai = await requireOwnedAi(client, req.auth!.userId, req.params.id, true);
         assertMutable(ai);
@@ -449,6 +453,26 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       });
       await removeDatasetFile(ctx, req.params.datasetId);
       return { deleted: true };
+    },
+  );
+
+  r.post(
+    '/ais/:id/avatar',
+    { preHandler: authed, schema: { tags: ['ai'], summary: 'Upload the AI’s picture (PNG, JPEG or WebP, up to 5 MB)', params: AiId, consumes: ['multipart/form-data'] } },
+    async (req) => {
+      const owned = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      assertMutable(owned);
+      const url = await saveAvatar(ctx, await req.file({ limits: { fileSize: AVATAR_MAX_BYTES, files: 1 } }), owned.id);
+      const ai = await tx(ctx.db, async (client) => {
+        await client.query('UPDATE core.personal_ais SET avatar_url = $2 WHERE id = $1', [owned.id, url]);
+        if (owned.status === 'verified') {
+          // ALTERA picks the new picture up straight away (presentation does not need a new version).
+          await publish(client, 'ai.updated', { aiId: owned.id, fields: ['avatarUrl'] });
+          await client.query(`SELECT pg_notify('alt_ai_events', $1)`, [JSON.stringify({ aiId: owned.id, event: 'updated' })]);
+        }
+        return loadAi(client, owned.id);
+      });
+      return detail(ai!);
     },
   );
 

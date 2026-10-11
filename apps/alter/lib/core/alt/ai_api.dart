@@ -8,6 +8,9 @@ import 'alt_session.dart';
 
 // Models for the personal AI as ALT Core describes it.
 
+/// A link to a file ALT serves, made reachable from this device (see `altMediaUrl`).
+String media(String url) => altMediaUrl(url, AltConfig.apiUrl);
+
 class AiToken {
   AiToken(this.j);
   final Map<String, dynamic> j;
@@ -27,6 +30,7 @@ class AltAi {
   String get handle => j['handle'] as String;
   String get name => j['name'] as String;
   String? get description => j['description'] as String?;
+  String? get avatarUrl => j['avatarUrl'] == null ? null : media(j['avatarUrl'] as String);
   String get status => j['status'] as String;
   bool get verified => j['verified'] == true;
   int? get currentVersion => (j['currentVersion'] as Map?)?['version'] as int?;
@@ -76,9 +80,26 @@ class AiVersionInfo {
   String get id => j['id'] as String;
   int get version => j['version'] as int;
   String get manifestCid => j['manifestCid'] as String;
-  String get manifestUrl => j['manifestUrl'] as String;
+  String get manifestUrl => media(j['manifestUrl'] as String);
   bool get published => j['published'] == true;
   bool get current => j['current'] == true;
+  String? get onchainTx => j['onchainTx'] as String?;
+  int get datasets => (j['datasets'] as num?)?.toInt() ?? 0;
+  int get memories => (j['memories'] as num?)?.toInt() ?? 0;
+  DateTime? get createdAt => j['createdAt'] == null ? null : DateTime.parse(j['createdAt'] as String);
+}
+
+/// Something the AI remembers about its owner, or a suggestion waiting for approval.
+class AiMemory {
+  AiMemory(this.j);
+  final Map<String, dynamic> j;
+  String get id => j['id'] as String;
+  String get content => j['content'] as String;
+  /// 'owner' (you taught it) or 'chat' (it suggested it while you talked).
+  String get source => j['source'] as String;
+  /// 'proposed', 'approved' or 'discarded'.
+  String get status => j['status'] as String;
+  DateTime? get createdAt => j['createdAt'] == null ? null : DateTime.parse(j['createdAt'] as String);
 }
 
 /// What each consent means (the same wording ALT Core records).
@@ -117,6 +138,25 @@ class AiApi {
         'consents': consents,
       }) as Map));
 
+  /// Edits name and bio (shown on ALTERA straight away) and, optionally, the persona (needs a new version).
+  Future<AltAi> update(String id, {String? name, String? description, Map<String, dynamic>? persona}) async =>
+      AltAi(Map<String, dynamic>.from(await _call('PATCH', '/ais/$id', body: {
+        if (name != null) 'name': name,
+        if (description != null) 'description': description.isEmpty ? null : description,
+        if (persona != null) 'persona': persona,
+      }) as Map));
+
+  Future<AltAi> uploadAvatar(String id, {required List<int> bytes, required String fileName, required String mimeType}) async {
+    final token = await altAccount.accessToken();
+    final req = http.MultipartRequest('POST', Uri.parse('${altAccount.coreUrl}/ais/$id/avatar'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: fileName, contentType: MediaType.parse(mimeType)));
+    final res = await http.Response.fromStream(await req.send());
+    final body = res.body.isEmpty ? null : jsonDecode(res.body);
+    if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, body);
+    return AltAi(Map<String, dynamic>.from(body as Map));
+  }
+
   Future<AltAi> updatePersona(String id, Map<String, dynamic> persona) async =>
       AltAi(Map<String, dynamic>.from(await _call('PATCH', '/ais/$id', body: {'persona': persona}) as Map));
 
@@ -149,8 +189,8 @@ class AiApi {
   Future<void> deleteDataset(String id, String datasetId) => _call('DELETE', '/ais/$id/datasets/$datasetId');
 
   // memories
-  Future<List<Map<String, dynamic>>> memories(String id, {String? status}) async =>
-      (await _call('GET', '/ais/$id/memories${status != null ? '?status=$status' : ''}') as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  Future<List<AiMemory>> memories(String id, {String? status}) async =>
+      (await _call('GET', '/ais/$id/memories${status != null ? '?status=$status' : ''}') as List).map((e) => AiMemory(Map<String, dynamic>.from(e as Map))).toList();
   Future<void> addMemory(String id, String content) => _call('POST', '/ais/$id/memories', body: {'content': content});
   Future<void> decideMemory(String id, String memoryId, bool approve) =>
       _call('PATCH', '/ais/$id/memories/$memoryId', body: {'status': approve ? 'approved' : 'discarded'});

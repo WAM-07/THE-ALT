@@ -228,6 +228,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
                         subtitle: Text(v.manifestCid, maxLines: 1, overflow: TextOverflow.ellipsis),
                         onTap: () => launchUrl(Uri.parse(v.manifestUrl), mode: LaunchMode.externalApplication),
                       ),
+                    if (_versions.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(onPressed: () => context.push('/ai/versions'), child: Text('All ${_versions.length} versions')),
+                      ),
                   ]),
                 ),
                 const SizedBox(height: 16),

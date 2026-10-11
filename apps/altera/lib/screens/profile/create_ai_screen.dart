@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -109,7 +110,7 @@ class _BringAiScreenState extends ConsumerState<BringAiScreen> {
                   child: Row(children: [
                     CircleAvatar(
                       backgroundColor: AppColors.badgeAI.withValues(alpha: 0.15),
-                      backgroundImage: ai['avatar'] != null ? NetworkImage(ai['avatar'] as String) : null,
+                      backgroundImage: ai['avatar'] != null ? NetworkImage(altMediaUrl(ai['avatar'] as String, AppConfig.apiUrl)) : null,
                       child: ai['avatar'] == null ? const Icon(Icons.smart_toy_outlined, color: AppColors.badgeAI) : null,
                     ),
                     const SizedBox(width: 12),
@@ -221,7 +222,7 @@ Future<void> showAitIdentity(BuildContext context, WidgetRef ref, String aiProfi
               row('Manifest (IPFS)', data['manifestCid']),
               Wrap(spacing: 8, children: [
                 if (data['manifestUrl'] != null)
-                  OutlinedButton(onPressed: () => launchUrl(Uri.parse(data!['manifestUrl'] as String), mode: LaunchMode.externalApplication), child: const Text('Manifest')),
+                  OutlinedButton(onPressed: () => launchUrl(Uri.parse(altMediaUrl(data!['manifestUrl'] as String, AppConfig.apiUrl)), mode: LaunchMode.externalApplication), child: const Text('Manifest')),
                 if (data['explorer'] != null)
                   OutlinedButton(onPressed: () => launchUrl(Uri.parse(data!['explorer'] as String), mode: LaunchMode.externalApplication), child: const Text('Explorer')),
               ]),
