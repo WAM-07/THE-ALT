@@ -5,6 +5,7 @@ import { loadConfig } from '../src/config.js';
 import { createMailer } from '../src/lib/mailer.js';
 import type { GoogleIdentity } from '../src/modules/auth/google.js';
 import { AppError } from '../src/lib/errors.js';
+import type { LlmProvider } from '../src/modules/ai/llm.js';
 
 const privateKey = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -25,7 +26,7 @@ export const fakeGoogle = {
   },
 };
 
-export async function makeApp(env: Record<string, string> = {}) {
+export async function makeApp(env: Record<string, string> = {}, opts: { llmProviders?: LlmProvider[] } = {}) {
   const config = loadConfig({
     NODE_ENV: 'test',
     DATABASE_URL: inject('databaseUrl'),
@@ -45,7 +46,7 @@ export async function makeApp(env: Record<string, string> = {}) {
     ...env,
   });
   const mailer = createMailer(config, () => {});
-  const app = await buildApp({ config, logger: false, google: fakeGoogle, mailer });
+  const app = await buildApp({ config, logger: false, google: fakeGoogle, mailer, jobs: false, ...(opts.llmProviders ? { llmProviders: opts.llmProviders } : {}) });
   await app.ready();
   return { app, mailer, config };
 }

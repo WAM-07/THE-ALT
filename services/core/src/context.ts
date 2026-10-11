@@ -3,6 +3,7 @@ import type { Db } from './db.js';
 import type { GoogleVerifier } from './modules/auth/google.js';
 import type { ChainService } from './lib/chain.js';
 import type { IpfsStore } from './lib/ipfs.js';
+import type { LlmRouter } from './modules/ai/llm.js';
 import type { Mailer } from './lib/mailer.js';
 import type { TokenService } from './lib/tokens.js';
 
@@ -16,6 +17,7 @@ export interface Ctx {
   /** Null when no blockchain is configured; chain features then answer 503 CHAIN_DISABLED. */
   chain: ChainService | null;
   ipfs: IpfsStore;
+  llm: LlmRouter;
 }
 
 export const PLATFORMS = ['alter', 'altera', 'altar', 'admin'] as const;

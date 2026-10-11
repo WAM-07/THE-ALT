@@ -17,6 +17,9 @@ import { localIpfs, pinataIpfs, type IpfsStore } from './lib/ipfs.js';
 import { createMailer, type Mailer } from './lib/mailer.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
+import { createLlmRouter, type LlmProvider, LlmRouter } from './modules/ai/llm.js';
+import { JobRunner } from './jobs/worker.js';
+import { aiRoutes } from './http/routes/ais.js';
 import { authRoutes } from './http/routes/auth.js';
 import { directoryRoutes } from './http/routes/directory.js';
 import { meRoutes } from './http/routes/me.js';
@@ -28,6 +31,9 @@ export interface BuildOptions {
   google?: GoogleVerifier;
   mailer?: Mailer;
   ipfs?: IpfsStore;
+  llmProviders?: LlmProvider[];
+  /** Start the background job loop (default: config.jobsEnabled). Tests drain jobs by hand. */
+  jobs?: boolean;
   logger?: boolean;
 }
 
@@ -65,9 +71,18 @@ export async function buildApp(opts: BuildOptions) {
     ipfs:
       opts.ipfs ??
       (config.ipfs.mode === 'pinata' ? pinataIpfs(config.ipfs.pinataJwt!, config.ipfs.gatewayUrl) : localIpfs(config.storageDir, config.publicUrl)),
+    llm: opts.llmProviders ? new LlmRouter(opts.llmProviders) : createLlmRouter(config.llm),
   };
+  const jobs = new JobRunner(ctx);
+  app.decorate('jobs', jobs);
+  if (opts.jobs ?? config.jobsEnabled) {
+    app.addHook('onReady', async () => {
+      await jobs.start();
+    });
+  }
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => {
+    await jobs.stop();
     await db.end();
   });
 
@@ -139,6 +154,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => meRoutes(i, ctx));
   await app.register(async (i) => directoryRoutes(i, ctx));
   await app.register(async (i) => chainRoutes(i, ctx));
+  await app.register(async (i) => aiRoutes(i, ctx));
 
   return app;
 }
@@ -146,5 +162,6 @@ export async function buildApp(opts: BuildOptions) {
 declare module 'fastify' {
   interface FastifyInstance {
     ctx: Ctx;
+    jobs: JobRunner;
   }
 }
