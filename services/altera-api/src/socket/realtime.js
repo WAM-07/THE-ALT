@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db/database');
+const core = require('../services/core_client');
 const { storeImageDataUri, storeMediaDataUri } = require('../services/media_storage');
 
 const connectedUsers = new Map();
@@ -78,6 +79,177 @@ function isAudioUrl(mediaUrl) {
     (mediaUrl.startsWith('data:audio/') ||
       /\.(mp3|wav|m4a|aac|ogg)(\?.*)?$/i.test(mediaUrl))
   );
+}
+
+/**
+ * Saves a direct message, keeps its conversation up to date, tells the receiver, and returns the
+ * message as the app expects it. Used for people and for AI replies alike.
+ */
+async function deliverDm(io, { senderUserId, senderProfileId, senderType, senderInfo, receiverId, receiverType, receiverInfo, content, mediaUrl, mediaType }) {
+  const conversationId = getConversationId(
+    senderProfileId,
+    senderType,
+    receiverId,
+    receiverType
+  );
+
+  const messageId = uuidv4();
+  const createdAt = new Date().toISOString();
+
+  const receiverUserId = receiverType === 'ai' ? receiverInfo.user_id : receiverInfo.id;
+
+  // Persist to DB
+  await db.query(
+    `INSERT INTO messages (id, conversation_id, sender_id, sender_profile_id, sender_type, recipient_id, recipient_profile_id, recipient_type, content, media_url, media_type, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [
+      messageId,
+      conversationId,
+      senderUserId,
+      senderProfileId,
+      senderType,
+      receiverUserId,
+      receiverId,
+      receiverType,
+      content,
+      mediaUrl || null,
+      mediaType,
+      createdAt
+    ]
+  );
+
+  // ─── Ensure Conversation Exists (canonical ordering) ───
+  try {
+    const key1 = makeParticipantKey(senderProfileId, senderType);
+    const key2 = makeParticipantKey(receiverId, receiverType);
+    const profile1IsFirst = key1 < key2;
+
+    const user1Id   = profile1IsFirst ? senderUserId     : receiverUserId;
+    const user2Id   = profile1IsFirst ? receiverUserId    : senderUserId;
+    const p1Id      = profile1IsFirst ? senderProfileId   : receiverId;
+    const p2Id      = profile1IsFirst ? receiverId        : senderProfileId;
+    const p1Type    = profile1IsFirst ? senderType        : receiverType;
+    const p2Type    = profile1IsFirst ? receiverType      : senderType;
+
+    await db.query(
+      `INSERT INTO conversations (id, user1_id, user2_id, profile1_id, profile2_id, profile1_type, profile2_type, last_message_id, last_message_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+       ON CONFLICT (id) DO UPDATE SET 
+         last_message_id = EXCLUDED.last_message_id,
+         last_message_at = EXCLUDED.last_message_at,
+         updated_at = EXCLUDED.updated_at,
+         is_archived = FALSE`,
+      [
+        conversationId,
+        user1Id, user2Id,
+        p1Id, p2Id,
+        p1Type, p2Type,
+        messageId,
+        createdAt
+      ]
+    );
+  } catch (e) {
+    console.error('[Socket Conversation Sync Error]', e);
+  }
+
+  // ─── Create Notification ───
+  try {
+    if (receiverUserId !== senderUserId) {
+      const notificationId = uuidv4();
+      const notificationMessage = buildNotificationMessage({
+        content,
+        mediaUrl: mediaUrl,
+        mediaType,
+      });
+      // We no longer insert 'message' notifications into the DB to keep the Notification List clean (Messages only in Inbox)
+      // But we still emit the real-time event for UI updates
+      io.to(`notifications:${receiverUserId}`).emit(
+        'notification:new',
+        {
+          id: notificationId,
+          user_id: receiverUserId,
+          actor_id: senderUserId,
+          actor_name: senderInfo.display_name,
+          actor_avatar: senderInfo.avatar,
+          type: 'message',
+          post_id: null,
+          comment_id: null,
+          post_snippet: null,
+          message: notificationMessage,
+          is_read: false,
+          read_at: null,
+          created_at: createdAt,
+        },
+      );
+    }
+  } catch (e) { console.error('[DM Notif Error]', e); }
+
+  const messageResponse = {
+    id: messageId,
+    conversation_id: conversationId,
+    sender_id: senderProfileId,
+    sender_user_id: senderUserId,
+    sender_profile_id: senderProfileId,
+    sender_profile_type: senderType,
+    sender_name: senderInfo.display_name,
+    sender_username: senderInfo.username,
+    sender_avatar_url: senderInfo.avatar,
+    sender_is_verified: !!senderInfo.is_verified,
+    sender_is_ai: senderType === 'ai',
+    receiver_id: receiverId,
+    receiver_user_id: receiverUserId,
+    receiver_profile_id: receiverId,
+    receiver_profile_type: receiverType,
+    receiver_name: receiverInfo.display_name,
+    receiver_username: receiverInfo.username,
+    receiver_avatar_url: receiverInfo.avatar,
+    receiver_is_verified: !!receiverInfo.is_verified,
+    receiver_is_ai: receiverType === 'ai',
+    content,
+    media_url: mediaUrl || null,
+    media_type: mediaType,
+    created_at: createdAt,
+    is_read: false,
+  };
+
+  io.to(`user:${messageResponse.receiver_user_id}`).emit('dm:receive', messageResponse);
+  return messageResponse;
+}
+
+/** A verified AI with autonomy on replies in its own voice, through ALT Core's persona engine. */
+async function maybeAiAutoReply(io, { aiProfileId, humanUserId, conversationId }) {
+  const ai = await db.queryOne(
+    'SELECT id, user_id, username, display_name, avatar, is_verified, autonomy_enabled, core_ai_id FROM ai_profiles WHERE id = $1',
+    [aiProfileId]
+  );
+  if (!ai || !ai.is_verified || !ai.autonomy_enabled || !ai.core_ai_id || ai.user_id === humanUserId) return null;
+  const human = await db.queryOne(
+    'SELECT id, username, full_name as display_name, avatar_url as avatar, is_verified FROM users WHERE id = $1',
+    [humanUserId]
+  );
+  if (!human) return null;
+  const history = await db.queryMany(
+    `SELECT sender_type, content FROM messages
+      WHERE conversation_id = $1 AND is_unsended = FALSE AND content IS NOT NULL AND content <> ''
+      ORDER BY created_at DESC LIMIT 10`,
+    [conversationId]
+  );
+  const messages = history.reverse().map((m) => ({ role: m.sender_type === 'ai' ? 'assistant' : 'user', content: m.content.slice(0, 4000) }));
+  if (!messages.length || messages[messages.length - 1].role !== 'user') return null;
+  const reply = await core.respond(ai.core_ai_id, 'altera_dm', messages, humanUserId);
+  if (!reply || !reply.text) return null;
+  return deliverDm(io, {
+    senderUserId: ai.user_id,
+    senderProfileId: ai.id,
+    senderType: 'ai',
+    senderInfo: ai,
+    receiverId: humanUserId,
+    receiverType: 'human',
+    receiverInfo: human,
+    content: reply.text,
+    mediaUrl: null,
+    mediaType: null,
+  });
 }
 
 function setupSocketIO(io) {
@@ -185,135 +357,26 @@ function setupSocketIO(io) {
           return socket.emit('dm:error', { message: 'Receiver not found' });
         }
 
-        const conversationId = getConversationId(
+        const messageResponse = await deliverDm(io, {
+          senderUserId: socket.userId,
           senderProfileId,
           senderType,
+          senderInfo,
           receiverId,
-          receiverType
-        );
-
-        const messageId = uuidv4();
-        const createdAt = new Date().toISOString();
-
-        const receiverUserId = receiverType === 'ai' ? receiverInfo.user_id : receiverInfo.id;
-
-        // Persist to DB
-        await db.query(
-          `INSERT INTO messages (id, conversation_id, sender_id, sender_profile_id, sender_type, recipient_id, recipient_profile_id, recipient_type, content, media_url, media_type, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [
-            messageId,
-            conversationId,
-            socket.userId,
-            senderProfileId,
-            senderType,
-            receiverUserId,
-            receiverId,
-            receiverType,
-            content,
-            resolvedMediaUrl || null,
-            mediaType,
-            createdAt
-          ]
-        );
-
-        // ─── Ensure Conversation Exists (canonical ordering) ───
-        try {
-          const key1 = makeParticipantKey(senderProfileId, senderType);
-          const key2 = makeParticipantKey(receiverId, receiverType);
-          const profile1IsFirst = key1 < key2;
-
-          const user1Id   = profile1IsFirst ? socket.userId     : receiverUserId;
-          const user2Id   = profile1IsFirst ? receiverUserId    : socket.userId;
-          const p1Id      = profile1IsFirst ? senderProfileId   : receiverId;
-          const p2Id      = profile1IsFirst ? receiverId        : senderProfileId;
-          const p1Type    = profile1IsFirst ? senderType        : receiverType;
-          const p2Type    = profile1IsFirst ? receiverType      : senderType;
-
-          await db.query(
-            `INSERT INTO conversations (id, user1_id, user2_id, profile1_id, profile2_id, profile1_type, profile2_type, last_message_id, last_message_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
-             ON CONFLICT (id) DO UPDATE SET 
-               last_message_id = EXCLUDED.last_message_id,
-               last_message_at = EXCLUDED.last_message_at,
-               updated_at = EXCLUDED.updated_at,
-               is_archived = FALSE`,
-            [
-              conversationId,
-              user1Id, user2Id,
-              p1Id, p2Id,
-              p1Type, p2Type,
-              messageId,
-              createdAt
-            ]
-          );
-        } catch (e) {
-          console.error('[Socket Conversation Sync Error]', e);
-        }
-
-        // ─── Create Notification ───
-        try {
-          if (receiverUserId !== socket.userId) {
-            const notificationId = uuidv4();
-            const notificationMessage = buildNotificationMessage({
-              content,
-              mediaUrl: resolvedMediaUrl,
-              mediaType,
-            });
-            // We no longer insert 'message' notifications into the DB to keep the Notification List clean (Messages only in Inbox)
-            // But we still emit the real-time event for UI updates
-            io.to(`notifications:${receiverUserId}`).emit(
-              'notification:new',
-              {
-                id: notificationId,
-                user_id: receiverUserId,
-                actor_id: socket.userId,
-                actor_name: senderInfo.display_name,
-                actor_avatar: senderInfo.avatar,
-                type: 'message',
-                post_id: null,
-                comment_id: null,
-                post_snippet: null,
-                message: notificationMessage,
-                is_read: false,
-                read_at: null,
-                created_at: createdAt,
-              },
-            );
-          }
-        } catch (e) { console.error('[DM Notif Error]', e); }
-
-        const messageResponse = {
-          id: messageId,
-          conversation_id: conversationId,
-          sender_id: senderProfileId,
-          sender_user_id: socket.userId,
-          sender_profile_id: senderProfileId,
-          sender_profile_type: senderType,
-          sender_name: senderInfo.display_name,
-          sender_username: senderInfo.username,
-          sender_avatar_url: senderInfo.avatar,
-          sender_is_verified: !!senderInfo.is_verified,
-          sender_is_ai: senderType === 'ai',
-          receiver_id: receiverId,
-          receiver_user_id: receiverUserId,
-          receiver_profile_id: receiverId,
-          receiver_profile_type: receiverType,
-          receiver_name: receiverInfo.display_name,
-          receiver_username: receiverInfo.username,
-          receiver_avatar_url: receiverInfo.avatar,
-          receiver_is_verified: !!receiverInfo.is_verified,
-          receiver_is_ai: receiverType === 'ai',
+          receiverType,
+          receiverInfo,
           content,
-          media_url: resolvedMediaUrl || null,
-          media_type: mediaType,
-          created_at: createdAt,
-          is_read: false,
-        };
-
-        // Emit to receiver and sender
-        io.to(`user:${messageResponse.receiver_user_id}`).emit('dm:receive', messageResponse);
+          mediaUrl: resolvedMediaUrl,
+          mediaType,
+        });
         socket.emit('dm:sent', messageResponse);
+
+        // M14: a verified AI whose owner switched autonomy on answers people who message it.
+        if (receiverType === 'ai' && senderType === 'human' && content) {
+          maybeAiAutoReply(io, { aiProfileId: receiverId, humanUserId: socket.userId, conversationId: messageResponse.conversation_id }).catch((e) =>
+            console.error('[AI DM reply]', e.message)
+          );
+        }
 
       } catch (err) {
         console.error('[Socket DM Error]', err);
@@ -420,4 +483,6 @@ function broadcastPost(io, post) {
   io.to('feed:live').emit('feed:new-post', post);
 }
 
-module.exports = { setupSocketIO, pushNotification, broadcastPost, connectedUsers };
+module.exports = {
+  deliverDm,
+  maybeAiAutoReply, setupSocketIO, pushNotification, broadcastPost, connectedUsers };

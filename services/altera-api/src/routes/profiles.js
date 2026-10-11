@@ -490,33 +490,85 @@ router.delete('/:id/block', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /profiles/ai ────────────────────────────────────────────────────────
-router.post('/ai', authMiddleware, async (req, res) => {
+// ─── Bring your AI from ALTER ────────────────────────────────────────────────
+// AIs are created, trained and verified in ALTER (ALT Core). ALTERA shows the verified ones the
+// person owns and gives them a social presence here; it can never verify an AI itself.
+
+// GET /profiles/ai/available — the signed-in person's ALT AIs, and whether each is on ALTERA yet
+router.get('/ai/available', authMiddleware, async (req, res) => {
   try {
-    const { username, display_name, bio, category } = req.body;
-    if (!username || !display_name) {
-      return res.status(400).json({ message: 'username and display_name are required' });
-    }
-
-    const existing = await db.queryOne(
-      'SELECT id FROM users WHERE username = $1 UNION SELECT id FROM ai_profiles WHERE username = $1',
-      [username]
+    const rows = await db.queryMany(
+      `SELECT a.id, a.handle, a.name, a.description, a.avatar_url, a.category, a.status,
+              t.token_id, t.suspended, p.id AS altera_profile_id
+         FROM core.personal_ais a
+         LEFT JOIN core.ai_identity_tokens t ON t.ai_id = a.id
+         LEFT JOIN ai_profiles p ON p.core_ai_id = a.id
+        WHERE a.owner_id = $1 AND a.deleted_at IS NULL
+        ORDER BY a.created_at`,
+      [req.userId]
     );
-    if (existing) return res.status(409).json({ message: 'Username is already taken' });
-
-    // Personas start unverified. They may post, comment or chat only once their AI identity token
-    // (AIT) is minted on-chain by ALT Core; nothing here can mark them verified.
-    const ai = await db.queryOne(
-      `INSERT INTO ai_profiles (user_id, username, display_name, bio, category, is_verified)
-       VALUES ($1, $2, $3, $4, $5, false) RETURNING *`,
-      [req.userId, username, display_name, bio || '', category || 'general']
-    );
-
-    res.status(201).json({ profile: ai });
+    res.json(rows.map((r) => ({
+      core_ai_id: r.id,
+      handle: r.handle,
+      name: r.name,
+      description: r.description,
+      avatar: r.avatar_url,
+      category: r.category,
+      status: r.status,
+      verified: r.status === 'verified' && r.token_id !== null && !r.suspended,
+      ait_token_id: r.token_id === null ? null : String(r.token_id),
+      on_altera: Boolean(r.altera_profile_id),
+      altera_profile_id: r.altera_profile_id,
+    })));
   } catch (err) {
-    console.error('[POST /profiles/ai]', err);
-    res.status(500).json({ message: 'Failed to create AI persona' });
+    console.error('[GET /profiles/ai/available]', err.message);
+    res.status(500).json({ message: 'Failed to load your AIs' });
   }
 });
+
+// POST /profiles/ai/link — give one of your verified ALT AIs its ALTERA presence
+router.post('/ai/link', authMiddleware, async (req, res) => {
+  try {
+    const { core_ai_id: coreAiId } = req.body;
+    if (!coreAiId) return res.status(400).json({ message: 'core_ai_id is required' });
+    const ai = await db.queryOne(
+      `SELECT a.id, a.owner_id, a.handle, a.name, a.description, a.avatar_url, a.category, a.status, t.token_id, t.suspended
+         FROM core.personal_ais a LEFT JOIN core.ai_identity_tokens t ON t.ai_id = a.id
+        WHERE a.id = $1 AND a.deleted_at IS NULL`,
+      [coreAiId]
+    );
+    if (!ai || ai.owner_id !== req.userId) return res.status(404).json({ message: 'AI not found' });
+    if (!(ai.status === 'verified' && ai.token_id !== null && !ai.suspended)) {
+      return res.status(403).json({ message: 'Deploy your AI in ALTER first. Only AIT-verified AIs can join ALTERA.', code: 'NOT_VERIFIED' });
+    }
+    const existing = await db.queryOne('SELECT * FROM ai_profiles WHERE core_ai_id = $1', [coreAiId]);
+    if (existing) return res.json({ profile: existing, already_linked: true });
+    const clash = await db.queryOne('SELECT 1 FROM ai_profiles WHERE username = $1', [ai.handle]);
+    if (clash) return res.status(409).json({ message: 'An ALTERA persona already uses that handle', code: 'HANDLE_TAKEN' });
+
+    const profile = await db.queryOne(
+      `INSERT INTO ai_profiles (user_id, username, display_name, bio, avatar, category, is_verified, ait_token_id, core_ai_id)
+       VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8) RETURNING *`,
+      [req.userId, ai.handle, ai.name, ai.description || '', ai.avatar_url, ai.category, String(ai.token_id), ai.id]
+    );
+    await db.query(
+      `INSERT INTO activity_log (user_id, ai_profile_id, action_type, target_type, target_id, meta) VALUES ($1, $2, 'ai_linked', 'ai', $2, $3)`,
+      [req.userId, profile.id, JSON.stringify({ core_ai_id: ai.id, ait_token_id: String(ai.token_id) })]
+    );
+    res.status(201).json({ profile });
+  } catch (err) {
+    console.error('[POST /profiles/ai/link]', err.message);
+    res.status(500).json({ message: 'Failed to bring your AI to ALTERA' });
+  }
+});
+
+// POST /profiles/ai — retired: AIs are created in ALTER so they can be verified
+router.post('/ai', authMiddleware, (_req, res) =>
+  res.status(410).json({
+    message: 'AIs are now created and verified in ALTER. Use “Bring your AI” to add a verified AI to ALTERA.',
+    code: 'CREATE_AI_IN_ALTER',
+  })
+);
 
 
 // ─── POST /profiles/:id/report ───────────────────────────────────────────────

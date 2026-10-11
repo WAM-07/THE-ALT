@@ -29,15 +29,33 @@ beforeAll(async () => {
     INTERNAL_SERVICE_KEY: 'test-internal-service-key-0123456789abcdef',
     ALT_PUBLIC_URL: PUBLIC_URL,
     RATE_LIMIT_ENABLED: 'false',
+    CLEARANCE_MIN_TEST_MESSAGES: '1',
+    STORAGE_DIR: '.data/test-uploads',
+    CHAIN_RPC_URL: inject('chain').rpcUrl,
+    CHAIN_ID: String(inject('chain').chainId),
+    AIT_REGISTRY_ADDRESS: inject('chain').registry,
+    ALT_MARKETPLACE_ADDRESS: inject('chain').marketplace,
+    RELAYER_PRIVATE_KEY: inject('chain').relayerPrivateKey,
   });
   mails = createMailer(config, () => {});
-  core = await buildApp({ config, logger: false, mailer: mails });
+  // A predictable "LLM" so tests can check what the persona engine was asked and what came back.
+  const persona = {
+    name: 'test-llm',
+    async complete(messages) {
+      const system = messages[0].content;
+      const name = system.match(/^You are (.+?) \(@/)?.[1] ?? 'AI';
+      const channel = /social media post/.test(system) ? 'post' : /NOT the person you represent/.test(system) ? 'dm' : 'chat';
+      return { text: `[${channel}] ${name} says hi about ${messages[messages.length - 1].content.slice(0, 30)} #alt`, provider: 'test-llm', model: 't-1' };
+    },
+  };
+  core = await buildApp({ config, logger: false, mailer: mails, jobs: false, llmProviders: [persona] });
   await core.listen({ port: 0, host: '127.0.0.1' });
 
   // ALTERA reads its configuration when its modules load, so set it first.
   Object.assign(process.env, {
     DATABASE_URL: databaseUrl,
     CORE_URL: `http://127.0.0.1:${core.server.address().port}`,
+    INTERNAL_SERVICE_KEY: 'test-internal-service-key-0123456789abcdef',
     ALT_PUBLIC_URL: PUBLIC_URL,
     RATE_LIMIT_ENABLED: 'false',
     NODE_ENV: 'test',
@@ -173,17 +191,18 @@ describe('social features on the shared database', () => {
     expect(me.body.human_profile.health_score).toBe(95);
   });
 
-  it('refuses posts from AI personas that have no AI identity token', async () => {
+  it('no longer creates AIs on ALTERA, and unlinked personas from before cannot post', async () => {
     const owner = await altAccount('altera');
-    const persona = await api('POST', '/profiles/ai', owner.token, {
-      username: `ai_${uniq()}`,
-      display_name: 'Unverified Bot',
-      bio: 'test',
-      category: 'general',
-    });
-    expect(persona.status).toBe(201);
-    const aiId = persona.body.id ?? persona.body.profile?.id ?? persona.body.ai_profile?.id;
-    const res = await api('POST', '/posts', owner.token, { content: 'I should not be able to post', author_type: 'ai', author_id: aiId });
+    const persona = await api('POST', '/profiles/ai', owner.token, { username: `ai_${uniq()}`, display_name: 'Old Bot', bio: 'test' });
+    expect(persona.status).toBe(410);
+    expect(persona.body.code).toBe('CREATE_AI_IN_ALTER');
+    // A persona created in ALTERA before identity tokens existed:
+    const db = require('../src/db/database.js');
+    const legacy = await db.queryOne(
+      `INSERT INTO ai_profiles (user_id, username, display_name, is_verified) VALUES ($1, $2, 'Legacy', false) RETURNING id`,
+      [owner.id, `legacy_${uniq()}`]
+    );
+    const res = await api('POST', '/posts', owner.token, { content: 'I should not be able to post', author_type: 'ai', author_id: legacy.id });
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('NOT_VERIFIED');
   });
@@ -199,8 +218,11 @@ describe('no server errors anywhere the ALTERA app reads from', () => {
     await api('POST', `/posts/${postId}/comments`, b.token, { content: 'sweep comment' });
     const story = await api('POST', '/stories', a.token, { media_url: 'https://example.com/s.png', media_type: 'image', text_content: 'hi' });
     expect(story.status).toBeLessThan(300);
-    const persona = await api('POST', '/profiles/ai', a.token, { username: `sw_${uniq()}`, display_name: 'Sweep AI', category: 'creative' });
-    const aiId = persona.body.profile.id;
+    const db = require('../src/db/database.js');
+    const aiId = (await db.queryOne(
+      `INSERT INTO ai_profiles (user_id, username, display_name, category) VALUES ($1, $2, 'Sweep AI', 'creative') RETURNING id`,
+      [a.id, `sw_${uniq()}`]
+    )).id;
 
     const paths = [
       '/feed',
@@ -329,6 +351,113 @@ describe('instant sign-out across apps', () => {
       expect((await api('GET', '/auth/me', person.token)).status).toBe(200);
     } finally {
       await authMod.stopRevocationListener();
+    }
+  });
+});
+
+describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
+  const coreCall = (method, url, token, payload) =>
+    core.inject({ method, url, headers: { authorization: `Bearer ${token}` }, payload }).then((r) => ({ status: r.statusCode, body: r.json() }));
+
+  /** Creates an AI in ALT Core the way ALTER does, and deploys it with an identity token. */
+  async function verifiedAi(owner) {
+    const handle = `ai_${uniq()}`;
+    const ai = (await coreCall('POST', '/ais', owner.token, {
+      name: 'Nova',
+      handle,
+      description: 'Loves astronomy',
+      onboarding: { primaryTrait: 'Creative' },
+      consents: { persona_training: true, third_party_processing: true, public_deployment: true, interaction_learning: true },
+    })).body;
+    await coreCall('POST', `/ais/${ai.id}/versions`, owner.token);
+    const session = (await coreCall('POST', `/ais/${ai.id}/chat/sessions`, owner.token, {})).body;
+    await coreCall('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, owner.token, { content: 'hello' });
+    await coreCall('POST', `/ais/${ai.id}/confirm`, owner.token, { confirmed: true });
+    expect((await coreCall('POST', `/ais/${ai.id}/deploy`, owner.token)).status).toBe(202);
+    await core.jobs.drain();
+    const verified = (await coreCall('GET', `/ais/${ai.id}`, owner.token)).body;
+    expect(verified.status).toBe('verified');
+    return verified;
+  }
+
+  it('brings a verified AI to ALTERA, where it writes in its own voice and auto-replies to people', async () => {
+    const owner = await altAccount('alter');
+    const coreAi = await verifiedAi(owner);
+
+    const available = await api('GET', '/profiles/ai/available', owner.token);
+    expect(available.body).toEqual([expect.objectContaining({ core_ai_id: coreAi.id, verified: true, on_altera: false, ait_token_id: coreAi.token.tokenId })]);
+
+    const linked = await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: coreAi.id });
+    expect(linked.status).toBe(201);
+    const profile = linked.body.profile;
+    expect(profile).toMatchObject({ username: coreAi.handle, display_name: 'Nova', is_verified: true, core_ai_id: coreAi.id });
+
+    // The persona engine drafts the post in the AI's voice; the owner publishes it.
+    const draft = await api('POST', '/ai/generate', owner.token, { instruction: 'tonight’s meteor shower', profile_id: profile.id });
+    expect(draft.status).toBe(200);
+    expect(draft.body).toMatchObject({ author: 'ai', content: expect.stringContaining('[post] Nova') });
+    const post = await api('POST', '/posts', owner.token, { content: draft.body.content, author_type: 'ai', author_id: profile.id, ai_generated: true });
+    expect(post.status).toBe(201);
+
+    // On-chain identity, as ALTERA shows it on the AI's profile.
+    const identity = await api('GET', `/blockchain/ai/${profile.id}`, owner.token);
+    expect(identity.body).toMatchObject({ verified: true, tokenId: coreAi.token.tokenId, manifestReadable: true });
+
+    // Someone messages the AI; with autonomy on it answers through Core.
+    await api('PATCH', `/profiles/ai/${profile.id}/autonomy`, owner.token, { enabled: true });
+    const fan = await altAccount('altera');
+    const { maybeAiAutoReply, deliverDm } = require('../src/socket/realtime.js');
+    const emitted = [];
+    const io = { to: (room) => ({ emit: (event, payload) => emitted.push({ room, event, payload }) }) };
+    const db = require('../src/db/database.js');
+    const fanInfo = await db.queryOne('SELECT id, username, full_name AS display_name, avatar_url AS avatar, is_verified FROM users WHERE id = $1', [fan.id]);
+    const aiInfo = await db.queryOne('SELECT id, user_id, username, display_name, avatar, is_verified FROM ai_profiles WHERE id = $1', [profile.id]);
+    const sent = await deliverDm(io, {
+      senderUserId: fan.id, senderProfileId: fan.id, senderType: 'human', senderInfo: fanInfo,
+      receiverId: profile.id, receiverType: 'ai', receiverInfo: aiInfo, content: 'Hi Nova, what should I watch tonight?', mediaUrl: null, mediaType: null,
+    });
+    const reply = await maybeAiAutoReply(io, { aiProfileId: profile.id, humanUserId: fan.id, conversationId: sent.conversation_id });
+    expect(reply).toMatchObject({ sender_profile_type: 'ai', sender_is_ai: true, receiver_user_id: fan.id, content: expect.stringContaining('[dm] Nova') });
+    expect(emitted.some((e) => e.room === `user:${fan.id}` && e.payload.id === reply.id)).toBe(true);
+  });
+
+  it('refuses unverified AIs, other people’s AIs and unsafe drafts', async () => {
+    const owner = await altAccount('alter');
+    const stranger = await altAccount('altera');
+    const draftOnly = (await coreCall('POST', '/ais', owner.token, { name: 'Draft', handle: `d_${uniq()}`, consents: {} })).body;
+    expect((await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: draftOnly.id })).body.code).toBe('NOT_VERIFIED');
+
+    const coreAi = await verifiedAi(owner);
+    expect((await api('POST', '/profiles/ai/link', stranger.token, { core_ai_id: coreAi.id })).status).toBe(404);
+
+    const unsafe = await api('POST', '/posts', owner.token, { content: 'here is how to make a bomb at home' });
+    expect(unsafe.status).toBe(422);
+    expect(unsafe.body).toMatchObject({ code: 'CONTENT_BLOCKED', categories: ['violence'] });
+    expect((await api('POST', '/posts', owner.token, { content: 'I hate Mondays, honestly' })).status).toBe(201);
+  });
+
+  it('loses its ALTERA access the moment ALT Core suspends it', async () => {
+    const owner = await altAccount('alter');
+    const coreAi = await verifiedAi(owner);
+    const profile = (await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: coreAi.id })).body.profile;
+    const coreEvents = require('../src/services/core_events.js');
+    const { syncLinkedAi } = require('../src/services/ai_sync.js');
+    coreEvents.on('alt_ai_events', ({ aiId }) => syncLinkedAi(aiId));
+    await coreEvents.start();
+    try {
+      const db = require('../src/db/database.js');
+      await db.query('UPDATE core.ai_identity_tokens SET suspended = true WHERE ai_id = $1', [coreAi.id]);
+      await db.query(`SELECT pg_notify('alt_ai_events', $1)`, [JSON.stringify({ aiId: coreAi.id, event: 'suspended' })]);
+      let verified = true;
+      for (let i = 0; i < 20 && verified; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        verified = (await db.queryOne('SELECT is_verified FROM ai_profiles WHERE id = $1', [profile.id])).is_verified;
+      }
+      expect(verified).toBe(false);
+      const res = await api('POST', '/posts', owner.token, { content: 'Am I still allowed to post?', author_type: 'ai', author_id: profile.id });
+      expect(res.body.code).toBe('NOT_VERIFIED');
+    } finally {
+      await coreEvents.stop();
     }
   });
 });

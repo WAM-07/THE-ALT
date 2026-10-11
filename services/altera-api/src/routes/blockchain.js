@@ -1,98 +1,64 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
-
-const router = express.Router();
+const core = require('../services/core_client');
 
 /**
- * Blockchain routes for Polygon Amoy AIT verification.
- * Migrated to PostgreSQL.
+ * On-chain identity of AIs on ALTERA (M13-FE-3, M17). Nothing here is simulated: answers come from
+ * ALT Core's independent check of the AIT registry contract and the IPFS manifest.
  */
+const router = express.Router();
 
-// ─── GET /blockchain/verify-ait/:tokenId ──────────────────────────────────────
+const fail = (res, err) =>
+  res.status(err.status && err.status < 600 ? err.status : 502).json({ message: err.message || 'Blockchain lookup failed', code: err.code });
+
+// GET /blockchain/verify-ait/:tokenId — the token as recorded on-chain, with its manifest
 router.get('/verify-ait/:tokenId', authMiddleware, async (req, res) => {
   try {
-    const { tokenId } = req.params;
-    await new Promise(r => setTimeout(r, 300)); // simulate ~300ms RPC latency
-
-    const aiProfile = await db.queryOne('SELECT * FROM ai_profiles WHERE ait_token_id = $1', [tokenId]);
-    
-    if (!aiProfile) {
-      return res.json({
-        token_id: tokenId,
-        is_valid: false,
-        owner_address: null,
-        verification_status: 'NOT_FOUND',
-        chain: 'polygon-amoy',
-        checked_at: new Date().toISOString(),
-      });
-    }
-
-    res.json({
-      token_id: tokenId,
-      is_valid: true,
-      owner_address: '0x' + '0'.repeat(40), // Mock wallet address
-      ai_profile_id: aiProfile.id,
-      display_name: aiProfile.display_name,
-      health_score: aiProfile.health_score,
-      verification_status: 'VERIFIED',
-      chain: 'polygon-amoy',
-      block_number: 8234567 + Math.floor(Math.random() * 1000),
-      checked_at: new Date().toISOString(),
-    });
+    if (!/^\d+$/.test(req.params.tokenId)) return res.status(400).json({ message: 'Token id must be a number' });
+    const token = await core.verifyToken(req.params.tokenId);
+    res.json({ ...token, verified: !token.suspended && token.manifestReadable });
   } catch (err) {
-    res.status(500).json({ message: 'Blockchain verification failed' });
+    fail(res, err);
   }
 });
 
-// ─── GET /blockchain/ait-metadata/:tokenId ────────────────────────────────────
-router.get('/ait-metadata/:tokenId', authMiddleware, async (req, res) => {
+// GET /blockchain/ai/:profileId — on-chain identity of an ALTERA AI persona
+router.get('/ai/:profileId', authMiddleware, async (req, res) => {
   try {
-    const { tokenId } = req.params;
-    await new Promise(r => setTimeout(r, 200));
-
-    const aiProfile = await db.queryOne('SELECT * FROM ai_profiles WHERE ait_token_id = $1', [tokenId]);
-    if (!aiProfile) return res.status(404).json({ message: 'AIT token not found' });
-
-    res.json({
-      token_id: tokenId,
-      metadata: {
-        name: aiProfile.display_name,
-        description: aiProfile.bio,
-        image: `ipfs://QmMockHash${tokenId}/avatar.png`,
-        attributes: [
-          { trait_type: 'Health Score', value: aiProfile.health_score },
-          { trait_type: 'Verified', value: aiProfile.is_verified },
-        ],
-        external_url: `https://altera.io/ai/${aiProfile.username}`,
-      },
-      ipfs_uri: `ipfs://QmMockHash${tokenId}/metadata.json`,
-      gateway_url: `https://w3s.link/ipfs/QmMockHash${tokenId}/metadata.json`,
-    });
+    const ai = await db.queryOne('SELECT id, username, ait_token_id, is_verified, core_ai_id FROM ai_profiles WHERE id = $1', [req.params.profileId]);
+    if (!ai) return res.status(404).json({ message: 'AI not found' });
+    if (!ai.core_ai_id || !ai.ait_token_id) {
+      return res.json({ verified: false, reason: 'This AI was not created and verified in ALTER, so it has no identity token.' });
+    }
+    const token = await core.verifyToken(ai.ait_token_id);
+    res.json({ verified: ai.is_verified && !token.suspended, ...token });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch AIT metadata' });
+    fail(res, err);
   }
 });
 
-// ─── GET /blockchain/wallet-ait/:address ──────────────────────────────────────
+// GET /blockchain/wallet-ait/:address — AI identity tokens held by a wallet (as mirrored by ALT Core)
 router.get('/wallet-ait/:address', authMiddleware, async (req, res) => {
   try {
-    // In a real scenario, we'd query the blockchain for tokens owned by this address
-    // For now, we'll return the AI profiles owned by the current user as a mock
-    const aiProfiles = await db.queryMany('SELECT id, username, display_name, is_verified, ait_token_id FROM ai_profiles WHERE user_id = $1', [req.userId]);
-    
-    const ownedTokens = aiProfiles
-      .filter(p => p.ait_token_id)
-      .map(p => ({
-        token_id: p.ait_token_id,
-        ai_profile_id: p.id,
-        display_name: p.display_name,
-        is_verified: p.is_verified,
-      }));
-      
-    res.json({ wallet_address: req.params.address, owned_tokens: ownedTokens, chain: 'polygon-amoy' });
+    const address = `${req.params.address}`.toLowerCase();
+    if (!/^0x[0-9a-f]{40}$/.test(address)) return res.status(400).json({ message: 'Not a wallet address' });
+    const rows = await db.queryMany(
+      `SELECT t.token_id, t.chain_id, t.contract_address, t.version, t.suspended, a.handle, a.name
+         FROM core.ai_identity_tokens t JOIN core.personal_ais a ON a.id = t.ai_id
+        WHERE t.owner_address = $1 ORDER BY t.minted_at`,
+      [address]
+    );
+    res.json(rows.map((r) => ({
+      token_id: String(r.token_id),
+      chain_id: r.chain_id,
+      contract: r.contract_address,
+      version: r.version,
+      suspended: r.suspended,
+      ai: { handle: r.handle, name: r.name },
+    })));
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch wallet tokens' });
+    fail(res, err);
   }
 });
 

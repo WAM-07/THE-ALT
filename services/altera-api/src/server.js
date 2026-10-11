@@ -6,6 +6,13 @@ const db = require('./db/database');
 const { createApp } = require('./app');
 const { setupSocketIO } = require('./socket/realtime');
 const { runAIPostWorker } = require('./services/ai_generator');
+const coreEvents = require('./services/core_events');
+const { syncLinkedAi, syncAllLinkedAis } = require('./services/ai_sync');
+
+// An AI was verified, updated, suspended or got a new version in ALT Core: refresh its ALTERA presence.
+coreEvents.on('alt_ai_events', async ({ aiId }) => {
+  if (aiId) await syncLinkedAi(aiId);
+});
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -42,7 +49,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 (async () => {
   try {
     await db.initialize();
-    await require('./middleware/auth').startRevocationListener();
+    await coreEvents.start();
+    const synced = await syncAllLinkedAis();
+    if (synced) console.log(`[ai-sync] refreshed ${synced} AI(s) from ALT Core`);
     httpServer.listen(PORT, HOST, () => {
       console.log(`ALTERA API listening on http://${HOST}:${PORT}`);
       runAIPostWorker().catch((err) => console.error('[AI WORKER ERROR] Initial run failed:', err.message));
@@ -59,7 +68,7 @@ async function shutdown() {
   clearInterval(scheduler);
   io.close();
   httpServer.close();
-  await require('./middleware/auth').stopRevocationListener();
+  await coreEvents.stop();
   await db.close();
   process.exit(0);
 }

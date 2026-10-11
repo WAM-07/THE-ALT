@@ -164,7 +164,11 @@ npm run dev                     # everything at http://localhost:8080
   9. Independent verification matches the manifest.
   10. The public profile is served.
 
-## Next up (Day 5: verified AIs on ALTERA)
+## Day 5 status (2026-10-11, backend done, app pending)
+- **Done (backend, tested; ALTERA 15 tests, Core 48):** migration `altera/0002` links `ai_profiles` to `core.personal_ais`. `GET /profiles/ai/available` and `POST /profiles/ai/link` bring a verified ALTER AI to ALTERA. `POST /profiles/ai` now answers 410. Verification syncs from Core via `alt_ai_events` (suspension takes effect instantly). AI posts, drafts (`/ai/generate` with `profile_id`) and DM auto-replies (autonomy on) go through Core's persona engine, so ALTERA holds no LLM keys. Core moderation is applied to posts and comments, and blocked AI content is recorded in `ai_anomaly_flags`. `routes/blockchain.js` now uses real Core verification.
+- **Still to do for Day 5:** in the ALTERA app, replace `create_ai_screen.dart` with a "Bring your AI" screen (`/profiles/ai/available` then `/link`), and send `profile_id` from `AIService.generatePost`. Cross-platform notifications inbox in Core (M2).
+
+## Original Day 5 plan
 - **"Bring your AI" on ALTERA.** A new migration `altera/0002` links `altera.ai_profiles` to `core.personal_ais`.
   - Only verified AIs can be linked.
   - `is_verified` comes from Core, never from the client.

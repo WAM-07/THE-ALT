@@ -2,15 +2,15 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
+const core = require('../services/core_client');
 const { storeImageDataUri } = require('../services/media_storage');
 
 const router = express.Router();
 
 // ─── Content Moderation: Keyword filter (M16-FE-1) ───────────────────────────
-const BANNED_KEYWORDS = [
-  'spam', 'scam', 'fake', 'phishing', 'porn', 'xxx', 'hate', 'kill',
-  'terrorist', 'bomb', 'drugs', 'cocaine', 'meth',
-];
+// Only unambiguous terms here: words like "hate" or "kill" appear in harmless posts ("I hate
+// Mondays"). Threats, violence and hate are caught by ALT Core's pattern rules (coreModeration).
+const BANNED_KEYWORDS = ['phishing', 'porn', 'xxx', 'cocaine', 'meth'];
 const SUSPICIOUS_PATTERNS = [
   /(.)\1{9,}/,            // repeated characters (aaaaaaaaa)
   /https?:\/\/\S+/gi,     // excessive links – flag not ban
@@ -32,6 +32,25 @@ function moderateContent(content) {
   const suspicious = SUSPICIOUS_PATTERNS.some(p => p.test(content))
     || SPAM_INDICATORS.some(p => p.test(content));
   return { blocked: false, suspicious };
+}
+
+// ─── ALT's shared safety rules (Module 16) ───────────────────────────────────
+// People may share their own contact details; AIs may not (and may never claim to be human).
+async function coreModeration(content, isAI) {
+  try {
+    const result = await core.moderate(content);
+    const categories = result.categories.filter((c) => isAI || !['private_data', 'impersonation'].includes(c));
+    return { blocked: categories.length > 0, categories };
+  } catch {
+    return { blocked: false, categories: [] }; // Core unreachable: ALTERA's own rules still apply
+  }
+}
+
+async function flagAiBehaviour(aiProfileId, description) {
+  await db.query(
+    `INSERT INTO ai_anomaly_flags (ai_profile_id, flag_type, severity, description) VALUES ($1, 'policy_violation', 'high', $2)`,
+    [aiProfileId, description.slice(0, 500)]
+  ).catch(() => {});
 }
 
 // ─── Conditional Publishing Quality Gate (M15-FE-1 Phase 4) ─────────────────
@@ -121,6 +140,11 @@ router.post('/', authMiddleware, async (req, res) => {
     const mod = moderateContent(content);
     if (mod.blocked) {
       return res.status(422).json({ message: mod.reason, code: 'CONTENT_BLOCKED' });
+    }
+    const coreMod = await coreModeration(content, author_type === 'ai');
+    if (coreMod.blocked) {
+      if (author_type === 'ai' && author_id) await flagAiBehaviour(author_id, `Post blocked: ${coreMod.categories.join(', ')}`);
+      return res.status(422).json({ message: 'This post breaks ALT’s content rules.', code: 'CONTENT_BLOCKED', categories: coreMod.categories });
     }
 
     const requestedAuthorType = author_type === 'ai' ? 'ai' : 'human';
@@ -539,10 +563,21 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
     }
 
     const mod = moderateContent(content);
-    if (mod.blocked) return res.status(422).json({ message: mod.reason });
+    if (mod.blocked) return res.status(422).json({ message: mod.reason, code: 'CONTENT_BLOCKED' });
 
     const isAI = author_type === 'ai';
     const aiProfileId = isAI ? author_id : null;
+    // M14-FE-2: only your own AIT-verified AI can comment.
+    if (isAI) {
+      const ai = await db.queryOne('SELECT id, is_verified FROM ai_profiles WHERE id = $1 AND user_id = $2', [author_id, req.userId]);
+      if (!ai) return res.status(403).json({ message: 'AI persona not found or not yours' });
+      if (!ai.is_verified) return res.status(403).json({ message: 'Only AIT-verified AI personas can comment', code: 'NOT_VERIFIED' });
+    }
+    const coreMod = await coreModeration(content, isAI);
+    if (coreMod.blocked) {
+      if (isAI) await flagAiBehaviour(author_id, `Comment blocked: ${coreMod.categories.join(', ')}`);
+      return res.status(422).json({ message: 'This comment breaks ALT’s content rules.', code: 'CONTENT_BLOCKED', categories: coreMod.categories });
+    }
 
     const result = await db.queryOne(
       'INSERT INTO comments (post_id, user_id, content, ai_profile_id) VALUES ($1, $2, $3, $4) RETURNING *',

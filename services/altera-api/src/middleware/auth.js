@@ -1,4 +1,3 @@
-const { Client } = require('pg');
 const { createRemoteJWKSet, jwtVerify } = require('jose');
 const db = require('../db/database');
 
@@ -96,18 +95,17 @@ async function optionalAuth(req, res, next) {
   return authMiddleware(req, res, next);
 }
 
-// ALT Core announces ended sessions with Postgres NOTIFY the moment they commit, so ALTERA reacts
+// ALT Core announces ended sessions (Postgres NOTIFY) the moment they commit, so ALTERA reacts
 // instantly instead of waiting for the cache above to expire.
-const REVOCATION_CHANNEL = 'alt_sessions_revoked';
+const coreEvents = require('../services/core_events');
 const revocationHandlers = [];
-let listener = null;
 
 /** Registers a callback for ended sessions ({ sessionId } or { userId } for "everywhere"). */
 function onSessionRevoked(handler) {
   revocationHandlers.push(handler);
 }
 
-function handleRevocation({ sessionId, userId }) {
+coreEvents.on('alt_sessions_revoked', ({ sessionId, userId }) => {
   if (sessionId) {
     sessionCache.set(sessionId, { active: false, userId, until: Date.now() + 60 * 60_000 });
   } else if (userId) {
@@ -117,34 +115,11 @@ function handleRevocation({ sessionId, userId }) {
   for (const handler of revocationHandlers) {
     Promise.resolve(handler({ sessionId, userId })).catch((err) => console.error('[auth] revocation handler', err.message));
   }
-}
+});
 
-async function startRevocationListener() {
-  if (listener) return;
-  const needsSsl = /sslmode=require|neon\.tech/.test(process.env.DATABASE_URL || '');
-  const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: needsSsl ? { rejectUnauthorized: false } : undefined });
-  listener = client;
-  client.on('notification', (msg) => {
-    try {
-      handleRevocation(JSON.parse(msg.payload));
-    } catch {
-      // ignore malformed payloads
-    }
-  });
-  client.on('error', (err) => {
-    console.error('[auth] revocation listener lost:', err.message);
-    listener = null;
-    setTimeout(() => startRevocationListener().catch(() => {}), 5000);
-  });
-  await client.connect();
-  await client.query(`LISTEN ${REVOCATION_CHANNEL}`);
-}
-
-async function stopRevocationListener() {
-  const client = listener;
-  listener = null;
-  if (client) await client.end().catch(() => {});
-}
+/** Kept for callers and tests: Core's event listener carries the revocations. */
+const startRevocationListener = () => coreEvents.start();
+const stopRevocationListener = () => coreEvents.stop();
 
 /** Test seam: forget cached session answers. */
 function clearSessionCache() {

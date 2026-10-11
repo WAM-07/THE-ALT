@@ -757,6 +757,46 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
   );
 
   r.post(
+    '/internal/moderate',
+    {
+      preHandler: requireService(ctx),
+      schema: { tags: ['internal'], summary: 'Module 16: check text against ALT’s safety rules', body: z.object({ text: z.string().max(20_000) }) },
+    },
+    async (req) => moderate(req.body.text),
+  );
+
+  r.post(
+    '/internal/assist',
+    {
+      preHandler: requireService(ctx),
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      schema: {
+        tags: ['internal'],
+        summary: 'Writing help for a person (not a persona): drafts a post from an instruction',
+        body: z.object({ instruction: z.string().trim().min(3).max(1000), callerUserId: z.uuid().optional() }),
+      },
+    },
+    async (req) => {
+      const started = Date.now();
+      const result = await ctx.llm.complete(
+        [
+          {
+            role: 'system',
+            content:
+              'You help people write posts for ALTERA, a social network. Write one post in the first person from the instruction. ' +
+              'No preamble or quotation marks; at most 600 characters; up to 3 hashtags. Refuse hateful, violent, sexual or illegal content.',
+          },
+          { role: 'user', content: req.body.instruction },
+        ],
+        { temperature: 0.8, maxTokens: 300 },
+      );
+      const check = moderate(result.text);
+      if (check.flagged) throw new AppError(422, 'CONTENT_BLOCKED', 'That request produced content that breaks ALT’s rules.', { categories: check.categories });
+      return { text: result.text, provider: result.provider, latencyMs: Date.now() - started };
+    },
+  );
+
+  r.post(
     '/internal/ais/:id/respond',
     {
       preHandler: requireService(ctx),
