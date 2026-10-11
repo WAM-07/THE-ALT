@@ -35,19 +35,24 @@ Useful extras:
 
 The first run creates `.env` from `.env.example` and generates development secrets in `.data/`. To use a hosted database such as Neon, put its connection string in `DATABASE_URL`.
 
-**Phone apps:**
-- `npm run dev` writes `apps/<app>/env/dev.json`.
-- Run an app with `flutter run --dart-define-from-file=env/dev.json` from `apps/alter` or `apps/altera`.
+**Phone apps** (Flutter 3.41, installed at `C:\flutter`):
+- `npm run dev` writes `apps/<app>/env/dev.json` with the gateway address for the Android emulator.
+- From `apps/alter` or `apps/altera`:
+  - Android emulator: `flutter run --dart-define-from-file=env/dev.json`.
+  - Phone on the same Wi-Fi: `flutter run --dart-define=ALT_API_URL=http://<your PC's LAN IP>:8080`. `npm run dev` prints the LAN address.
+  - Browser: `flutter run -d chrome --dart-define=ALT_API_URL=http://localhost:8080`.
+- Sign up in one app and use **Open ALTERA / Open ALTER** to move between them without signing in again.
 
 ## Layout
 
 ```
 services/core        ALT Core API (TypeScript, Fastify, PostgreSQL)
 services/gateway     single entry point: routing, token checks, rate limits, WebSockets
-services/altera-api  ALTERA social backend (being moved onto ALT Core)
+services/altera-api  ALTERA social backend (uses ALT Core accounts; data in the altera schema)
 apps/alter           ALTER Flutter app
 apps/altera          ALTERA Flutter app
 packages/devkit      embedded database, migration runner, dev secrets
+packages/alt_account Flutter package: ALT sign-in, sessions, handoff, Account Center (used by both apps)
 scripts/dev.mjs      the one-command launcher
 Documentations/      scope document, SDS, presentations, meeting logs
 ```

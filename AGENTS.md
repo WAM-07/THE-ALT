@@ -18,7 +18,8 @@ THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutt
 2. **Never weaken authentication or authorisation to make something work.** This includes skipping token checks, trusting a user ID sent by the client, or disabling rate limits outside tests. If you are blocked, stop and report.
 3. **One account system.**
    - Users live only in `core.users`. Never create another users table or another login endpoint in a platform service.
-   - Platform services identify the caller by verifying the ALT access token (RS256, public key at `/core/.well-known/jwks.json`). They may also read the `x-alt-user-id` header set by the gateway.
+   - Platform services identify the caller by verifying the ALT access token (RS256, public key at `/core/.well-known/jwks.json`) **and** checking the session is still active (see `services/altera-api/src/middleware/auth.js`). They may also read the `x-alt-user-id` header set by the gateway.
+   - Flutter apps sign people in **only** through `packages/alt_account` (`AltAccountClient`). Never add login, token or password code to an app.
 4. **Each service writes only to its own Postgres schema** (`core`, `altera`, `altar`).
    - Reading other schemas through a view, or holding a foreign key to `core.users` or `core.personal_ais`, is fine.
    - Writing to another schema is not. Call that service's API instead.
@@ -35,7 +36,7 @@ THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutt
    - Run `npm test` (backend) and `flutter analyze` (apps) before saying you are done.
    - Report failures honestly, with the output.
 9. **Do not touch these:**
-   - `services/core/src/http/routes/auth.ts`, `services/core/src/modules/accounts/*`, `services/core/migrations/*` and `packages/contracts/*`, unless your task explicitly names them;
+   - `services/core/src/http/routes/auth.ts`, `services/core/src/modules/accounts/*`, `services/core/migrations/*`, `packages/alt_account/lib/src/client.dart`, `services/altera-api/src/middleware/auth.js` and `packages/contracts/*`, unless your task explicitly names them;
    - anything under `_archive/` or `Documentations/*.pdf`.
 10. **Keep changes small and focused.** Don't reformat files you didn't otherwise change. Match the style of the file you're editing.
 
@@ -49,6 +50,8 @@ npx tsc --noEmit    # inside services/core or services/gateway
 ```
 
 - In development, OTP emails are not sent. Read them at `http://localhost:8080/core/dev/mail`.
+- **Flutter** is at `C:\flutter` (not in the repo; a path with a space breaks Flutter's native-asset builds). Use `C:\flutter\bin\flutter` if it isn't on PATH. Check each app with `flutter analyze` and `flutter test`, and `flutter build web` to prove it compiles. There is no Android SDK on the dev machine.
+- In Flutter widget tests, mock secure storage with `FlutterSecureStorage.setMockInitialValues({})` and the `app_links` channel (see `apps/*/test/widget_test.dart`).
 - Flutter apps take their API address from `--dart-define-from-file=env/dev.json`, which `npm run dev` writes. The Android emulator uses `10.0.2.2`.
 
 ## Conventions

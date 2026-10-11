@@ -712,6 +712,11 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
 
 ## Decision log
 
+- **2026-10-11 (build day 2):**
+  - **ALTERA keeps its own tables** in the `altera` schema. People live only in `core.users`, and a read-only `altera.users` view keeps the existing ALTERA queries working. Data is not migrated from Neon: the project starts fresh, as the owner decided.
+  - **Platform services check that a session is still active, not just that the token is valid.** Core announces revocations with Postgres `NOTIFY` on `alt_sessions_revoked`, so signing out in one app takes effect in every app immediately.
+  - **The Flutter apps share `packages/alt_account`** for sign-in, sessions, handoff and the Account Center. Auth0 is removed from ALTERA. Google sign-in stays hidden in the apps until a client ID is configured.
+  - **The Flutter SDK moved to `C:\flutter`** because the native-asset build breaks on paths with spaces. ALTER gained an Android project.
 - **2026-10-11 (build day 1):**
   - The 60% sprint plan and live status are in `PROGRESS.md`; rules for AI agents are in `AGENTS.md`.
   - **No Docker and no Redis.** Development uses embedded PostgreSQL from npm. Events and jobs use PostgreSQL (transactional outbox, LISTEN/NOTIFY, a `SKIP LOCKED` job table). This means one less server to run and deploy, and Docker isn't available on the dev machine.
