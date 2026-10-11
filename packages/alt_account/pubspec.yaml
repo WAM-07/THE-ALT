@@ -1,0 +1,21 @@
+name: alt_account
+description: One ALT account for ALTER, ALTAR and ALTERA. API client for ALT Core, secure session storage, app-to-app handoff and the shared Account Center screens.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  flutter_secure_storage: ^9.0.0
+  url_launcher: ^6.3.0
+  app_links: ^7.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
