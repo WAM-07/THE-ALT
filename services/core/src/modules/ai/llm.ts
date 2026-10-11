@@ -101,6 +101,10 @@ export interface LlmConfig {
   providers: string[];
   groqApiKey?: string | undefined;
   groqModel: string;
+  geminiApiKey?: string | undefined;
+  geminiModel: string;
+  deepseekApiKey?: string | undefined;
+  deepseekModel: string;
   compatBaseUrl?: string | undefined;
   compatApiKey?: string | undefined;
   compatModel?: string | undefined;
@@ -110,6 +114,11 @@ export function createLlmRouter(cfg: LlmConfig): LlmRouter {
   const providers: LlmProvider[] = [];
   for (const name of cfg.providers) {
     if (name === 'groq' && cfg.groqApiKey) providers.push(openAiCompatible('groq', 'https://api.groq.com/openai/v1', cfg.groqApiKey, cfg.groqModel));
+    // Gemini and DeepSeek both offer OpenAI-compatible endpoints.
+    if (name === 'gemini' && cfg.geminiApiKey) {
+      providers.push(openAiCompatible('gemini', 'https://generativelanguage.googleapis.com/v1beta/openai', cfg.geminiApiKey, cfg.geminiModel));
+    }
+    if (name === 'deepseek' && cfg.deepseekApiKey) providers.push(openAiCompatible('deepseek', 'https://api.deepseek.com', cfg.deepseekApiKey, cfg.deepseekModel));
     if (name === 'compat' && cfg.compatBaseUrl && cfg.compatApiKey && cfg.compatModel) {
       providers.push(openAiCompatible('compat', cfg.compatBaseUrl, cfg.compatApiKey, cfg.compatModel));
     }

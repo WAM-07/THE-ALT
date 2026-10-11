@@ -51,7 +51,11 @@ const EnvSchema = z.object({
   // Persona engine (Module 10). Providers are tried in order; "mock" needs no key and is for development.
   LLM_PROVIDERS: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
-  GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
+  GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default('gemini-flash-latest'),
+  DEEPSEEK_API_KEY: z.string().optional(),
+  DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
   LLM_COMPAT_BASE_URL: z.string().optional(),
   LLM_COMPAT_API_KEY: z.string().optional(),
   LLM_COMPAT_MODEL: z.string().optional(),
@@ -113,9 +117,21 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     ipfs: { mode: e.IPFS_MODE, pinataJwt: e.PINATA_JWT, gatewayUrl: e.IPFS_GATEWAY_URL },
     llm: {
       // Default: Groq when a key is present, always with the mock as a last resort in development.
-      providers: e.LLM_PROVIDERS ? list(e.LLM_PROVIDERS) : [...(e.GROQ_API_KEY ? ['groq'] : []), ...(e.NODE_ENV === 'production' ? [] : ['mock'])],
+      // Default order: Groq, then Gemini, then DeepSeek (whichever have keys); the mock only in development.
+      providers: e.LLM_PROVIDERS
+        ? list(e.LLM_PROVIDERS)
+        : [
+            ...(e.GROQ_API_KEY ? ['groq'] : []),
+            ...(e.GEMINI_API_KEY ? ['gemini'] : []),
+            ...(e.DEEPSEEK_API_KEY ? ['deepseek'] : []),
+            ...(e.NODE_ENV === 'production' ? [] : ['mock']),
+          ],
       groqApiKey: e.GROQ_API_KEY,
       groqModel: e.GROQ_MODEL,
+      geminiApiKey: e.GEMINI_API_KEY,
+      geminiModel: e.GEMINI_MODEL,
+      deepseekApiKey: e.DEEPSEEK_API_KEY,
+      deepseekModel: e.DEEPSEEK_MODEL,
       compatBaseUrl: e.LLM_COMPAT_BASE_URL,
       compatApiKey: e.LLM_COMPAT_API_KEY,
       compatModel: e.LLM_COMPAT_MODEL,
