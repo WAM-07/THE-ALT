@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-
+import 'package:alter/core/alt/alt_session.dart';
+import 'package:alter/core/models/consent_log.dart';
+import 'package:alter/core/models/persona.dart';
+import 'package:alter/features/auth/screens/auth_screen.dart';
 import 'package:alter/main.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+import 'dart:io';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUpAll(() async {
+    Hive.init(Directory.systemTemp.createTempSync('alter_test').path);
+    Hive.registerAdapter(PersonaAdapter());
+    Hive.registerAdapter(ConsentLogAdapter());
+    await Hive.openBox<Persona>('personaBox');
+    await Hive.openBox<ConsentLog>('consentBox');
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.llfbandit.app_links/messages'), (_) async => null);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('without a saved ALT session ALTER asks the person to sign in', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: AlterApp()));
+    await tester.runAsync(restoreAltSession);
+    // The sign-in background animates forever, so pump fixed frames instead of settling.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.byType(AuthScreen), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+
+    await tester.tap(find.text('New here? Create an ALT account'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Create account'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
 }

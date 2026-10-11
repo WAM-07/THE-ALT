@@ -1,5 +1,5 @@
 name: alter
-description: "A new Flutter project."
+description: "ALTER: create, train and chat with your personal AI. Part of THE ALT ECOSYSTEM."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  # One ALT account, shared with ALTERA and ALTAR
+  alt_account:
+    path: ../../packages/alt_account
 
   # State Management
   flutter_riverpod: ^2.6.1
@@ -33,6 +37,7 @@ dependencies:
   file_picker: ^8.0.0
 
 dev_dependencies:
+  flutter_secure_storage: ^9.0.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
