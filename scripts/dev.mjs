@@ -7,7 +7,7 @@
 // Works on Windows, macOS and Linux. Needs only Node.js 22+.
 import { ensureDatabase, dropDatabase, loadDevSecrets, loadEnvFile, runMigrations, startPostgres } from '@alt/devkit';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,7 +19,7 @@ const dataDir = path.join(root, '.data');
 const args = new Set(process.argv.slice(2));
 const require = createRequire(import.meta.url);
 
-const colors = { core: 36, gateway: 35, altera: 33, altar: 32, postgres: 34, dev: 37 };
+const colors = { core: 36, gateway: 35, altera: 33, altar: 32, postgres: 34, chain: 94, dev: 37 };
 const tag = (name) => `\x1b[${colors[name] ?? 37}m${name.padEnd(8)}\x1b[0m`;
 const say = (msg) => console.log(`${tag('dev')} ${msg}`);
 const fail = (msg) => {
@@ -74,6 +74,82 @@ try {
 } catch (err) {
   await postgres?.stop();
   fail(err.message);
+}
+
+// ---------------------------------------------------------------- 3b. blockchain
+// CHAIN_MODE=local (default): a throwaway Hardhat chain on :8545 with freshly deployed contracts.
+// CHAIN_MODE=amoy: Polygon Amoy; addresses come from packages/contracts/deployments/amoy.json and
+// RELAYER_PRIVATE_KEY / CHAIN_RPC_URL from .env.
+const chainMode = (process.env.CHAIN_MODE || 'local').toLowerCase();
+const contractsDir = path.join(root, 'packages', 'contracts');
+const hardhatCli = path.join(root, 'node_modules', 'hardhat', 'dist', 'src', 'cli.js');
+// Hardhat's well-known development account #1. It only ever exists on the local chain.
+const LOCAL_RELAYER_KEY = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
+let chainProcess = null;
+
+async function rpcReady(url) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
+      signal: AbortSignal.timeout(1000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function applyDeployment(d) {
+  process.env.CHAIN_ID ||= String(d.chainId);
+  process.env.AIT_REGISTRY_ADDRESS ||= d.registry;
+  process.env.ALT_MARKETPLACE_ADDRESS ||= d.marketplace;
+  process.env.CHAIN_DEPLOYED_AT_BLOCK ||= String(d.deployedAtBlock ?? 0);
+}
+
+if (chainMode === 'local') {
+  if (!existsSync(path.join(contractsDir, 'artifacts', 'contracts', 'AITRegistry.sol'))) {
+    say('compiling smart contracts (first run)…');
+    const built = spawnSync(process.execPath, [hardhatCli, 'build'], { cwd: contractsDir, stdio: 'inherit' });
+    if (built.status !== 0) fail('Smart contracts did not compile.');
+  }
+  const rpc = 'http://127.0.0.1:8545';
+  if (await rpcReady(rpc)) {
+    say('a local chain is already running on :8545; reusing it');
+  } else {
+    say('starting local blockchain (Hardhat) on :8545…');
+    chainProcess = spawn(process.execPath, [hardhatCli, 'node'], { cwd: contractsDir, stdio: ['ignore', 'ignore', 'pipe'] });
+    readline.createInterface({ input: chainProcess.stderr }).on('line', (l) => console.log(`${tag('chain')} ${l}`));
+    for (let i = 0; i < 120 && !(await rpcReady(rpc)); i++) await new Promise((r) => setTimeout(r, 500));
+    if (!(await rpcReady(rpc))) fail('The local blockchain did not start.');
+  }
+  say('deploying AITRegistry and ALTMarketplace…');
+  const deploy = spawnSync(process.execPath, [hardhatCli, 'run', 'scripts/deploy.ts', '--network', 'localhost'], {
+    cwd: contractsDir,
+    encoding: 'utf8',
+  });
+  const line = (deploy.stdout || '').split(/\r?\n/).find((l) => l.startsWith('ALT_DEPLOYMENT '));
+  if (deploy.status !== 0 || !line) fail(`Contract deployment failed:
+${deploy.stdout}
+${deploy.stderr}`);
+  const d = JSON.parse(line.slice('ALT_DEPLOYMENT '.length));
+  process.env.CHAIN_RPC_URL = rpc;
+  process.env.CHAIN_NAME = 'ALT local chain';
+  process.env.CHAIN_EXPLORER_URL = ''; // no public explorer for a local chain
+  process.env.RELAYER_PRIVATE_KEY ||= LOCAL_RELAYER_KEY;
+  for (const k of ['CHAIN_ID', 'AIT_REGISTRY_ADDRESS', 'ALT_MARKETPLACE_ADDRESS', 'CHAIN_DEPLOYED_AT_BLOCK']) delete process.env[k];
+  applyDeployment(d);
+  say(`contracts: registry ${d.registry} · marketplace ${d.marketplace}`);
+} else if (chainMode === 'amoy') {
+  const file = path.join(contractsDir, 'deployments', 'amoy.json');
+  if (!existsSync(file)) fail('CHAIN_MODE=amoy but packages/contracts/deployments/amoy.json is missing. Deploy first: npm run deploy:amoy -w @alt/contracts');
+  applyDeployment(JSON.parse(readFileSync(file, 'utf8')));
+  process.env.CHAIN_NAME ||= 'Polygon Amoy';
+  process.env.CHAIN_EXPLORER_URL ||= 'https://amoy.polygonscan.com';
+  if (blank('CHAIN_RPC_URL') || blank('RELAYER_PRIVATE_KEY')) fail('CHAIN_MODE=amoy needs CHAIN_RPC_URL and RELAYER_PRIVATE_KEY in .env');
+} else if (chainMode !== 'off') {
+  fail(`Unknown CHAIN_MODE "${chainMode}" (use local, amoy or off).`);
 }
 
 // ---------------------------------------------------------------- 4. app config for the Flutter apps
@@ -170,6 +246,10 @@ async function shutdown() {
     if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(c.pid), '/T', '/F'], { stdio: 'ignore' });
     else c.kill('SIGTERM');
   }
+  if (chainProcess && chainProcess.exitCode === null) {
+    if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(chainProcess.pid), '/T', '/F'], { stdio: 'ignore' });
+    else chainProcess.kill('SIGTERM');
+  }
   await postgres?.stop().catch(() => {});
   process.exit(0);
 }
@@ -199,6 +279,7 @@ console.log(`
     API docs (ALT Core)           ${url}/core/docs
     Emails / OTP codes (dev)      ${url}/core/dev/mail
     Database                      ${postgres ? `embedded PostgreSQL on port ${process.env.DEV_POSTGRES_PORT || 54320}` : 'DATABASE_URL from .env'}
+    Blockchain                    ${chainMode === 'off' ? 'off' : `${process.env.CHAIN_NAME} (chain ${process.env.CHAIN_ID}) · AIT registry ${process.env.AIT_REGISTRY_ADDRESS}`}
     Phones on this Wi-Fi          ${lanIp ? `http://${lanIp}:${ports.gateway}` : 'no LAN address found'}
   Press Ctrl+C to stop everything.
 `);

@@ -159,3 +159,55 @@ export function loadEnvFile(file, target = process.env) {
   }
   return parsed;
 }
+
+/** Hardhat's well-known development account #1 (relayer in dev and tests). Never holds real funds. */
+export const LOCAL_RELAYER_KEY = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
+
+async function rpcReady(url) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
+      signal: AbortSignal.timeout(1000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Starts a throwaway local blockchain and deploys THE ALT contracts to it.
+ * `network` must be a Hardhat network in packages/contracts/hardhat.config.ts pointing at `port`.
+ */
+export async function startLocalChain({ repoRoot, port = 8546, network = 'testchain' }) {
+  const { spawn, spawnSync } = await import('node:child_process');
+  const contractsDir = path.join(repoRoot, 'packages', 'contracts');
+  const cli = path.join(repoRoot, 'node_modules', 'hardhat', 'dist', 'src', 'cli.js');
+  const rpcUrl = `http://127.0.0.1:${port}`;
+  if (!existsSync(path.join(contractsDir, 'artifacts', 'contracts', 'AITRegistry.sol'))) {
+    const built = spawnSync(process.execPath, [cli, 'build'], { cwd: contractsDir, encoding: 'utf8' });
+    if (built.status !== 0) throw new Error(`Contracts did not compile:\n${built.stdout}\n${built.stderr}`);
+  }
+  if (await rpcReady(rpcUrl)) throw new Error(`Something is already listening on ${rpcUrl}`);
+  const child = spawn(process.execPath, [cli, 'node', '--port', String(port)], { cwd: contractsDir, stdio: 'ignore' });
+  for (let i = 0; i < 120 && !(await rpcReady(rpcUrl)); i++) await new Promise((r) => setTimeout(r, 500));
+  if (!(await rpcReady(rpcUrl))) {
+    child.kill();
+    throw new Error('Local chain did not start');
+  }
+  const deploy = spawnSync(process.execPath, [cli, 'run', 'scripts/deploy.ts', '--network', network], { cwd: contractsDir, encoding: 'utf8' });
+  const line = (deploy.stdout || '').split(/\r?\n/).find((l) => l.startsWith('ALT_DEPLOYMENT '));
+  if (deploy.status !== 0 || !line) {
+    child.kill();
+    throw new Error(`Contract deployment failed:\n${deploy.stdout}\n${deploy.stderr}`);
+  }
+  const deployment = JSON.parse(line.slice('ALT_DEPLOYMENT '.length));
+  const stop = async () => {
+    if (child.exitCode !== null) return;
+    if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    else child.kill('SIGTERM');
+  };
+  return { rpcUrl, deployment, relayerPrivateKey: LOCAL_RELAYER_KEY, stop };
+}

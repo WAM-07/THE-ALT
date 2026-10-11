@@ -35,6 +35,19 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  // Blockchain (Module 17). Leave CHAIN_RPC_URL blank to run without a chain.
+  CHAIN_RPC_URL: z.string().optional(),
+  CHAIN_ID: z.coerce.number().int().positive().optional(),
+  CHAIN_NAME: z.string().default('ALT chain'),
+  AIT_REGISTRY_ADDRESS: z.string().optional(),
+  ALT_MARKETPLACE_ADDRESS: z.string().optional(),
+  RELAYER_PRIVATE_KEY: z.string().optional(),
+  CHAIN_EXPLORER_URL: z.string().optional(),
+  CHAIN_CONFIRMATIONS: z.coerce.number().int().min(1).default(1),
+  // IPFS (Module 6): local = content-addressed files under STORAGE_DIR; pinata = pinned for real.
+  IPFS_MODE: z.enum(['local', 'pinata']).default('local'),
+  PINATA_JWT: z.string().optional(),
+  IPFS_GATEWAY_URL: z.string().default('https://gateway.pinata.cloud'),
   DEEP_LINK_ALTER: z.string().default('alter://handoff'),
   DEEP_LINK_ALTERA: z.string().default('altera://handoff'),
 });
@@ -49,6 +62,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   }
   const e = parsed.data;
   if (e.MAIL_MODE === 'smtp' && !e.SMTP_URL) throw new Error('MAIL_MODE=smtp requires SMTP_URL');
+  if (e.IPFS_MODE === 'pinata' && !e.PINATA_JWT) throw new Error('IPFS_MODE=pinata requires PINATA_JWT');
+  const chainOn = Boolean(e.CHAIN_RPC_URL?.trim());
+  if (chainOn && (!e.CHAIN_ID || !e.AIT_REGISTRY_ADDRESS || !e.RELAYER_PRIVATE_KEY)) {
+    throw new Error('CHAIN_RPC_URL is set, so CHAIN_ID, AIT_REGISTRY_ADDRESS and RELAYER_PRIVATE_KEY are required too');
+  }
   const publicUrl = new URL(e.ALT_PUBLIC_URL);
   return {
     env: e.NODE_ENV,
@@ -70,6 +88,19 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     corsOrigins: list(e.CORS_ORIGINS),
     storageDir: e.STORAGE_DIR,
     rateLimitEnabled: e.RATE_LIMIT_ENABLED,
+    chain: chainOn
+      ? {
+          rpcUrl: e.CHAIN_RPC_URL!,
+          chainId: e.CHAIN_ID!,
+          name: e.CHAIN_NAME,
+          registryAddress: e.AIT_REGISTRY_ADDRESS!,
+          marketplaceAddress: e.ALT_MARKETPLACE_ADDRESS,
+          relayerPrivateKey: e.RELAYER_PRIVATE_KEY!,
+          explorerUrl: e.CHAIN_EXPLORER_URL,
+          confirmations: e.CHAIN_CONFIRMATIONS,
+        }
+      : null,
+    ipfs: { mode: e.IPFS_MODE, pinataJwt: e.PINATA_JWT, gatewayUrl: e.IPFS_GATEWAY_URL },
     deepLinks: {
       alter: e.DEEP_LINK_ALTER,
       altera: e.DEEP_LINK_ALTERA,

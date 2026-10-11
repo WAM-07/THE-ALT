@@ -12,18 +12,22 @@ import type { Config } from './config.js';
 import type { Ctx } from './context.js';
 import { createPool } from './db.js';
 import { AppError } from './lib/errors.js';
+import { ChainService } from './lib/chain.js';
+import { localIpfs, pinataIpfs, type IpfsStore } from './lib/ipfs.js';
 import { createMailer, type Mailer } from './lib/mailer.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
 import { authRoutes } from './http/routes/auth.js';
 import { directoryRoutes } from './http/routes/directory.js';
 import { meRoutes } from './http/routes/me.js';
+import { chainRoutes } from './http/routes/chain.js';
 
 export interface BuildOptions {
   config: Config;
   /** Test seams. */
   google?: GoogleVerifier;
   mailer?: Mailer;
+  ipfs?: IpfsStore;
   logger?: boolean;
 }
 
@@ -57,6 +61,10 @@ export async function buildApp(opts: BuildOptions) {
     tokens: await TokenService.create(config.jwtPrivateKeyPem, `${config.publicUrl}/core`, config.accessTokenTtl),
     mailer: opts.mailer ?? createMailer(config, (m) => app.log.info(m)),
     google: opts.google ?? createGoogleVerifier(config.googleClientIds),
+    chain: config.chain ? new ChainService(config.chain) : null,
+    ipfs:
+      opts.ipfs ??
+      (config.ipfs.mode === 'pinata' ? pinataIpfs(config.ipfs.pinataJwt!, config.ipfs.gatewayUrl) : localIpfs(config.storageDir, config.publicUrl)),
   };
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => {
@@ -130,6 +138,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => authRoutes(i, ctx));
   await app.register(async (i) => meRoutes(i, ctx));
   await app.register(async (i) => directoryRoutes(i, ctx));
+  await app.register(async (i) => chainRoutes(i, ctx));
 
   return app;
 }

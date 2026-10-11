@@ -29,3 +29,24 @@ export declare function loadDevSecrets(dataDir: string): {
 };
 
 export declare function loadEnvFile(file: string, target?: Record<string, string | undefined>): Record<string, string>;
+
+export declare const LOCAL_RELAYER_KEY: string;
+
+export interface LocalChain {
+  rpcUrl: string;
+  deployment: {
+    network: string;
+    chainId: number;
+    registry: string;
+    marketplace: string;
+    deployer: string;
+    relayer: string;
+    treasury: string;
+    platformFeeBps: number;
+    deployedAtBlock: number;
+  };
+  relayerPrivateKey: string;
+  stop(): Promise<void>;
+}
+
+export declare function startLocalChain(options: { repoRoot: string; port?: number; network?: string }): Promise<LocalChain>;

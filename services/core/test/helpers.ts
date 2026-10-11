@@ -36,6 +36,12 @@ export async function makeApp(env: Record<string, string> = {}) {
     RATE_LIMIT_ENABLED: 'false',
     ADMIN_EMAILS: ADMIN_EMAIL,
     STORAGE_DIR: '.data/test-uploads',
+    CHAIN_RPC_URL: inject('chain').rpcUrl,
+    CHAIN_ID: String(inject('chain').chainId),
+    CHAIN_NAME: 'ALT test chain',
+    AIT_REGISTRY_ADDRESS: inject('chain').registry,
+    ALT_MARKETPLACE_ADDRESS: inject('chain').marketplace,
+    RELAYER_PRIVATE_KEY: inject('chain').relayerPrivateKey,
     ...env,
   });
   const mailer = createMailer(config, () => {});
