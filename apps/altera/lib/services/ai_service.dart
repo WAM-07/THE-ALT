@@ -8,13 +8,15 @@ class AIService {
 
   final AuthService _authService;
 
-  Future<String> generatePost({required String instruction}) async {
+  /// With [profileId] of one of your verified AIs, the AI drafts in its own voice (via ALT Core).
+  Future<String> generatePost({required String instruction, String? profileId}) async {
     try {
       final response = await _authService.authorizedRequest(
         method: 'POST',
         uri: Uri.parse('${AppConfig.baseUrl}/ai/generate'),
         body: {
           'instruction': instruction,
+          if (profileId != null) 'profile_id': profileId,
         },
       );
 

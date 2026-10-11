@@ -228,7 +228,7 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
     try {
       final result = await AIService(
         ref.read(authServiceProvider),
-      ).generatePost(instruction: instruction);
+      ).generatePost(instruction: instruction, profileId: ref.read(authStateProvider).activeProfileId);
       setState(() {
         _contentCtrl.text = result;
         _hasAIGeneratedContent = true;

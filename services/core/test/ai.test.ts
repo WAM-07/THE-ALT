@@ -277,3 +277,27 @@ describe('writing help and moderation for other ALT services', () => {
     expect(draft.json()).toMatchObject({ text: expect.stringContaining('spy reply'), provider: 'spy' });
   });
 });
+
+describe('text in any language', () => {
+  it('stores and returns emoji, Urdu and typographic characters intact', async () => {
+    const u = await signUp(t);
+    const ai = await createAi(u.accessToken);
+    const session = (await call('POST', `/ais/${ai.id}/chat/sessions`, u.accessToken, {})).json();
+    const text = 'Salam 👋 آپ کیسے ہیں؟ “quotes” and a narrow space here';
+    const res = await call('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, u.accessToken, { content: text });
+    expect(res.statusCode).toBe(200);
+    const msgs = (await call('GET', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, u.accessToken)).json();
+    expect(msgs[0].content).toBe(text);
+  });
+});
+
+describe('what the AI knows from your data', () => {
+  it('uses all of your notes when they are short, even without matching words', async () => {
+    const u = await signUp(t);
+    const ai = await createAi(u.accessToken);
+    await call('POST', `/ais/${ai.id}/datasets`, u.accessToken, { title: 'Likes', text: 'I love Flutter and blockchain.' });
+    const session = (await call('POST', `/ais/${ai.id}/chat/sessions`, u.accessToken, {})).json();
+    await call('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, u.accessToken, { content: 'What do I enjoy?' });
+    expect(lastSystemPrompt()).toContain('I love Flutter and blockchain.');
+  });
+});

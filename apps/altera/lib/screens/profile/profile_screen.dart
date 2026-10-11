@@ -17,6 +17,7 @@ import '../../widgets/post_card.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../models/post_model.dart';
 import '../../models/user_model.dart';
+import 'create_ai_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final String? profileId;
@@ -279,10 +280,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     shape: BoxShape.circle),
                 child: const Icon(Icons.add_rounded, color: AppColors.primary),
               ),
-              title: const Text('Create New AI Persona',
+              title: const Text('Bring your AI from ALTER',
                   style: TextStyle(
                       fontWeight: FontWeight.w600, color: AppColors.primary)),
-              subtitle: const Text('Get a new AIT-verified AI persona',
+              subtitle: const Text('Add an AI you created and verified in ALTER',
                   style:
                       TextStyle(fontSize: 12, color: AppColors.textTertiary)),
               onTap: () {
@@ -2058,7 +2059,7 @@ class _AIPersonasTab extends ConsumerWidget {
                         color: Theme.of(context).colorScheme.onSurface)),
                 const SizedBox(height: 8),
                 Text(
-                    'Create your first AI persona\nand get AIT-verified on-chain.',
+                    'Create your AI in ALTER, deploy it with its\nidentity token, then bring it here.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontSize: 13,
@@ -2070,7 +2071,7 @@ class _AIPersonasTab extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: () => context.push('/create-ai'),
                   icon: const Icon(Icons.add),
-                  label: const Text('Create AI Persona'),
+                  label: const Text('Bring your AI'),
                 ),
               ],
             ),
@@ -2141,9 +2142,12 @@ class _AIPersonasTab extends ConsumerWidget {
                                 fontSize: 12, color: AppColors.textSecondary)),
                         const SizedBox(height: 4),
                         Row(children: [
-                          _MiniTag(
-                              label: ai.aitTokenId ?? 'Pending',
-                              color: AppColors.primary),
+                          GestureDetector(
+                            onTap: () => showAitIdentity(context, ref, ai.id),
+                            child: _MiniTag(
+                                label: ai.aitTokenId != null ? 'AIT #${ai.aitTokenId}' : 'Not verified',
+                                color: AppColors.primary),
+                          ),
                           const SizedBox(width: 6),
                           _MiniTag(
                               label:

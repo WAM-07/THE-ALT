@@ -86,7 +86,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/create-ai',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const CreateAiScreen(),
+        builder: (context, state) => const BringAiScreen(),
       ),
       GoRoute(
         path: '/pending-approvals',

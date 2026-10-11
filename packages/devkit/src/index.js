@@ -21,6 +21,8 @@ export async function startPostgres({ dataDir, port = 54320, user = 'alt', passw
     password,
     port,
     persistent: true,
+    // Without this, initdb on Windows picks the system code page (e.g. WIN1252) and emoji or Urdu text fail.
+    initdbFlags: ['--encoding=UTF8', '--locale=C'],
     onLog: quiet ? () => {} : console.log,
     onError: (e) => console.error('[postgres]', e?.toString?.() ?? e),
   });
@@ -40,7 +42,8 @@ export async function ensureDatabase(adminUrl, name) {
   await client.connect();
   try {
     const { rowCount } = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [name]);
-    if (!rowCount) await client.query(`CREATE DATABASE ${name}`);
+    // Always UTF-8, whatever the cluster's default (clusters made before this fix may be WIN1252).
+    if (!rowCount) await client.query(`CREATE DATABASE ${name} ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0`);
   } finally {
     await client.end();
   }

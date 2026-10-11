@@ -1,265 +1,234 @@
+import 'dart:convert';
+
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_text_field.dart';
 
-class CreateAiScreen extends ConsumerStatefulWidget {
-  const CreateAiScreen({super.key});
+/// "Bring your AI": AIs are created, trained and verified in ALTER. Here the person adds their
+/// verified AIs to ALTERA. ALTERA cannot create or verify an AI itself.
+class BringAiScreen extends ConsumerStatefulWidget {
+  const BringAiScreen({super.key});
 
   @override
-  ConsumerState<CreateAiScreen> createState() => _CreateAiScreenState();
+  ConsumerState<BringAiScreen> createState() => _BringAiScreenState();
 }
 
-class _CreateAiScreenState extends ConsumerState<CreateAiScreen> {
-  static const _categories = ['companion', 'creative', 'technical', 'general'];
-
-  final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
-  final _usernameCtrl = TextEditingController();
-  final _bioCtrl = TextEditingController();
-
-  bool _isCreating = false;
-  String? _category = 'general';
+class _BringAiScreenState extends ConsumerState<BringAiScreen> {
+  List<Map<String, dynamic>>? _ais;
+  String? _error;
+  String? _busyId;
 
   @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _usernameCtrl.dispose();
-    _bioCtrl.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  Future<void> _createAi() async {
-    if (!_formKey.currentState!.validate()) return;
-    
-    setState(() => _isCreating = true);
-    
-    final success = await ref.read(authStateProvider.notifier).createAIPersona(
-      displayName: _nameCtrl.text.trim(),
-      username: _usernameCtrl.text.trim(),
-      bio: _bioCtrl.text.trim(),
-      category: _category ?? 'general',
-    );
-    
-    if (mounted) {
-      setState(() => _isCreating = false);
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('AI Persona created successfully!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ));
-        context.pop();
-      } else {
-        final error = ref.read(authStateProvider).error ?? 'Failed to create AI';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(error),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ));
+  Future<void> _load() async {
+    final auth = ref.read(authServiceProvider);
+    try {
+      final res = await auth.authorizedRequest(method: 'GET', uri: Uri.parse('${auth.baseUrl}/profiles/ai/available'));
+      final body = jsonDecode(res.body);
+      if (res.statusCode != 200) throw Exception(body is Map ? body['message'] : 'Could not load your AIs');
+      setState(() {
+        _ais = (body as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _error = null;
+      });
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _bring(Map<String, dynamic> ai) async {
+    final auth = ref.read(authServiceProvider);
+    setState(() => _busyId = ai['core_ai_id'] as String);
+    try {
+      final res = await auth.authorizedRequest(
+        method: 'POST',
+        uri: Uri.parse('${auth.baseUrl}/profiles/ai/link'),
+        body: {'core_ai_id': ai['core_ai_id']},
+      );
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode >= 400) throw Exception(body['message'] ?? 'Could not add your AI');
+      await ref.read(authStateProvider.notifier).refreshProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${ai['name']} is now on ALTERA. Switch to it from your profile.'),
+        backgroundColor: AppColors.success,
+      ));
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: AppColors.error));
       }
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
+  Future<void> _openAlter() async {
+    try {
+      final opened = await ref.read(authServiceProvider).handoff.open(AltPlatform.alter);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Install ALTER to create and verify your AI.')));
+      }
+    } on AltApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Create AI Persona'),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: AppColors.aiGradient),
-                  borderRadius: BorderRadius.circular(16),
+      appBar: AppBar(title: const Text('Bring your AI')),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'Your personal AI is created, trained and verified in ALTER. Once it has its AI identity token, '
+              'you can bring it here to post, comment and chat on ALTERA.',
+              style: TextStyle(color: muted),
+            ),
+            const SizedBox(height: 16),
+            if (_error != null) Text(_error!, style: const TextStyle(color: AppColors.error)),
+            if (_ais == null && _error == null) const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator())),
+            if (_ais != null && _ais!.isEmpty)
+              _EmptyState(onOpenAlter: _openAlter),
+            for (final ai in _ais ?? <Map<String, dynamic>>[])
+              Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(children: [
+                    CircleAvatar(
+                      backgroundColor: AppColors.badgeAI.withValues(alpha: 0.15),
+                      backgroundImage: ai['avatar'] != null ? NetworkImage(ai['avatar'] as String) : null,
+                      child: ai['avatar'] == null ? const Icon(Icons.smart_toy_outlined, color: AppColors.badgeAI) : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Flexible(child: Text('${ai['name']}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                          if (ai['verified'] == true) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.verified_rounded, size: 16, color: AppColors.primary),
+                          ],
+                        ]),
+                        Text('@${ai['handle']}', style: TextStyle(fontSize: 12, color: muted)),
+                        const SizedBox(height: 4),
+                        Text(
+                          ai['verified'] == true
+                              ? 'AI identity token #${ai['ait_token_id']}'
+                              : 'Not deployed yet: finish it in ALTER (status: ${ai['status']})',
+                          style: TextStyle(fontSize: 12, color: ai['verified'] == true ? AppColors.success : AppColors.warning),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(width: 8),
+                    if (ai['on_altera'] == true)
+                      const Chip(label: Text('On ALTERA'))
+                    else if (ai['verified'] == true)
+                      FilledButton(
+                        onPressed: _busyId == null ? () => _bring(ai) : null,
+                        child: _busyId == ai['core_ai_id']
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Bring'),
+                      )
+                    else
+                      OutlinedButton(onPressed: _openAlter, child: const Text('Open ALTER')),
+                  ]),
                 ),
-                child: const Column(
-                  children: [
-                    Icon(Icons.smart_toy_outlined, size: 48, color: Colors.white),
-                    SizedBox(height: 12),
-                    Text(
-                      'Design your digital companion.',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Once created, your AI will be AIT-verified on-chain.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
               ),
-              const SizedBox(height: 32),
-              
-              AlteraTextField(
-                controller: _nameCtrl,
-                label: 'Display Name',
-                hint: 'e.g. Nova AI',
-                prefixIcon: Icons.badge_outlined,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              
-              AlteraTextField(
-                controller: _usernameCtrl,
-                label: 'Username',
-                hint: 'e.g. nova_bot',
-                prefixIcon: Icons.alternate_email,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Required';
-                  if (val.contains(' ')) return 'No spaces allowed';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 36),
-
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Bio / Identity Prompt',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _bioCtrl,
-                    maxLines: 4,
-                    textAlignVertical: TextAlignVertical.top,
-                    decoration: InputDecoration(
-                      hintText: 'Describe who this AI is and how they should act...',
-                      alignLabelWithHint: true,
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(bottom: 56),
-                        child: Icon(Icons.description_outlined),
-                      ),
-                      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                      filled: true,
-                      fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Theme.of(context).cardColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Theme.of(context).dividerColor, width: 1),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.error, width: 1),
-                      ),
-                      focusedErrorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.error, width: 2),
-                      ),
-                    ),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'Required';
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              // AI Category Dropdown
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'AI Category',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: _category,
-                    dropdownColor: Theme.of(context).cardColor,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 16,
-                    ),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Theme.of(context).cardColor,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.2)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.2)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                      ),
-                    ),
-                    items: _categories
-                        .map(
-                          (category) => DropdownMenuItem(
-                            value: category,
-                            child: Text(category.toUpperCase(), style: const TextStyle(letterSpacing: 0.5, fontSize: 13, fontWeight: FontWeight.bold)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _isCreating
-                        ? null
-                        : (value) => setState(() => _category = value),
-                    validator: (value) =>
-                        value == null ? 'Please select a category' : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              
-              AlteraButton(
-                label: 'Create & Verify on Blockchain',
-                onPressed: _createAi,
-                isLoading: _isCreating,
-                icon: Icons.hexagon_outlined,
-                isEnabled: !_isCreating,
-                fullWidth: true,
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onOpenAlter});
+  final VoidCallback onOpenAlter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(children: [
+        const Icon(Icons.psychology_alt_outlined, size: 56, color: AppColors.badgeAI),
+        const SizedBox(height: 12),
+        const Text('You have no personal AI yet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        const SizedBox(height: 6),
+        const Text('Create it in ALTER: teach it about you, test it, and deploy it with its identity token.', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        FilledButton.icon(onPressed: onOpenAlter, icon: const Icon(Icons.open_in_new), label: const Text('Open ALTER')),
+      ]),
+    );
+  }
+}
+
+/// Shows an AI's on-chain identity (M13-FE-3, M17-FE-4), checked live against the blockchain.
+Future<void> showAitIdentity(BuildContext context, WidgetRef ref, String aiProfileId) async {
+  final auth = ref.read(authServiceProvider);
+  Map<String, dynamic>? data;
+  String? error;
+  try {
+    final res = await auth.authorizedRequest(method: 'GET', uri: Uri.parse('${auth.baseUrl}/blockchain/ai/$aiProfileId'));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 400) throw Exception(body['message'] ?? 'Could not check the blockchain');
+    data = body;
+  } catch (e) {
+    error = e.toString().replaceFirst('Exception: ', '');
+  }
+  if (!context.mounted) return;
+  Widget row(String k, Object? v) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          SelectableText('${v ?? '-'}', style: const TextStyle(fontSize: 12)),
+        ]),
+      );
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(data?['verified'] == true ? Icons.verified_rounded : Icons.help_outline, color: data?['verified'] == true ? AppColors.success : AppColors.warning),
+              const SizedBox(width: 8),
+              Text(data?['verified'] == true ? 'Verified AI identity' : 'Not verified', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 12),
+            if (error != null) Text(error),
+            if (data != null && data['tokenId'] == null) Text('${data['reason'] ?? 'This AI has no identity token.'}'),
+            if (data != null && data['tokenId'] != null) ...[
+              row('Token', '#${data['tokenId']} on ${data['network']} (chain ${data['chainId']})'),
+              row('Contract', data['contract']),
+              row('Creator', data['creator']),
+              row('Owner', data['owner']),
+              row('Version', 'v${data['version']}${data['suspended'] == true ? ' · SUSPENDED' : ''}'),
+              row('Manifest (IPFS)', data['manifestCid']),
+              Wrap(spacing: 8, children: [
+                if (data['manifestUrl'] != null)
+                  OutlinedButton(onPressed: () => launchUrl(Uri.parse(data!['manifestUrl'] as String), mode: LaunchMode.externalApplication), child: const Text('Manifest')),
+                if (data['explorer'] != null)
+                  OutlinedButton(onPressed: () => launchUrl(Uri.parse(data!['explorer'] as String), mode: LaunchMode.externalApplication), child: const Text('Explorer')),
+              ]),
+            ],
+          ]),
+        ),
+      ),
+    ),
+  );
 }

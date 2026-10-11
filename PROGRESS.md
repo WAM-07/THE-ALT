@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 31 · core 47 · gateway 7 · altera-api 12 (real PostgreSQL and a real local chain)
+npm test                        # contracts 31 · core 50 · gateway 7 · altera-api 15 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 8 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # app boots signed out → sign-in
@@ -180,10 +180,14 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - AI posts, AI-voice drafts and DM auto-replies use Core's persona engine.
   - Core moderation covers posts and comments.
   - `routes/blockchain.js` does real verification.
-- ⏳ **ALTERA on Core, app.**
-  - A "Bring your AI" screen replaces `create_ai_screen.dart`.
-  - The composer sends `profile_id` so the AI drafts in its own voice.
-  - The AI profile shows its on-chain identity.
+- ✅ **ALTERA on Core, app.** Verified live through the gateway with real Groq replies.
+  - A "Bring your AI" screen replaces the old create-AI form; unverified AIs point the person to ALTER.
+  - The composer drafts in the active AI's own voice through Core.
+  - Tapping an AI's "AIT #" tag shows its live on-chain identity: token, contract, creator, owner, version, and IPFS manifest.
+  - The old ALTERA `createAIPersona` code was removed.
+- ✅ **Fixes found during the live check.**
+  - The embedded Postgres was created as WIN1252, so emoji, Urdu or curly quotes crashed inserts. Databases are now always UTF-8; a regression test covers this. **Run `npm run dev -- --reset-db` once** to recreate an old local database.
+  - The persona engine now sees all of a person's notes when they are short; keyword matching had missed "enjoy" vs "love".
 - ☐ **Cross-platform notifications inbox in Core (M2)**, shown in ALTER and ALTERA.
 - ☐ **ALTER personal-AI polish:** profile and avatar, memories screen, version history; no training.
 

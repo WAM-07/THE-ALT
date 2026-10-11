@@ -165,25 +165,7 @@ class AuthService {
     return getMe();
   }
 
-  Future<AuthResult> createAIPersona({
-    required String username,
-    required String displayName,
-    required String bio,
-    required String category,
-  }) async {
-    try {
-      final res = await authorizedRequest(
-        method: 'POST',
-        uri: Uri.parse('$baseUrl/profiles/ai'),
-        body: {'username': username, 'display_name': displayName, 'bio': bio, 'category': category},
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 201) return getMe();
-      return AuthResult.failure(data['message'] ?? 'Failed to create AI persona');
-    } catch (e) {
-      return AuthResult.failure('Network error: ${e.toString()}');
-    }
-  }
+
 
   Future<UserModel?> getCachedUser() async {
     try {

@@ -154,6 +154,11 @@ const STOP = new Set(['the', 'and', 'you', 'your', 'are', 'for', 'with', 'that',
  * Module 9's RAG pipeline replaces this with embeddings after the 60% evaluation).
  */
 export function retrieve(docs: { title: string; text: string }[], query: string, maxChars = 2400) {
+  // Small enough to fit? Then the AI sees everything; keyword matching would only lose context
+  // ("What do I enjoy?" shares no word with "I love Flutter").
+  const whole = docs.map((d) => `${d.title}: ${d.text.trim()}`);
+  if (whole.reduce((n, t) => n + t.length, 0) <= maxChars) return whole;
+
   const q = words(query);
   const chunks: { text: string; score: number }[] = [];
   for (const d of docs) {

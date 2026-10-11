@@ -153,26 +153,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return result;
   }
 
-  Future<bool> createAIPersona({
-    required String username,
-    required String displayName,
-    required String bio,
-    required String category,
-  }) async {
-    state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.createAIPersona(
-      username: username,
-      displayName: displayName,
-      bio: bio,
-      category: category,
-    );
-    if (result.success) {
-      state = state.copyWith(user: result.user, isLoading: false);
-      return true;
-    }
-    state = state.copyWith(isLoading: false, error: result.error);
-    return false;
-  }
+
 
   Future<void> checkAuth() async {
     final result = await _authService.refreshToken();
