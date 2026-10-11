@@ -27,14 +27,14 @@ class ScaffoldWithNavBar extends StatelessWidget {
       extendBody: true, // Allows body to go behind the floating nav bar
       bottomNavigationBar: SafeArea(
         child: Container(
-          margin: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
+          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             color: isDark ? ALTColors.darkBgSurface01 : ALTColors.lightBgSurface01,
             borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               )
@@ -54,22 +54,28 @@ class ScaffoldWithNavBar extends StatelessWidget {
                 onTap: () => _goBranch(0),
               ),
               _NavBarIcon(
-                icon: Icons.memory,
-                label: 'Training',
+                icon: Icons.chat_bubble_outline,
+                label: 'Chat',
                 isSelected: navigationShell.currentIndex == 1,
                 onTap: () => _goBranch(1),
               ),
               _NavBarIcon(
                 icon: Icons.storage,
-                label: 'Dataset',
+                label: 'Data',
                 isSelected: navigationShell.currentIndex == 2,
                 onTap: () => _goBranch(2),
               ),
               _NavBarIcon(
-                icon: Icons.settings,
-                label: 'Settings',
+                icon: Icons.memory,
+                label: 'Deploy',
                 isSelected: navigationShell.currentIndex == 3,
                 onTap: () => _goBranch(3),
+              ),
+              _NavBarIcon(
+                icon: Icons.settings,
+                label: 'Settings',
+                isSelected: navigationShell.currentIndex == 4,
+                onTap: () => _goBranch(4),
               ),
             ],
           ),
@@ -101,9 +107,9 @@ class _NavBarIcon extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? ALTColors.violet100.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? ALTColors.violet100.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(

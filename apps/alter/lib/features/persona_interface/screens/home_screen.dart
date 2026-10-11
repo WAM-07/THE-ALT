@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
-import '../../../core/providers/storage_providers.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
@@ -28,7 +28,6 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final persona = ref.watch(currentPersonaProvider);
     final card = (isDark ? ALTColors.darkBgSurface01 : ALTColors.lightBgSurface01).withValues(alpha: 0.9);
     final muted = isDark ? ALTColors.darkTextSecondary : ALTColors.lightTextSecondary;
 
@@ -48,23 +47,38 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text('@${user?.handle ?? ''}', style: ALTTypography.bodyMedium.copyWith(color: muted)),
                 const SizedBox(height: 24),
-                _Card(
-                  color: card,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: ALTColors.irisViolet,
-                      child: Icon(Icons.psychology_alt_rounded, color: Colors.white),
-                    ),
-                    title: Text(persona?.name ?? 'Your personal AI', style: ALTTypography.headlineSmall),
-                    subtitle: Text(
-                      persona == null ? 'Finish onboarding to create it.' : 'Draft · not yet trained or deployed',
-                      style: ALTTypography.bodySmall.copyWith(color: muted),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.go(persona == null ? '/onboarding' : '/training'),
-                  ),
+                ValueListenableBuilder<AltAi?>(
+                  valueListenable: currentAi,
+                  builder: (context, ai, _) {
+                    final (status, next, route) = switch (ai?.status) {
+                      'verified' => ('Verified · identity token #${ai!.token?.tokenId}', 'It can now appear on ALTERA and ALTAR.', '/training'),
+                      'minting' => ('Minting its identity token…', 'This takes a few seconds.', '/training'),
+                      'ready' => ('Version v${ai!.latestVersion?['version']} built', 'Finish the checks and deploy it.', '/training'),
+                      _ => ('Draft', 'Add data about you and chat with it.', '/dataset'),
+                    };
+                    return _Card(
+                      color: card,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: ai?.verified == true ? ALTColors.jadeSurge : ALTColors.irisViolet,
+                          child: Icon(ai?.verified == true ? Icons.verified : Icons.psychology_alt_rounded, color: Colors.white),
+                        ),
+                        title: Text(ai?.name ?? 'Your personal AI', style: ALTTypography.headlineSmall),
+                        subtitle: Text('$status\n$next', style: ALTTypography.bodySmall.copyWith(color: muted)),
+                        isThreeLine: true,
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.go(route),
+                      ),
+                    );
+                  },
                 ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: FilledButton.tonalIcon(onPressed: () => context.go('/chat'), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat'))),
+                  const SizedBox(width: 8),
+                  Expanded(child: FilledButton.tonalIcon(onPressed: () => context.go('/dataset'), icon: const Icon(Icons.add), label: const Text('Add data'))),
+                ]),
                 const SizedBox(height: 16),
                 _Card(
                   color: card,

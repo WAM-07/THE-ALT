@@ -7,6 +7,7 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
 import '../../../shared/widgets/gradient_background.dart';
+import '../../consent_engine/screens/consent_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -43,6 +44,12 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('ALT Account'),
                 subtitle: const Text('Profile, password, two-factor, devices and wallets'),
                 onTap: () => context.push('/account'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Privacy & consent'),
+                subtitle: const Text('What your AI may do with your data'),
+                onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ConsentScreen())),
               ),
               ListTile(
                 leading: const Icon(Icons.forum_outlined),

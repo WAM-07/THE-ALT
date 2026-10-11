@@ -8,6 +8,8 @@ import 'core/storage/hive_setup.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await HiveSetup.init();
+  // Loads the person's AI whenever someone signs in (and forgets it on sign-out).
+  watchAltSession();
   runApp(const ProviderScope(child: AlterApp()));
   // Restores the ALT session in the background; the router shows a splash until it is done.
   restoreAltSession();

@@ -13,6 +13,9 @@ import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/models/persona.dart';
 import '../../../core/providers/storage_providers.dart';
+import '../../../core/alt/ai_api.dart';
+import '../../../core/alt/alt_session.dart';
+import 'package:alt_account/alt_account.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -43,7 +46,54 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
+  /// Creates the person's AI in ALT Core with their answers and their recorded consent.
   Future<void> _finishOnboarding() async {
+    final user = altAccount.currentUser.value;
+    final first = (_name.trim().isNotEmpty ? _name.trim() : user?.displayName ?? 'My').split(' ').first;
+    final base = '${user?.handle ?? 'me'}_ai'.replaceAll(RegExp(r'[^A-Za-z0-9_.]'), '_');
+    final stem = base.length > 26 ? base.substring(0, 26) : base;
+    AltAi? created;
+    String? error;
+    for (var attempt = 0; attempt < 5 && created == null; attempt++) {
+      try {
+        created = await aiApi.create(
+          name: "$first's ALT",
+          handle: attempt == 0 ? stem : '${stem}${attempt + 1}',
+          onboarding: {
+            if (int.tryParse(_age) != null) 'age': int.parse(_age),
+            if (_pronoun != null && _pronoun != 'Prefer not to say') 'pronouns': _pronoun,
+            'roles': _selectedRoles,
+            if (_profileTrait != null) 'primaryTrait': _profileTrait,
+          },
+          consents: {
+            'persona_training': _consent1,
+            'third_party_processing': _consent2,
+            'public_deployment': _consent3,
+            'interaction_learning': _consent4,
+          },
+        );
+      } on AltApiException catch (e) {
+        if (e.code != 'HANDLE_TAKEN') {
+          error = e.message;
+          break;
+        }
+      }
+    }
+    if (created == null) {
+      if (!mounted) return;
+      final retry = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Could not create your AI'),
+          content: Text(error ?? 'Please try again.'),
+          actions: [FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Try again'))],
+        ),
+      );
+      if (retry == true) await _finishOnboarding();
+      return;
+    }
+
     final persona = Persona(
       id: 'current_user',
       name: _name,
@@ -55,9 +105,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       createdAt: DateTime.now(),
     );
     await ref.read(personaRepositoryProvider).savePersona(persona);
-    if (mounted) {
-      context.go('/home');
-    }
+    currentAi.value = created;
+    aiPhase.value = AiPhase.exists; // the router moves on to Home
+    if (mounted) context.go('/home');
   }
 
   @override
@@ -587,20 +637,27 @@ class _Stage6ConsentState extends State<_Stage6Consent> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Permissions & Sovereignty", style: ALTTypography.headlineLarge),
+          const Text("Your data, your choice", style: ALTTypography.headlineLarge),
           const SizedBox(height: 8),
-          const Text("Confirm the rules of the ecosystem.", style: ALTTypography.bodyMedium),
-          const SizedBox(height: 32),
-          _buildCard("I understand my data is stored locally.", c1, () => setState(() => c1 = !c1)),
-          _buildCard("I consent to local model training.", c2, () => setState(() => c2 = !c2)),
-          _buildCard("I understand this is a mock simulation.", c3, () => setState(() => c3 = !c3)),
-          _buildCard("I retain full cryptographic ownership.", c4, () => setState(() => c4 = !c4)),
-          const Spacer(),
+          const Text("Each choice is recorded and can be changed any time in Settings. The first one is needed to build your AI.",
+              style: ALTTypography.bodyMedium),
+          const SizedBox(height: 24),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(children: [
+                _buildCard(consentScopes['persona_training']!, c1, () => setState(() => c1 = !c1)),
+                _buildCard(consentScopes['third_party_processing']!, c2, () => setState(() => c2 = !c2)),
+                _buildCard(consentScopes['public_deployment']!, c3, () => setState(() => c3 = !c3)),
+                _buildCard(consentScopes['interaction_learning']!, c4, () => setState(() => c4 = !c4)),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ALTButton(
               label: "Confirm",
-              onPressed: (c1 && c2 && c3 && c4) ? () => widget.onComplete(c1, c2, c3, c4) : null,
+              onPressed: c1 ? () => widget.onComplete(c1, c2, c3, c4) : null,
             ),
           )
         ],
@@ -778,7 +835,7 @@ class _Stage9GeneratingState extends State<_Stage9Generating> with SingleTickerP
         const Icon(Icons.memory, size: 80, color: ALTColors.irisViolet)
             .animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(1,1), end: const Offset(1.2, 1.2), duration: 1.seconds),
         const SizedBox(height: 32),
-        const Text("Initializing Neural Pathways...", style: ALTTypography.headlineMedium),
+        const Text("Creating your personal AI...", style: ALTTypography.headlineMedium),
         const SizedBox(height: 48),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 48.0),

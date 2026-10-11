@@ -1,6 +1,8 @@
 import 'package:alt_account/alt_account.dart';
 import 'package:flutter/foundation.dart';
 
+import 'ai_api.dart';
+
 /// Where ALTER finds THE ALT. Set with `flutter run --dart-define-from-file=env/dev.json`
 /// (written by `npm run dev`) or `--dart-define=ALT_API_URL=http://<pc-lan-ip>:8080` on a phone.
 class AltConfig {
@@ -31,4 +33,45 @@ Future<void> restoreAltSession() async {
   } finally {
     altSessionReady.value = true;
   }
+}
+
+// ---------------------------------------------------------------- the person's AI
+
+enum AiPhase { unknown, loading, none, exists }
+
+/// Whether the signed-in person already has a personal AI (loaded from ALT Core after sign-in).
+final ValueNotifier<AiPhase> aiPhase = ValueNotifier<AiPhase>(AiPhase.unknown);
+
+/// The person's AI, kept fresh by screens that change it.
+final ValueNotifier<AltAi?> currentAi = ValueNotifier<AltAi?>(null);
+
+Future<void> loadMyAi() async {
+  aiPhase.value = AiPhase.loading;
+  try {
+    final list = await aiApi.myAis();
+    currentAi.value = list.isEmpty ? null : await aiApi.get(list.first.id);
+    aiPhase.value = list.isEmpty ? AiPhase.none : AiPhase.exists;
+  } catch (_) {
+    // Offline or server trouble: let the person in; screens retry and show errors.
+    aiPhase.value = currentAi.value == null ? AiPhase.none : AiPhase.exists;
+  }
+}
+
+Future<AltAi?> refreshCurrentAi() async {
+  final ai = currentAi.value;
+  if (ai == null) return null;
+  currentAi.value = await aiApi.get(ai.id);
+  return currentAi.value;
+}
+
+/// Keeps the AI state in step with sign-in and sign-out.
+void watchAltSession() {
+  altAccount.currentUser.addListener(() {
+    if (altAccount.currentUser.value == null) {
+      currentAi.value = null;
+      aiPhase.value = AiPhase.unknown;
+    } else if (aiPhase.value == AiPhase.unknown) {
+      loadMyAi();
+    }
+  });
 }
