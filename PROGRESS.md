@@ -218,8 +218,10 @@ Work one step at a time, then stop for the owner's review before starting the ne
 ## Environment notes
 - **Development needs no keys.** Optional settings go in `.env`: `GOOGLE_CLIENT_IDS`, `SMTP_URL` with `MAIL_MODE=smtp`, and `ADMIN_EMAILS`.
 - **Flutter SDK is at `C:\flutter`.** It was moved out of `ALTER/flutter` because Flutter's native-asset build fails when the SDK path contains a space ("C:\THE ALT"). Add `C:\flutter\bin` to PATH.
-- **No Android SDK is installed on this machine.** To run the apps on a phone or emulator, install Android Studio. On this machine the apps can be checked with `flutter test`, `flutter analyze` and `flutter build web`.
-  - Run on a web browser: `flutter run -d chrome --dart-define=ALT_API_URL=http://localhost:8080`.
-  - Run on an emulator: `flutter run --dart-define-from-file=env/dev.json`.
-  - Run on a physical phone: `--dart-define=ALT_API_URL=http://<PC LAN IP>:8080`. `npm run dev` prints the LAN address.
+- **Android Studio is installed** (SDK 36, Android 16 emulator, licences accepted). Both apps build and run on the emulator. Checked 2026-10-12: sign-in, the ALTER → ALTERA handoff, the verified AI and the shared inbox.
+  - **Gradle 9.1 is required.** Android Studio bundles Java 25, which Gradle 8.x cannot run on (the build fails with just "25.0.3").
+  - Emulator: start `npm run dev`, then `flutter run --dart-define-from-file=env/dev.json` in `apps/alter` or `apps/altera`. The emulator reaches the PC at `10.0.2.2`.
+  - Physical phone: `--dart-define=ALT_API_URL=http://<PC LAN IP>:8080` (`npm run dev` prints it).
+  - Web browser: `flutter run -d chrome --dart-define=ALT_API_URL=http://localhost:8080`.
+  - With Git Bash, run `export MSYS_NO_PATHCONV=1` before `adb push` or `adb shell`; otherwise device paths like `/data/local/tmp` become Windows paths.
 - **Docker is not installed and isn't needed.**

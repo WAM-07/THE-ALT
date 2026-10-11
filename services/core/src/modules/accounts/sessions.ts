@@ -37,6 +37,8 @@ async function accessFor(ctx: Ctx, user: UserRow, sessionId: string, platform: s
 }
 
 /** Creates a session for a user who has just proven who they are. Runs in the caller's transaction. */
+const SIGN_IN_HOW: Record<string, string> = { password: 'with a password', google: 'with Google', siwe: 'with a wallet', 'password+totp': 'with a password and 2FA code', 'password+recovery': 'with a password and a recovery code', email_verification: 'by confirming the email' };
+
 export async function startSession(ctx: Ctx, client: pg.PoolClient, user: UserRow, device: DeviceInfo, method: string): Promise<TokenPair> {
   const secret = randomToken(32);
   const expiresAt = new Date(Date.now() + ctx.config.refreshTokenTtlDays * 86_400_000);
@@ -66,7 +68,7 @@ export async function startSession(ctx: Ctx, client: pg.PoolClient, user: UserRo
       category: 'security',
       type: 'security.new_sign_in',
       title: `New sign-in to ${device.platform.toUpperCase()}`,
-      body: `${device.deviceName ?? 'A device'} signed in to your ALT account (${method.replace(/_/g, ' ')}). If this wasn't you, sign out everywhere and change your password.`,
+      body: `${device.deviceName ?? 'A device'} signed in to your ALT account ${SIGN_IN_HOW[method] ?? `(${method.replace(/_/g, ' ')})`}. If this wasn't you, sign out everywhere and change your password.`,
       data: { platform: device.platform, method, sessionId },
     });
   }

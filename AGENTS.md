@@ -50,7 +50,7 @@ npx tsc --noEmit    # inside services/core or services/gateway
 ```
 
 - In development, OTP emails are not sent. Read them at `http://localhost:8080/core/dev/mail`.
-- **Flutter** is at `C:\flutter` (not in the repo; a path with a space breaks Flutter's native-asset builds). Use `C:\flutter\bin\flutter` if it isn't on PATH. Check each app with `flutter analyze` and `flutter test`, and `flutter build web` to prove it compiles. There is no Android SDK on the dev machine.
+- **Flutter** is at `C:\flutter` (not in the repo; a path with a space breaks Flutter's native-asset builds). Use `C:\flutter\bin\flutter` if it isn't on PATH. Check each app with `flutter analyze` and `flutter test`, and `flutter build web` to prove it compiles. Android Studio (SDK 36, an Android 16 emulator) is installed; build with `flutter build apk --debug`. Both apps need Gradle 9.1+ because Android Studio bundles Java 25.
 - In Flutter widget tests, mock secure storage with `FlutterSecureStorage.setMockInitialValues({})` and the `app_links` channel (see `apps/*/test/widget_test.dart`).
 - Flutter apps take their API address from `--dart-define-from-file=env/dev.json`, which `npm run dev` writes. The Android emulator uses `10.0.2.2`.
 

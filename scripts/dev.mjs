@@ -9,6 +9,7 @@ import { ensureDatabase, dropDatabase, loadDevSecrets, loadEnvFile, runMigration
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -51,6 +52,20 @@ const ports = {
   altar: Number(process.env.ALTAR_PORT || 4200),
 };
 process.env.ALT_PUBLIC_URL ||= `http://localhost:${ports.gateway}`;
+
+// A second `npm run dev` would fight the first one for the ports and the database files.
+const portInUse = (port) =>
+  new Promise((resolve) => {
+    const probe = net.createServer().once('error', () => resolve(true)).once('listening', () => probe.close(() => resolve(false)));
+    probe.listen(port, '0.0.0.0');
+  });
+const busy = [];
+for (const [name, port] of [['gateway', ports.gateway], ['ALT Core', ports.core], ['ALTERA API', ports.altera], ['database', Number(process.env.DEV_POSTGRES_PORT || 54320)]]) {
+  if (await portInUse(port)) busy.push(`${name} (port ${port})`);
+}
+if (busy.length) {
+  fail(`THE ALT already seems to be running: ${busy.join(', ')} in use. Stop the other "npm run dev" (Ctrl+C in its window) and try again.`);
+}
 
 // ---------------------------------------------------------------- 3. database
 let postgres = null;
