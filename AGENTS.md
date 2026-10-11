@@ -1,0 +1,67 @@
+# Instructions for AI coding agents
+
+Read this whole file before changing anything. Then read `PROGRESS.md` (where things are) and the relevant section of `ROADMAP.md` (the design). If this file and your own habits disagree, this file wins. If `ROADMAP.md` and the code disagree, stop and ask the owner (Wamiq).
+
+## What you are working on
+
+THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutter), ALTAR (Next.js), and ALTERA (Flutter).
+
+- **One account works everywhere.**
+- **AIs are created only in ALTER.** An AI may act on ALTERA or ALTAR only after it is *verified*, meaning it has an AI Identity Token (AIT) on Polygon.
+- Design is in `ROADMAP.md`, section 4. Do not invent a different architecture.
+
+## Hard rules
+
+1. **Never commit secrets.**
+   - Configuration comes from `.env`. Only `.env.example` is committed.
+   - Never put a secret in a Flutter or web app; anything shipped to a device is public.
+2. **Never weaken authentication or authorisation to make something work.** This includes skipping token checks, trusting a user ID sent by the client, or disabling rate limits outside tests. If you are blocked, stop and report.
+3. **One account system.**
+   - Users live only in `core.users`. Never create another users table or another login endpoint in a platform service.
+   - Platform services identify the caller by verifying the ALT access token (RS256, public key at `/core/.well-known/jwks.json`). They may also read the `x-alt-user-id` header set by the gateway.
+4. **Each service writes only to its own Postgres schema** (`core`, `altera`, `altar`).
+   - Reading other schemas through a view, or holding a foreign key to `core.users` or `core.personal_ais`, is fine.
+   - Writing to another schema is not. Call that service's API instead.
+5. **Migrations:**
+   - New SQL files only, in `services/<service>/migrations/NNNN_name.sql`.
+   - **Never edit a migration that has been committed**; the runner refuses changed checksums.
+   - Never create tables at server start-up.
+6. **Do not rename or delete existing API routes** that the ALTERA app calls unless the task says so. ALTERA's Flutter app depends on about 60 endpoints.
+7. **Never fake verification.** No hard-coded `is_verified = true`, mock transaction hashes or pretend blockchain calls.
+   - If a feature is simulated on purpose, name it `simulated`/`mock` in code and in the UI.
+   - Add it to the "Known mocks" list in `PROGRESS.md`.
+8. **Tests:**
+   - Add or update tests for any backend behaviour you change.
+   - Run `npm test` (backend) and `flutter analyze` (apps) before saying you are done.
+   - Report failures honestly, with the output.
+9. **Do not touch these:**
+   - `services/core/src/http/routes/auth.ts`, `services/core/src/modules/accounts/*`, `services/core/migrations/*` and `packages/contracts/*`, unless your task explicitly names them;
+   - anything under `_archive/` or `Documentations/*.pdf`.
+10. **Keep changes small and focused.** Don't reformat files you didn't otherwise change. Match the style of the file you're editing.
+
+## How to run and check things
+
+```bash
+npm install
+npm run dev         # everything at http://localhost:8080 (embedded Postgres, no Docker)
+npm test            # all backend tests
+npx tsc --noEmit    # inside services/core or services/gateway
+```
+
+- In development, OTP emails are not sent. Read them at `http://localhost:8080/core/dev/mail`.
+- Flutter apps take their API address from `--dart-define-from-file=env/dev.json`, which `npm run dev` writes. The Android emulator uses `10.0.2.2`.
+
+## Conventions
+
+- **Backend:** TypeScript (ESM, Node 22+), Fastify 5, zod schemas on every route, and `pg` with SQL (no ORM). Wrap multi-statement writes in `tx()`.
+- **Errors:** throw `AppError` from `services/core/src/lib/errors.ts`. Clients receive `{ "error": { "code", "message", "details?", "requestId" } }`.
+- **Audit:** record security-relevant actions with `audit(client, …)` inside the same transaction. Announce changes other services care about with `publish(client, topic, payload)`, the outbox.
+- **API paths behind the gateway:** `/core/...`, `/altera/...`, `/altar/...`. Inside a service, routes have no prefix.
+- **Flutter:** Riverpod and go_router (ALTER). Use the existing theme files. No hard-coded URLs; use the dart-define config.
+- **Commits:** imperative summary line, then what and why. One logical change per commit.
+
+## When you finish a task
+
+1. Run the checks above.
+2. Update `PROGRESS.md`: tick what you finished, add anything you mocked or left undone, and note any new environment variables.
+3. Summarise for the owner: files changed, how you verified, and what is still open.
