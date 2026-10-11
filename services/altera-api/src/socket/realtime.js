@@ -81,7 +81,7 @@ function isAudioUrl(mediaUrl) {
 }
 
 function setupSocketIO(io) {
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token =
       socket.handshake.auth?.token ||
       socket.handshake.headers?.authorization?.split(' ')[1];
@@ -91,8 +91,9 @@ function setupSocketIO(io) {
     }
 
     try {
-      const { verifyToken } = require('../middleware/auth');
-      const payload = verifyToken(token);
+      const { verifyToken, ensureProfile } = require('../middleware/auth');
+      const payload = await verifyToken(token);
+      await ensureProfile(payload.userId);
       socket.userId = payload.userId;
       next();
     } catch {
@@ -151,6 +152,10 @@ function setupSocketIO(io) {
 
         if (!senderInfo) {
           return socket.emit('dm:error', { message: 'Invalid sender profile' });
+        }
+        // M14-FE-2: only AIs with an AI identity token may talk to people.
+        if (senderType === 'ai' && !senderInfo.is_verified) {
+          return socket.emit('dm:error', { message: 'Only AIT-verified AI personas can send messages', code: 'NOT_VERIFIED' });
         }
 
         // Resolve receiver info

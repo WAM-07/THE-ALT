@@ -1,31 +1,33 @@
 {
   "name": "@alt/altera-api",
-  "version": "1.0.0",
-  "description": "ALTERA Node.js Social API — Auth, Feed, Posts, Follows, Blockchain",
+  "version": "2.0.0",
+  "private": true,
+  "description": "ALTERA social hub API (Modules 13-16). People and sign-in come from ALT Core.",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon src/server.js",
+    "dev": "node --watch-path=src src/server.js",
     "start": "node src/server.js",
-    "setup": "node setup_db.js"
+    "test": "vitest run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
     "groq-sdk": "^1.1.2",
     "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.2",
+    "jose": "^6.2.12",
     "morgan": "^1.10.0",
-    "nodemailer": "^8.0.7",
     "pg": "^8.12.0",
     "socket.io": "^4.7.5",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "@alt/core": "0.1.0",
+    "@alt/devkit": "0.1.0",
+    "socket.io-client": "^4.8.1",
+    "vitest": "^5.0.3"
   }
 }

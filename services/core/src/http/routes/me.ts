@@ -17,6 +17,11 @@ import { findUserById, handleTaken, loadMe, touchPlatform } from '../../modules/
 import { requireUser } from '../auth-guard.js';
 import { Address, DisplayName, Handle, Platform, SelfRole } from '../schemas.js';
 
+/** Only pictures served by ALT itself (or its Cloudinary account) may become an avatar: no tracking pixels. */
+function isTrustedMediaUrl(ctx: Ctx, url: string) {
+  return url.startsWith(`${ctx.config.publicUrl}/`) || url.startsWith('https://res.cloudinary.com/');
+}
+
 const AVATAR_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
@@ -41,12 +46,21 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
         tags: ['account'],
         summary: 'Update the profile shown across ALTER, ALTAR and ALTERA',
         body: z
-          .object({ displayName: DisplayName.optional(), handle: Handle.optional(), bio: z.string().max(500).nullable().optional() })
+          .object({
+            displayName: DisplayName.optional(),
+            handle: Handle.optional(),
+            bio: z.string().max(500).nullable().optional(),
+            /** An image already hosted by an ALT service (e.g. uploaded through ALTERA) or Cloudinary. */
+            avatarUrl: z.url().max(500).nullable().optional(),
+          })
           .refine((b) => Object.keys(b).length > 0, 'Nothing to update'),
       },
     },
     async (req) => {
       const b = req.body;
+      if (b.avatarUrl && !isTrustedMediaUrl(ctx, b.avatarUrl)) {
+        throw badRequest('AVATAR_URL_NOT_ALLOWED', 'Upload the picture through an ALT app instead.');
+      }
       const user = await tx(ctx.db, async (client) => {
         const before = await findUserById(client, req.auth!.userId, true);
         if (!before) throw unauthorized();
@@ -55,8 +69,9 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
         }
         await client.query(
           `UPDATE core.users SET display_name = COALESCE($2, display_name), handle = COALESCE($3, handle),
-                  bio = CASE WHEN $5 THEN $4 ELSE bio END WHERE id = $1`,
-          [before.id, b.displayName ?? null, b.handle ?? null, b.bio ?? null, b.bio !== undefined],
+                  bio = CASE WHEN $5 THEN $4 ELSE bio END,
+                  avatar_url = CASE WHEN $7 THEN $6 ELSE avatar_url END WHERE id = $1`,
+          [before.id, b.displayName ?? null, b.handle ?? null, b.bio ?? null, b.bio !== undefined, b.avatarUrl ?? null, b.avatarUrl !== undefined],
         );
         await audit(client, {
           action: 'account.profile_updated',

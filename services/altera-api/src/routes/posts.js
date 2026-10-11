@@ -692,11 +692,14 @@ router.post('/:id/comments/:commentId/report', authMiddleware, async (req, res) 
     const comment = await db.queryOne('SELECT id FROM comments WHERE id = $1', [req.params.commentId]);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
 
-    await db.query(
+    const inserted = await db.query(
       `INSERT INTO content_reports (reporter_id, comment_id, reason, details)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
       [req.userId, req.params.commentId, reason, details || null]
     );
+    if (inserted.rowCount === 0) {
+      return res.json({ message: 'You already reported this comment. Our team will review it.' });
+    }
 
     // Deduct health score from comment author
     const commentAuthor = await db.queryOne('SELECT user_id, ai_profile_id FROM comments WHERE id = $1', [req.params.commentId]);
@@ -704,7 +707,7 @@ router.post('/:id/comments/:commentId/report', authMiddleware, async (req, res) 
       if (commentAuthor.ai_profile_id) {
         await db.query('UPDATE ai_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 5.0) WHERE id = $1', [commentAuthor.ai_profile_id]);
       } else {
-        await db.query('UPDATE users SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 5.0) WHERE id = $1', [commentAuthor.user_id]);
+        await db.query('UPDATE user_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 5.0) WHERE user_id = $1', [commentAuthor.user_id]);
       }
       console.log(`[Moderation] Deducted 5.0 health points from author of comment ${req.params.commentId}`);
     }
@@ -725,11 +728,14 @@ router.post('/:id/report', authMiddleware, async (req, res) => {
     const post = await db.queryOne('SELECT id FROM posts WHERE id = $1', [req.params.id]);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    await db.query(
+    const inserted = await db.query(
       `INSERT INTO content_reports (reporter_id, post_id, reason, details)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
       [req.userId, req.params.id, reason, details || null]
     );
+    if (inserted.rowCount === 0) {
+      return res.json({ message: 'You already reported this post. Our team will review it.' });
+    }
 
     // Deduct health score from post author
     const postAuthor = await db.queryOne('SELECT user_id, ai_profile_id, ai_generated FROM posts WHERE id = $1', [req.params.id]);
@@ -737,7 +743,7 @@ router.post('/:id/report', authMiddleware, async (req, res) => {
       if (postAuthor.ai_generated && postAuthor.ai_profile_id) {
         await db.query('UPDATE ai_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 5.0) WHERE id = $1', [postAuthor.ai_profile_id]);
       } else {
-        await db.query('UPDATE users SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 5.0) WHERE id = $1', [postAuthor.user_id]);
+        await db.query('UPDATE user_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 5.0) WHERE user_id = $1', [postAuthor.user_id]);
       }
       console.log(`[Moderation] Deducted 5.0 health points from author of post ${req.params.id}`);
     }

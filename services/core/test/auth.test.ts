@@ -320,6 +320,16 @@ describe('profile, directory and admin', () => {
     expect((await get(`/handles/${newHandle}/available`)).json().available).toBe(false);
   });
 
+  it('accepts avatars hosted by ALT services but not arbitrary URLs', async () => {
+    const u = await signUp(t);
+    const patch = (avatarUrl: string) =>
+      t.app.inject({ method: 'PATCH', url: '/me', headers: auth(u.accessToken), payload: { avatarUrl } });
+    const ok = await patch('http://localhost:8080/altera/media/0b5f9a1e-2c3d-4e5f-8a9b-0c1d2e3f4a5b');
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().avatarUrl).toBe('http://localhost:8080/altera/media/0b5f9a1e-2c3d-4e5f-8a9b-0c1d2e3f4a5b');
+    expect((await patch('https://tracker.example.com/pixel.png')).json().error.code).toBe('AVATAR_URL_NOT_ALLOWED');
+  });
+
   it('lets services look users up only with the service key', async () => {
     const u = await signUp(t);
     const denied = await post('/internal/users/lookup', { ids: [u.user.id] });

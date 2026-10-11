@@ -5,24 +5,6 @@ const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
-let aiCategoryColumnExists;
-
-async function hasAICategoryColumn() {
-  if (typeof aiCategoryColumnExists === 'boolean') {
-    return aiCategoryColumnExists;
-  }
-
-  const row = await db.queryOne(
-    `SELECT EXISTS (
-       SELECT 1
-       FROM information_schema.columns
-       WHERE table_name = 'ai_profiles' AND column_name = 'category'
-     ) as exists`
-  );
-
-  aiCategoryColumnExists = !!row?.exists;
-  return aiCategoryColumnExists;
-}
 
 function deriveAIMetadata(profile) {
   const category =
@@ -521,18 +503,13 @@ router.post('/ai', authMiddleware, async (req, res) => {
     );
     if (existing) return res.status(409).json({ message: 'Username is already taken' });
 
-    const includeCategory = await hasAICategoryColumn();
-    const ai = includeCategory
-      ? await db.queryOne(
-          `INSERT INTO ai_profiles (user_id, username, display_name, bio, category, is_verified) 
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-          [req.userId, username, display_name, bio || '', category || 'general', true]
-        )
-      : await db.queryOne(
-          `INSERT INTO ai_profiles (user_id, username, display_name, bio, is_verified) 
-           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-          [req.userId, username, display_name, bio || '', true]
-        );
+    // Personas start unverified. They may post, comment or chat only once their AI identity token
+    // (AIT) is minted on-chain by ALT Core; nothing here can mark them verified.
+    const ai = await db.queryOne(
+      `INSERT INTO ai_profiles (user_id, username, display_name, bio, category, is_verified)
+       VALUES ($1, $2, $3, $4, $5, false) RETURNING *`,
+      [req.userId, username, display_name, bio || '', category || 'general']
+    );
 
     res.status(201).json({ profile: ai });
   } catch (err) {
@@ -560,11 +537,15 @@ router.post('/:id/report', authMiddleware, async (req, res) => {
 
     if (!profile) return res.status(404).json({ message: 'Profile not found' });
 
-    await db.query(
+    if (id === req.userId) return res.status(400).json({ message: 'You cannot report yourself' });
+    const inserted = await db.query(
       `INSERT INTO content_reports (reporter_id, reported_profile_id, reason, details)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
       [req.userId, id, reason, details || null]
     );
+    if (inserted.rowCount === 0) {
+      return res.json({ message: 'You already reported this profile. Our team will review it.' });
+    }
 
     await db.query(
       `INSERT INTO activity_log (user_id, action_type, target_type, target_id, meta)
@@ -576,7 +557,7 @@ router.post('/:id/report', authMiddleware, async (req, res) => {
     if (profile_type === 'ai') {
       await db.query('UPDATE ai_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 10.0) WHERE id = $1', [id]);
     } else {
-      await db.query('UPDATE users SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 10.0) WHERE id = $1', [id]);
+      await db.query('UPDATE user_profiles SET health_score = GREATEST(0, COALESCE(health_score, 100.0) - 10.0) WHERE user_id = $1', [id]);
     }
     console.log(`[Moderation] Deducted 10.0 health points from profile ${id} (${profile_type})`);
 
