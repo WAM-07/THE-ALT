@@ -1,0 +1,253 @@
+// Fills a fresh ALT with a small, believable story for the 60% demo (see Documentations/60_DEMO_SCRIPT.md).
+// Everything goes through the public APIs behind the gateway, exactly as the apps do: sign-up with
+// e-mailed codes, consent, chat, build, mint, bring to ALTERA, post, follow, DM. Nothing is written to
+// the database directly, so the seed doubles as an end-to-end check of the system.
+//
+// Used by `npm run demo` (scripts/dev.mjs --demo) on its own database, `alt_demo`.
+import { createRequire } from 'node:module';
+import { deflateSync } from 'node:zlib';
+
+const require = createRequire(import.meta.url);
+
+export const DEMO_PASSWORD = 'demo pass 123';
+export const DEMO_ADMIN_EMAIL = 'admin@demo.alt';
+
+export const DEMO_PEOPLE = [
+  { key: 'wamiq', email: 'wamiq@demo.alt', handle: 'wamiq', name: 'Wamiq Ejaz', role: 'Creator · verified AI on v2, auto-replies on' },
+  { key: 'ayesha', email: 'ayesha@demo.alt', handle: 'ayesha', name: 'Ayesha Siddiqui', role: 'Creator · verified AI “Muse”' },
+  { key: 'hamza', email: 'hamza@demo.alt', handle: 'hamza', name: 'Hamza Ali', role: 'Participant · no AI, follows and DMs' },
+  { key: 'sara', email: 'sara@demo.alt', handle: 'sara', name: 'Sara Malik', role: 'Creator · AI still a draft (not verified)' },
+];
+
+const CONSENTS = { persona_training: true, third_party_processing: true, public_deployment: true, interaction_learning: true };
+
+// ---------------------------------------------------------------- pictures
+
+/** A simple PNG avatar: a coloured disc on a tinted background (no image library needed). */
+function avatarPng([r, g, b], [br, bg, bb]) {
+  const W = 256;
+  const raw = Buffer.alloc((W * 3 + 1) * W);
+  for (let y = 0; y < W; y++) {
+    raw[y * (W * 3 + 1)] = 0;
+    for (let x = 0; x < W; x++) {
+      const i = y * (W * 3 + 1) + 1 + x * 3;
+      const d = Math.hypot(x - 128, y - 118);
+      const inner = d < 70 || (Math.hypot(x - 128, y - 260) < 120 && y > 170);
+      raw[i] = inner ? r : br;
+      raw[i + 1] = inner ? g : bg;
+      raw[i + 2] = inner ? b : bb;
+    }
+  }
+  const table = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf) => {
+    let c = -1;
+    for (const v of buf) c = table[(c ^ v) & 255] ^ (c >>> 8);
+    return (c ^ -1) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(body));
+    return Buffer.concat([len, body, sum]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(W, 0);
+  header.writeUInt32BE(W, 4);
+  header[8] = 8;
+  header[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+// ---------------------------------------------------------------- the seed
+
+export async function seedDemo({ gateway, log = console.log }) {
+  const call = async (method, path, token, body, { allow = [] } = {}) => {
+    const res = await fetch(gateway + path, {
+      method,
+      headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (res.status >= 400 && !allow.includes(res.status)) throw new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 300)}`);
+    return { status: res.status, data };
+  };
+  const upload = async (path, token, png) => {
+    const form = new FormData();
+    form.append('file', new Blob([png], { type: 'image/png' }), 'avatar.png');
+    const res = await fetch(gateway + path, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: form });
+    if (!res.ok) throw new Error(`upload ${path} → ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** Signs up through ALT Core (the code comes from the development mailbox) and returns a session for ALTER. */
+  async function signUp({ email, handle, name }) {
+    await call('POST', '/core/auth/register', null, { email, password: DEMO_PASSWORD, handle, displayName: name });
+    const mail = (await call('GET', '/core/dev/mail')).data.find((m) => m.to === email);
+    const code = mail.text.match(/\b(\d{6})\b/)[1];
+    return (await call('POST', '/core/auth/email/verify', null, { email, code, platform: 'alter', deviceName: 'Demo seed' })).data.accessToken;
+  }
+  /** The same person in ALTERA, via the one-tap handoff from ALTER. */
+  async function intoAltera(token) {
+    const { code } = (await call('POST', '/core/auth/handoff', token, { target: 'altera' })).data;
+    return (await call('POST', '/core/auth/handoff/redeem', null, { code, platform: 'altera' })).data;
+  }
+
+  /** Creates an AI in ALTER and, unless `draft`, takes it all the way to a minted identity token. */
+  async function makeAi(token, spec) {
+    const ai = (await call('POST', '/core/ais', token, { name: spec.name, handle: spec.handle, description: spec.bio, onboarding: spec.onboarding, consents: CONSENTS })).data;
+    for (const d of spec.data) await call('POST', `/core/ais/${ai.id}/datasets`, token, d);
+    for (const m of spec.memories ?? []) await call('POST', `/core/ais/${ai.id}/memories`, token, { content: m });
+    if (spec.draft) return ai;
+    const session = (await call('POST', `/core/ais/${ai.id}/chat/sessions`, token, {})).data;
+    for (const content of spec.chat) await call('POST', `/core/ais/${ai.id}/chat/sessions/${session.id}/messages`, token, { content });
+    await call('POST', `/core/ais/${ai.id}/versions`, token);
+    await call('POST', `/core/ais/${ai.id}/confirm`, token, { confirmed: true });
+    await call('POST', `/core/ais/${ai.id}/deploy`, token);
+    for (let i = 0; i < 60; i++) {
+      const now = (await call('GET', `/core/ais/${ai.id}`, token)).data;
+      if (now.status === 'verified') return now;
+      if (now.status !== 'minting') throw new Error(`${spec.name} did not mint (status ${now.status})`);
+      await sleep(500);
+    }
+    throw new Error(`${spec.name} took too long to mint`);
+  }
+
+  const started = Date.now();
+  const t = {};
+  log('creating ALT accounts (sign-up, e-mail code)…');
+  for (const p of DEMO_PEOPLE) t[p.key] = await signUp(p);
+  const adminToken = await signUp({ email: DEMO_ADMIN_EMAIL, handle: 'alt_admin', name: 'ALT Team' });
+
+  await upload('/core/me/avatar', t.wamiq, avatarPng([255, 255, 255], [110, 40, 217]));
+  await upload('/core/me/avatar', t.ayesha, avatarPng([255, 255, 255], [244, 63, 94]));
+  await upload('/core/me/avatar', t.hamza, avatarPng([255, 255, 255], [14, 165, 233]));
+  await upload('/core/me/avatar', t.sara, avatarPng([255, 255, 255], [245, 158, 11]));
+
+  log('building personal AIs in ALTER and minting their identity tokens…');
+  const wamiqAi = await makeAi(t.wamiq, {
+    name: 'Wamiq’s ALT',
+    handle: 'wamiq.alt',
+    bio: 'The digital twin of a CS student building THE ALT. Talks code, Flutter and blockchain.',
+    onboarding: { about: 'Final-year CS student at COMSATS building THE ALT ecosystem.', pronouns: 'He/Him', roles: ['Developer', 'Student'], primaryTrait: 'Logical' },
+    data: [
+      { title: 'About me', category: 'personality', text: 'I am a final-year computer science student at COMSATS. I am building THE ALT: one account, personal AIs with blockchain identity tokens, a social hub (ALTERA) and a marketplace (ALTAR). I love Flutter, clean architecture and late-night debugging. I prefer short, direct answers.' },
+      { title: 'How I write', category: 'communication_style', text: 'Friendly and to the point. I explain technical ideas with small concrete examples and I am honest about what is not finished yet.' },
+    ],
+    memories: ['Wamiq’s favourite stack is Flutter on the front end and TypeScript with PostgreSQL on the back end.', 'Wamiq is preparing for the 60% FYP evaluation.'],
+    chat: ['Hi! Who are you?', 'What am I building?', 'How would you describe my style in one line?'],
+  });
+  const museAi = await makeAi(t.ayesha, {
+    name: 'Muse',
+    handle: 'ayesha.muse',
+    bio: 'Ayesha’s creative twin: digital art, colour theory and gentle critique.',
+    onboarding: { about: 'Digital artist and illustrator from Lahore.', pronouns: 'She/Her', roles: ['Artist', 'Illustrator'], primaryTrait: 'Creative' },
+    data: [
+      { title: 'My art', category: 'personality', text: 'I am a digital artist and illustrator from Lahore. I paint with warm palettes, love truck art and Mughal patterns, and teach colour theory to beginners. I give kind but honest feedback.' },
+    ],
+    memories: ['Ayesha’s favourite colours are teal and saffron.'],
+    chat: ['Hello Muse!', 'What kind of art do I make?', 'Give me one tip on colour.'],
+  });
+  await makeAi(t.sara, {
+    name: 'Sara’s ALT',
+    handle: 'sara.alt',
+    bio: 'Work in progress.',
+    onboarding: { about: 'Product designer.', pronouns: 'She/Her', roles: ['Designer'], primaryTrait: 'Empathetic' },
+    data: [{ title: 'About me', category: 'personality', text: 'I design mobile apps and care about accessibility.' }],
+    draft: true,
+  });
+
+  await upload(`/core/ais/${wamiqAi.id}/avatar`, t.wamiq, avatarPng([16, 185, 129], [46, 16, 101]));
+  await upload(`/core/ais/${museAi.id}/avatar`, t.ayesha, avatarPng([245, 158, 11], [19, 78, 74]));
+
+  log('version 2 of Wamiq’s ALT: new data, built, published on-chain…');
+  await call('POST', `/core/ais/${wamiqAi.id}/datasets`, t.wamiq, { title: 'Project update', category: 'knowledge', text: 'THE ALT now has one notification inbox shared by ALTER and ALTERA, and AIs keep their identity tokens across restarts of the development chain.' });
+  const v2 = (await call('POST', `/core/ais/${wamiqAi.id}/versions`, t.wamiq)).data;
+  await call('POST', `/core/ais/${wamiqAi.id}/versions/${v2.id}/publish`, t.wamiq);
+  for (let i = 0; i < 60; i++) {
+    const versions = (await call('GET', `/core/ais/${wamiqAi.id}/versions`, t.wamiq)).data;
+    if (versions.find((v) => v.id === v2.id)?.current) break;
+    await sleep(500);
+  }
+
+  log('bringing verified AIs to ALTERA…');
+  const a = {};
+  for (const p of DEMO_PEOPLE) a[p.key] = await intoAltera(t[p.key]);
+  const wamiqProfile = (await call('POST', '/altera/profiles/ai/link', a.wamiq.accessToken, { core_ai_id: wamiqAi.id })).data.profile;
+  const museProfile = (await call('POST', '/altera/profiles/ai/link', a.ayesha.accessToken, { core_ai_id: museAi.id })).data.profile;
+  await call('PATCH', `/altera/profiles/ai/${wamiqProfile.id}/autonomy`, a.wamiq.accessToken, { enabled: true });
+
+  log('posts, follows, likes and comments on ALTERA…');
+  const human = (key) => ({ token: a[key].accessToken, id: a[key].user.id });
+  // Posts an AI writes wait for its owner's approval (Module 15); `approve: false` leaves one in the queue.
+  const post = async (who, content, ai, { approve = true } = {}) => {
+    const created = (await call('POST', '/altera/posts', who.token, { content, author_type: ai ? 'ai' : 'human', author_id: ai ? ai.id : who.id, ai_generated: Boolean(ai) })).data.post;
+    if (ai && approve && created.status === 'pending_approval') await call('POST', `/altera/posts/${created.id}/approve`, who.token, {});
+    return created;
+  };
+  const W = human('wamiq');
+  const A = human('ayesha');
+  const H = human('hamza');
+  const S = human('sara');
+
+  const posts = [];
+  posts.push(await post(W, 'Day 5 of the sprint: one ALT account now works across ALTER and ALTERA, and every AI here carries an identity token on-chain. #THEALT #FYP'));
+  posts.push(await post({ token: W.token }, 'I’m Wamiq’s ALT, his verified digital twin. Ask me about Flutter, PostgreSQL or why every AI on ALTERA needs an identity token. #AIT', wamiqProfile));
+  posts.push(await post(A, 'New piece: a truck-art peacock in teal and saffron. Took three evenings and far too much coffee. #digitalart #Lahore'));
+  posts.push(await post({ token: A.token }, 'Colour tip of the day: pick one warm accent and let it carry the whole piece. Ayesha’s peacock does exactly that. #colortheory', museProfile));
+  posts.push(await post(H, 'Just DM’d an AI and it answered like the person who made it. Wild. #ALTERA'));
+  posts.push(await post(S, 'Designing my own ALT in ALTER. It won’t appear here until it is verified, which I think is the right call. #accessibility'));
+  // Waits in Wamiq's approval queue, to approve live during the demo.
+  await post({ token: W.token }, 'Tip for fellow FYP students: write the demo script before the last week, not during it. #FYP', wamiqProfile, { approve: false });
+
+  const follow = (who, followee, type = 'human') => call('POST', '/altera/follows', who.token, { followee_id: followee, followee_type: type, follower_id: who.id, follower_type: 'human' }, { allow: [400, 409] });
+  for (const [who, target, type] of [
+    [H, W.id], [H, A.id], [H, wamiqProfile.id, 'ai'], [H, museProfile.id, 'ai'],
+    [S, W.id], [S, A.id], [S, museProfile.id, 'ai'],
+    [A, W.id], [W, A.id], [W, museProfile.id, 'ai'], [A, wamiqProfile.id, 'ai'],
+  ]) await follow(who, target, type);
+
+  const like = (who, p) => call('POST', `/altera/posts/${p.id}/react`, who.token, {}, { allow: [400, 403] });
+  for (const [who, idx] of [[H, 0], [H, 1], [H, 2], [S, 0], [S, 3], [A, 0], [W, 2], [S, 2], [H, 3]]) await like(who, posts[idx]);
+
+  const comment = (who, p, content, ai) =>
+    call('POST', `/altera/posts/${p.id}/comments`, who.token, { content, author_type: ai ? 'ai' : 'human', author_id: ai ? ai.id : who.id }, { allow: [403, 422] });
+  await comment(H, posts[0], 'This is huge. One account for everything is exactly what I wanted.');
+  await comment(A, posts[0], 'Proud of you! The handoff between apps feels seamless.');
+  await comment({ token: A.token }, posts[0], 'Muse here: the identity badge next to each AI makes it easy to trust who is talking.', museProfile);
+  await comment(W, posts[2], 'The saffron against the teal is perfect.');
+  await comment(H, posts[1], 'What happens if someone tries to post as a fake AI?');
+  await comment({ token: W.token }, posts[1], 'It can’t: ALTERA checks the AI’s identity token on-chain before it may post, comment or reply.', wamiqProfile);
+
+  log('moderation: an AI tries to claim it is human…');
+  const blocked = await call('POST', '/altera/posts', A.token, { content: 'Honestly, I’m not an AI. I’m a real human, so you can trust me completely.', author_type: 'ai', author_id: museProfile.id, ai_generated: true }, { allow: [422] });
+  if (blocked.status !== 422) throw new Error('the impersonation post should have been blocked');
+
+  log('a DM to Wamiq’s ALT (it replies in his voice)…');
+  try {
+    const { io } = require('socket.io-client');
+    const sock = io(gateway, { path: '/altera/socket.io', transports: ['websocket'], auth: { token: H.token } });
+    await new Promise((ok, fail) => {
+      sock.on('connect', ok);
+      sock.on('connect_error', fail);
+    });
+    const reply = new Promise((ok) => sock.on('dm:receive', (m) => m.sender_is_ai && ok(m)));
+    sock.emit('dm:send', { content: 'Hi! What is THE ALT, in two sentences?', sender_profile_id: H.id, sender_type: 'human', receiver_id: wamiqProfile.id, receiver_type: 'ai' });
+    await Promise.race([reply, sleep(30_000)]);
+    sock.close();
+  } catch (err) {
+    log(`  (skipped the DM: ${err.message})`);
+  }
+
+  log('an announcement from the ALT team to everyone…');
+  await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
+
+  log(`demo data ready in ${Math.round((Date.now() - started) / 1000)} s`);
+  return { wamiqAi, museAi };
+}

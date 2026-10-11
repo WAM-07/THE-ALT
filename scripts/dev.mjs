@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { DEMO_ADMIN_EMAIL, DEMO_PASSWORD, DEMO_PEOPLE, seedDemo } from './seed-demo.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = path.join(root, '.data');
@@ -43,6 +44,12 @@ loadEnvFile(envFile);
 const blank = (k) => !process.env[k] || process.env[k].trim() === '';
 for (const [k, v] of Object.entries(loadDevSecrets(dataDir))) if (blank(k)) process.env[k] = v;
 process.env.NODE_ENV ||= 'development';
+
+// `npm run demo`: the same system on its own database (alt_demo), rebuilt and filled with the demo story
+// every time. Your everyday data in the `alt` database is never touched.
+const demo = args.has('--demo');
+const dbName = demo ? 'alt_demo' : 'alt';
+if (demo) process.env.ADMIN_EMAILS = [process.env.ADMIN_EMAILS, DEMO_ADMIN_EMAIL].filter(Boolean).join(',');
 process.env.STORAGE_DIR ||= path.join(dataDir, 'uploads');
 
 const ports = {
@@ -72,14 +79,14 @@ let postgres = null;
 if (blank('DATABASE_URL')) {
   say('starting embedded PostgreSQL (first run downloads nothing; binaries come from npm)…');
   postgres = await startPostgres({ dataDir: path.join(dataDir, 'postgres'), port: Number(process.env.DEV_POSTGRES_PORT || 54320) });
-  if (args.has('--reset-db')) {
-    await dropDatabase(postgres.adminUrl, 'alt');
-    say('local database wiped');
+  if (args.has('--reset-db') || demo) {
+    await dropDatabase(postgres.adminUrl, dbName);
+    say(demo ? 'demo database (alt_demo) rebuilt from scratch' : 'local database wiped');
   }
-  await ensureDatabase(postgres.adminUrl, 'alt');
-  process.env.DATABASE_URL = postgres.urlFor('alt');
-} else if (args.has('--reset-db')) {
-  fail('--reset-db only works with the embedded database (DATABASE_URL is set in .env).');
+  await ensureDatabase(postgres.adminUrl, dbName);
+  process.env.DATABASE_URL = postgres.urlFor(dbName);
+} else if (args.has('--reset-db') || demo) {
+  fail(`${demo ? 'npm run demo' : '--reset-db'} only works with the embedded database (DATABASE_URL is set in .env), so it can never wipe a real one.`);
 }
 
 say('applying migrations…');
@@ -298,3 +305,19 @@ console.log(`
     Phones on this Wi-Fi          ${lanIp ? `http://${lanIp}:${ports.gateway}` : 'no LAN address found'}
   Press Ctrl+C to stop everything.
 `);
+
+if (demo) {
+  say('filling the demo story (about a minute; real sign-ups, AI chats and on-chain mints)…');
+  try {
+    await seedDemo({ gateway: url, log: (m) => say(m) });
+    const rows = DEMO_PEOPLE.map((p) => `    ${p.email.padEnd(20)} ${p.role}`).join('\n');
+    console.log(`
+\x1b[1m  Demo accounts\x1b[0m (password for all: "${DEMO_PASSWORD}")
+${rows}
+    ${DEMO_ADMIN_EMAIL.padEnd(20)} Admin (sent the welcome announcement)
+  The walkthrough is in Documentations/60_DEMO_SCRIPT.md.
+`);
+  } catch (err) {
+    say(`\x1b[31mthe demo story could not be created: ${err.message}\x1b[0m`);
+  }
+}

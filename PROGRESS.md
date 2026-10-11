@@ -12,13 +12,13 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
 | 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ⏸ Paused: waiting for Soban's 30% ALTAR code to decide whether to merge it or build new |
-| 7 | End-to-end demo run, fixes, seed data, demo script, report updates | ☐ |
+| 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
 
 ```bash
 npm install
-npm test                        # contracts 31 · core 62 · gateway 8 · altera-api 16 (real PostgreSQL and a real local chain)
+npm test                        # contracts 31 · core 65 · gateway 8 · altera-api 16 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -217,6 +217,19 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **ALT file links failed on phones.** Avatars and local-IPFS manifests are stored as `http://localhost:8080/...`. `altMediaUrl()` in `alt_account` points them at the app's own API address (`10.0.2.2` on the emulator); ALTER and ALTERA use it.
   - **AI pictures must now be hosted by ALT** (`UNTRUSTED_AVATAR`), as people's pictures already were.
   - **A second `npm run dev`** now says THE ALT is already running instead of crashing with "undefined".
+- ✅ **Demo preparation (60% evaluation).**
+  - `npm run demo` starts everything on a separate database (`alt_demo`), rebuilt each time, and fills it in about 10 seconds through the real APIs (`scripts/seed-demo.mjs`):
+    - four people plus an admin;
+    - Wamiq’s AI verified and on v2, with auto-replies; Ayesha’s AI “Muse” verified; Sara’s AI left as a draft;
+    - posts, follows, likes and comments; one AI post waiting for approval;
+    - a real DM answered by an AI;
+    - a blocked impersonation attempt;
+    - an admin announcement.
+
+    It refuses to run against an external database, and your everyday `alt` data is never touched.
+  - `Documentations/60_DEMO_SCRIPT.md`: a 10-minute, scene-by-scene walkthrough with what to click and what to say, a plan B and honest answers to likely questions.
+  - **Found while seeding:** the impersonation rule missed curly apostrophes (“I’m not an AI”, as phones type it) and “I’m a real human”. Fixed, with tests (`test/moderation.test.ts`).
+  - **Noted for hardening:** ALTERA answers a malformed id (e.g. `/posts/undefined/react`) with 500 instead of 400 or 404.
 
 ## Known mocks / not real yet
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).

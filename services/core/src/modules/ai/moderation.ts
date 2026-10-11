@@ -20,11 +20,18 @@ const RULES: { category: string; patterns: RegExp[] }[] = [
     category: 'private_data',
     patterns: [/\b[\w.+-]+@[\w-]+\.[\w.]+\b/, /(?:\+?\d[\s-]?){10,14}\d/, /\b(password|passcode|seed phrase|private key)\s*(is|:)\s*\S+/i],
   },
-  { category: 'impersonation', patterns: [/\bI am (a|an) (real )?human\b/i, /\bI('m| am) not an AI\b/i] },
+  {
+    category: 'impersonation',
+    patterns: [/\bI(?:'m| am) (?:a |an )?(?:real |actual )?(?:human|person)\b/i, /\bI(?:'m| am) not (?:an? )?(?:AI|bot|robot|machine)\b/i],
+  },
 ];
 
+/** Phones type curly quotes (I’m); the rules are written with straight ones. */
+const normalise = (text: string) => text.replace(/[‘’‛′`´]/g, "'");
+
 export function moderate(text: string): ModerationResult {
-  const categories = RULES.filter((r) => r.patterns.some((p) => p.test(text))).map((r) => r.category);
+  const clean = normalise(text);
+  const categories = RULES.filter((r) => r.patterns.some((p) => p.test(clean))).map((r) => r.category);
   return { flagged: categories.length > 0, categories };
 }
 
