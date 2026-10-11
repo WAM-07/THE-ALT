@@ -712,6 +712,10 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
 
 ## Decision log
 
+- **2026-10-11 (owner review after build day 4):**
+  - Work proceeds one reviewed step at a time.
+  - Priority: core, then ALTERA on core, then ALTER's personal AI without training.
+  - **The ALTAR marketplace is paused** until Soban's 30% code has been evaluated. The contracts in `packages/contracts` stay as built and tested, but no more ALTAR work happens for now.
 - **2026-10-11 (build day 2):**
   - **ALTERA keeps its own tables** in the `altera` schema. People live only in `core.users`, and a read-only `altera.users` view keeps the existing ALTERA queries working. Data is not migrated from Neon: the project starts fresh, as the owner decided.
   - **Platform services check that a session is still active, not just that the token is valid.** Core announces revocations with Postgres `NOTIFY` on `alt_sessions_revoked`, so signing out in one app takes effect in every app immediately.

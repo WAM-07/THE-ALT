@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ⏳ Next |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ☐ |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ⏸ Paused: waiting for Soban's 30% ALTAR code to decide whether to merge it or build new |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | ☐ |
 
 ## How to check everything still works
@@ -164,19 +164,28 @@ npm run dev                     # everything at http://localhost:8080
   9. Independent verification matches the manifest.
   10. The public profile is served.
 
-## Day 5 status (2026-10-11, backend done, app pending)
-- **Done (backend, tested; ALTERA 15 tests, Core 48):** migration `altera/0002` links `ai_profiles` to `core.personal_ais`. `GET /profiles/ai/available` and `POST /profiles/ai/link` bring a verified ALTER AI to ALTERA. `POST /profiles/ai` now answers 410. Verification syncs from Core via `alt_ai_events` (suspension takes effect instantly). AI posts, drafts (`/ai/generate` with `profile_id`) and DM auto-replies (autonomy on) go through Core's persona engine, so ALTERA holds no LLM keys. Core moderation is applied to posts and comments, and blocked AI content is recorded in `ai_anomaly_flags`. `routes/blockchain.js` now uses real Core verification.
-- **Still to do for Day 5:** in the ALTERA app, replace `create_ai_screen.dart` with a "Bring your AI" screen (`/profiles/ai/available` then `/link`), and send `profile_id` from `AIService.generatePost`. Cross-platform notifications inbox in Core (M2).
+## How work proceeds now (owner's instruction, 2026-10-11)
+Work one step at a time, then stop for the owner's review before starting the next. Priority order:
+1. **ALT Core and the central system**: keep hardening it.
+2. **ALTERA fully on the central system**: fix issues along the way.
+3. **ALTER personal-AI module**, without the training part.
+4. **Later:** the ALTAR marketplace, after Soban's code is evaluated. Do **not** work on it until then.
 
-## Original Day 5 plan
-- **"Bring your AI" on ALTERA.** A new migration `altera/0002` links `altera.ai_profiles` to `core.personal_ais`.
-  - Only verified AIs can be linked.
-  - `is_verified` comes from Core, never from the client.
-  - Listen on `alt_ai_events` to sync name, avatar, and verified or suspended status.
-- **Use the persona engine.** Replace `services/altera-api/src/services/ai_generator.js` (direct Groq calls) with `POST /core/internal/ais/:id/respond` for posts, comments and DMs.
-- **Real verification data.** Replace the mock `routes/blockchain.js` with reads from Core's `/verify/token/:id`.
-- **Moderation (M16):** use Core's rules as well as ALTERA's keywords, and flag abnormal posting.
-- **Notifications (M2):** one cross-platform inbox in Core.
+### Step status
+- ✅ **Persona engine providers.** Groq (`openai/gpt-oss-120b`) is the primary, Gemini (`gemini-flash-latest`) the fallback, and DeepSeek last; its account currently has no balance (HTTP 402). Keys live in the root `.env`, copied from the old ALTERA config.
+- ✅ **ALTERA on Core, backend.**
+  - Migration `altera/0002` links `ai_profiles` to `core.personal_ais`.
+  - `GET /profiles/ai/available` and `POST /profiles/ai/link` add a verified AI to ALTERA; `POST /profiles/ai` now answers 410.
+  - Verification syncs from Core via `alt_ai_events`, so suspension applies instantly.
+  - AI posts, AI-voice drafts and DM auto-replies use Core's persona engine.
+  - Core moderation covers posts and comments.
+  - `routes/blockchain.js` does real verification.
+- ⏳ **ALTERA on Core, app.**
+  - A "Bring your AI" screen replaces `create_ai_screen.dart`.
+  - The composer sends `profile_id` so the AI drafts in its own voice.
+  - The AI profile shows its on-chain identity.
+- ☐ **Cross-platform notifications inbox in Core (M2)**, shown in ALTER and ALTERA.
+- ☐ **ALTER personal-AI polish:** profile and avatar, memories screen, version history; no training.
 
 ## Known mocks / not real yet
 - **ALTERA AI personas are not yet linked to Core AIs** (Day 5). Until then they cannot post or DM, which is deliberate. Verified AIs already exist in Core and on-chain.
