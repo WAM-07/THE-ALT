@@ -22,10 +22,11 @@ dependencies:
   dio: ^5.4.3
   web_socket_channel: ^3.0.1
 
-  # Auth & Storage
+  # Auth & Storage (one ALT account, shared with ALTER and ALTAR)
+  alt_account:
+    path: ../../packages/alt_account
   flutter_secure_storage: ^9.0.0
   shared_preferences: ^2.2.3
-  auth0_flutter: ^2.0.1
 
   # UI & Fonts
   google_fonts: ^6.2.1

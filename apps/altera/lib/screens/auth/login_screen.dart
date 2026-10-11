@@ -1,7 +1,10 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
@@ -50,24 +53,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final result = await ref.read(authStateProvider.notifier).login(
-            email,
-            password,
-          );
-
+      final notifier = ref.read(authStateProvider.notifier);
+      var result = await notifier.login(email, password);
       if (!mounted) return;
 
-      if (result) {
-        context.go('/feed');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              ref.read(authStateProvider).error ??
-                  'Login failed. Please try again.',
-            ),
-          ),
+      if (result.mfaToken != null) {
+        // Two-factor authentication is on: ask for the authenticator (or recovery) code.
+        final entered = await showAltCodeDialog(
+          context,
+          title: 'Two-factor authentication',
+          message: 'Enter the 6-digit code from your authenticator app.',
+          allowRecoveryCode: true,
         );
+        if (entered == null || !mounted) return;
+        result = await notifier.completeTwoFactor(
+          result.mfaToken!,
+          code: entered.recovery ? null : entered.code,
+          recoveryCode: entered.recovery ? entered.code : null,
+        );
+      } else if (result.verifyEmail != null) {
+        // The ALT account exists but its email was never confirmed; a fresh code was just sent.
+        result = await _confirmEmail(result.verifyEmail!);
+      }
+
+      if (!mounted) return;
+      if (result.success) {
+        context.go('/feed');
+      } else if (result.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.error!)));
       }
     } catch (e) {
       if (!mounted) return;
@@ -79,6 +92,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<AuthResult> _confirmEmail(String email) async {
+    final notifier = ref.read(authStateProvider.notifier);
+    final entered = await showAltCodeDialog(
+      context,
+      title: 'Verify your email',
+      message: 'We sent a 6-digit code to $email.',
+      onResend: () => notifier.resendVerificationCode(email),
+    );
+    if (entered == null) return AuthResult.failure('Verify your email to continue.');
+    return notifier.verifyEmail(email, entered.code);
   }
 
   Future<void> _continueWithGoogle() async {
@@ -186,11 +211,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
 
   String? _validateEmail(String? value) {
-    final email = value?.trim() ?? '';
-    if (email.isEmpty) return 'Email is required';
-    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-      return 'Enter a valid email';
-    }
+    // Either the email or the @handle of the ALT account.
+    final identifier = value?.trim() ?? '';
+    if (identifier.isEmpty) return 'Email or username is required';
     return null;
   }
 
@@ -258,8 +281,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         // Email Field
                         AlteraTextField(
-                          label: 'Email Address',
-                          hint: 'Enter your email',
+                          label: 'Email or username',
+                          hint: 'Your ALT account email or @handle',
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
                           prefixIcon: Icons.mail_outline,
@@ -315,7 +338,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Divider
+                  // Google sign-in appears only when a Google client is configured for ALT Core.
+                  if (AppConfig.isGoogleSignInConfigured) ...[
                   Row(
                     children: [
                       Expanded(
@@ -342,6 +366,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       _buildSocialButton(Icons.g_translate, 'Google'),
                     ],
                   ),
+                  ],
                   SizedBox(height: MediaQuery.of(context).size.height * 0.06),
 
                   // Signup Link

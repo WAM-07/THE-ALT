@@ -36,10 +36,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        
-        manifestPlaceholders["auth0Domain"] = "dev-5ntz6q1ho6k7jxdg.us.auth0.com"
-        manifestPlaceholders["auth0Scheme"] = "altera"
-        manifestPlaceholders["auth0PackageName"] = "com.alteraapp.altera_app"
     }
 
     signingConfigs {

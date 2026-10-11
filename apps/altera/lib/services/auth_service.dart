@@ -1,47 +1,39 @@
 import 'dart:convert';
-import 'package:auth0_flutter/auth0_flutter.dart';
-import 'package:auth0_flutter/auth0_flutter_web.dart';
-import 'package:flutter/foundation.dart';
+
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+
 import '../config/app_config.dart';
 import '../models/user_model.dart';
 
+/// ALTERA's view of the signed-in person.
+///
+/// Signing up, signing in, passwords and sessions belong to the person's ALT account and are
+/// handled by ALT Core through the shared `alt_account` package, the same code ALTER and ALTAR use.
+/// This service adds what is ALTERA-specific: the profile bundle from `/altera/auth/me` (the
+/// human profile plus their AI personas) and an authorised HTTP helper for ALTERA's API.
 class AuthService {
-  final String _baseUrl = AppConfig.baseUrl;
-  String get baseUrl => _baseUrl;
+  AuthService({AltAccountClient? alt})
+      : alt = alt ?? AltAccountClient(apiUrl: AppConfig.apiUrl, platform: AltPlatform.altera, deviceName: 'ALTERA app');
+
+  final AltAccountClient alt;
+  late final AltHandoff handoff = AltHandoff(alt);
+
+  String get baseUrl => AppConfig.baseUrl;
   final _storage = const FlutterSecureStorage();
-  static const String _tokenKey = 'access_token';
-  static const String _refreshKey = 'refresh_token';
-  static const String _userKey = 'user_data';
-  static const String _userCachedAtKey = 'user_cached_at';
+  static const String _userKey = 'altera.user_bundle';
+  static const String _userCachedAtKey = 'altera.user_bundle_cached_at';
   static const Duration _userCacheTtl = Duration(hours: 1);
   String? activeProfileId;
 
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
+  // ------------------------------------------------------------------ tokens and requests
 
-  Future<void> saveTokens({
-    required String token,
-    required String refreshToken,
-  }) async {
-    await _storage.write(key: _tokenKey, value: token);
-    await _storage.write(key: _refreshKey, value: refreshToken);
-  }
+  Future<String?> getToken() => alt.accessToken();
 
-  Future<void> clearTokens() async {
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _refreshKey);
-    await _storage.delete(key: _userKey);
-    await _storage.delete(key: _userCachedAtKey);
-  }
+  Future<bool> get isLoggedIn async => alt.isSignedIn || await alt.accessToken() != null;
 
-  Future<bool> get isLoggedIn async {
-    final token = await getToken();
-    if (token == null || token.trim().isEmpty) return false;
-    return !_isTokenExpired(token);
-  }
-
-  bool get canUseGoogleAuth => AppConfig.isAuth0Configured;
+  bool get canUseGoogleAuth => AppConfig.isGoogleSignInConfigured;
 
   Future<Map<String, String>> authHeaders() async {
     final token = await getToken();
@@ -51,45 +43,45 @@ class AuthService {
     };
   }
 
+  /// Calls an ALT service as the signed-in person; refreshes the session once on 401.
   Future<http.Response> authorizedRequest({
     required String method,
     required Uri uri,
     Object? body,
     Map<String, String>? headers,
     bool retryOnUnauthorized = true,
-  }) async {
-    final mergedHeaders = {
-      ...await authHeaders(),
-      if (headers != null) ...headers,
-    };
-    final response = await _send(
-      method: method,
-      uri: uri,
-      headers: mergedHeaders,
-      body: body,
-    );
-
-    if (response.statusCode != 401 || !retryOnUnauthorized) {
-      return response;
-    }
-
-    final refreshed = await refreshToken();
-    if (!refreshed.success) {
-      return response;
-    }
-
-    final retryHeaders = {
-      ...await authHeaders(),
-      if (headers != null) ...headers,
-    };
-    return _send(
-      method: method,
-      uri: uri,
-      headers: retryHeaders,
-      body: body,
-    );
+  }) {
+    return alt.authorizedSend(method, uri, body: body, headers: headers);
   }
 
+  // ------------------------------------------------------------------ session
+
+  /// Restores the previous session at start-up.
+  Future<AuthResult> restore() async {
+    final user = await alt.restore();
+    if (user == null) return AuthResult.failure('Not signed in');
+    return getMe();
+  }
+
+  /// Signs in with email or handle and password.
+  Future<AuthResult> login({required String email, required String password}) async {
+    try {
+      return _afterSignIn(await alt.signIn(email, password));
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
+    }
+  }
+
+  Future<AuthResult> completeTwoFactor(String mfaToken, {String? code, String? recoveryCode}) async {
+    try {
+      await alt.completeTwoFactor(mfaToken, code: code, recoveryCode: recoveryCode);
+      return getMe();
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
+    }
+  }
+
+  /// Creates the ALT account and emails a verification code. Finish with [verifyEmail].
   Future<AuthResult> register({
     required String email,
     required String password,
@@ -97,134 +89,80 @@ class AuthService {
     required String displayName,
   }) async {
     try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'username': username,
-          'display_name': displayName,
-        }),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 201) {
-        await saveTokens(
-          token: data['token'],
-          refreshToken: data['refresh_token'],
-        );
-        final user = UserModel.fromJson(data['user']);
-        await _writeCachedUser(data['user']);
-        return AuthResult.success(user);
-      }
-      return AuthResult.failure(data['message'] ?? 'Registration failed');
-    } catch (e) {
-      return AuthResult.failure('Network error: ${e.toString()}');
+      await alt.register(email: email, password: password, handle: username, displayName: displayName);
+      return AuthResult.needsVerification(email.trim());
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
     }
   }
 
-  Future<AuthResult> login({
-    required String email,
-    required String password,
-  }) async {
+  /// Confirms the emailed code; the person is then signed in.
+  Future<AuthResult> verifyEmail(String email, String code) async {
     try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        await saveTokens(
-          token: data['token'],
-          refreshToken: data['refresh_token'],
-        );
-        final user = UserModel.fromJson(data['user']);
-        await _writeCachedUser(data['user']);
-        return AuthResult.success(user);
-      }
-      return AuthResult.failure(data['message'] ?? 'Login failed');
-    } catch (e) {
-      return AuthResult.failure('Network error: ${e.toString()}');
+      return _afterSignIn(await alt.verifyEmail(email, code));
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
+    }
+  }
+
+  Future<AuthResult> resendVerificationCode(String email) async {
+    try {
+      await alt.resendEmailCode(email);
+      return const AuthResult._(success: true);
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
+    }
+  }
+
+  /// Signs in from another ALT app's handoff link (altera://handoff?code=...).
+  Future<AuthResult> redeemHandoff(String code) async {
+    try {
+      await alt.redeemHandoff(code);
+      return getMe();
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
     }
   }
 
   Future<AuthResult> loginWithGoogle() async {
-    if (!AppConfig.isAuth0Configured) {
-      return AuthResult.failure(
-        'Auth0 Google sign-in is not configured yet.',
-      );
-    }
+    return AuthResult.failure('Google sign-in is not set up on this build yet. Use your email and password.');
+  }
 
+  Future<AuthResult> _afterSignIn(SignInResult result) async {
+    return switch (result) {
+      SignedIn() => await getMe(),
+      TwoFactorRequired(:final mfaToken) => AuthResult.twoFactor(mfaToken),
+      EmailNotVerified(:final email) => AuthResult.needsVerification(email),
+    };
+  }
+
+  Future<void> logout() async {
+    await alt.signOut();
+    await _clearCachedUser();
+  }
+
+  // ------------------------------------------------------------------ ALTERA profile bundle
+
+  /// The ALTERA profile bundle: the person plus their AI personas.
+  Future<AuthResult> getMe() async {
     try {
-      if (kIsWeb) {
-        final auth0Web = Auth0Web(
-          AppConfig.auth0Domain,
-          AppConfig.auth0ClientId,
-          redirectUrl: AppConfig.auth0RedirectUrl,
-        );
-
-        await auth0Web.loginWithRedirect(
-          redirectUrl: AppConfig.auth0RedirectUrl,
-          audience:
-              AppConfig.auth0Audience.isEmpty ? null : AppConfig.auth0Audience,
-          scopes: {'openid', 'profile', 'email'},
-          parameters: const {'connection': 'google-oauth2'},
-        );
-
-        return AuthResult.launched(
-          'Continue with Google in the browser to finish signing in.',
-        );
+      final res = await authorizedRequest(method: 'GET', uri: Uri.parse('$baseUrl/auth/me'));
+      final data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
+        final user = UserModel.fromJson(data as Map<String, dynamic>);
+        await _writeCachedUser(data);
+        return AuthResult.success(user);
       }
-
-      final auth0 = Auth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
-      final credentials = await auth0
-          .webAuthentication(
-        scheme: AppConfig.auth0Scheme,
-      )
-          .login(
-        audience:
-            AppConfig.auth0Audience.isEmpty ? null : AppConfig.auth0Audience,
-        scopes: {'openid', 'profile', 'email'},
-        parameters: const {'connection': 'google-oauth2'},
-      );
-
-      return _exchangeAuth0AccessToken(credentials.accessToken);
+      return AuthResult.failure((data is Map ? data['message'] : null)?.toString() ?? 'Failed to load your profile');
     } catch (e) {
-      final error = e.toString();
-      if (error.contains('redirect_uri') ||
-          error.contains('Callback URL mismatch')) {
-        return AuthResult.failure(
-          'Google sign-in failed: callback URL mismatch. '
-          'Make sure Auth0 Allowed Callback URLs includes '
-          '${AppConfig.auth0AndroidRedirectUrl}.',
-        );
-      }
-      return AuthResult.failure('Google sign-in failed: $error');
+      return AuthResult.failure('Cannot reach ALTERA. Check your connection.');
     }
   }
 
-  Future<AuthResult?> restoreGoogleSession() async {
-    if (!AppConfig.isAuth0Configured || !kIsWeb) return null;
-
-    try {
-      final auth0Web = Auth0Web(
-        AppConfig.auth0Domain,
-        AppConfig.auth0ClientId,
-        redirectUrl: AppConfig.auth0RedirectUrl,
-      );
-
-      final credentials = await auth0Web.onLoad(
-        audience:
-            AppConfig.auth0Audience.isEmpty ? null : AppConfig.auth0Audience,
-        scopes: {'openid', 'profile', 'email'},
-      );
-
-      if (credentials == null) return null;
-      return _exchangeAuth0AccessToken(credentials.accessToken);
-    } catch (_) {
-      return null;
-    }
+  /// Kept for existing callers: refreshes the session and reloads the profile bundle.
+  Future<AuthResult> refreshToken() async {
+    if (!await alt.refresh()) return AuthResult.failure('Session expired');
+    return getMe();
   }
 
   Future<AuthResult> createAIPersona({
@@ -236,332 +174,80 @@ class AuthService {
     try {
       final res = await authorizedRequest(
         method: 'POST',
-        uri: Uri.parse('$_baseUrl/profiles/ai'),
-        body: {
-          'username': username,
-          'display_name': displayName,
-          'bio': bio,
-          'category': category,
-        },
+        uri: Uri.parse('$baseUrl/profiles/ai'),
+        body: {'username': username, 'display_name': displayName, 'bio': bio, 'category': category},
       );
       final data = jsonDecode(res.body);
-      if (res.statusCode == 201) {
-        return refreshToken();
-      }
-      return AuthResult.failure(
-        data['message'] ?? 'Failed to create AI persona',
-      );
-    } catch (e) {
-      return AuthResult.failure('Network error: ${e.toString()}');
-    }
-  }
-
-  Future<void> logout() async {
-    try {
-      await authorizedRequest(
-        method: 'POST',
-        uri: Uri.parse('$_baseUrl/auth/logout'),
-        retryOnUnauthorized: false,
-      );
-    } catch (_) {}
-
-    if (AppConfig.isAuth0Configured) {
-      final logoutUrl =
-          kIsWeb ? AppConfig.auth0LogoutUrl : AppConfig.auth0AndroidRedirectUrl;
-      try {
-        if (kIsWeb) {
-          final auth0Web = Auth0Web(
-            AppConfig.auth0Domain,
-            AppConfig.auth0ClientId,
-            redirectUrl: AppConfig.auth0RedirectUrl,
-          );
-          await auth0Web.logout(returnToUrl: logoutUrl);
-        } else {
-          final auth0 = Auth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
-          // For mobile, we omit returnTo to avoid "Oops! Something went wrong" errors
-          // if the logout URL is not explicitly whitelisted in the Auth0 Dashboard.
-          // The SDK will still clear the browser session.
-          await auth0
-              .webAuthentication(scheme: AppConfig.auth0Scheme)
-              .logout();
-        }
-      } catch (e) {
-        debugPrint('Auth0 logout error: $e');
-        // Ignore Auth0 logout/redirect failure and clear local session anyway.
-      }
-    }
-    await clearTokens();
-  }
-
-  Future<AuthResult> getMe() async {
-    try {
-      final res = await authorizedRequest(
-        method: 'GET',
-        uri: Uri.parse('$_baseUrl/auth/me'),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        final user = UserModel.fromJson(data);
-        await _writeCachedUser(data);
-        return AuthResult.success(user);
-      }
-      return AuthResult.failure(data['message'] ?? 'Failed to fetch user data');
+      if (res.statusCode == 201) return getMe();
+      return AuthResult.failure(data['message'] ?? 'Failed to create AI persona');
     } catch (e) {
       return AuthResult.failure('Network error: ${e.toString()}');
     }
   }
 
   Future<UserModel?> getCachedUser() async {
-    final raw = await _storage.read(key: _userKey);
-    final cachedAt = await _storage.read(key: _userCachedAtKey);
-    if (raw == null || cachedAt == null) return null;
-
     try {
+      final raw = await _storage.read(key: _userKey);
+      final cachedAt = await _storage.read(key: _userCachedAtKey);
+      if (raw == null || cachedAt == null) return null;
       final age = DateTime.now().millisecondsSinceEpoch - int.parse(cachedAt);
       if (age > _userCacheTtl.inMilliseconds) {
-        await _storage.delete(key: _userKey);
-        await _storage.delete(key: _userCachedAtKey);
+        await _clearCachedUser();
         return null;
       }
-      return UserModel.fromJson(jsonDecode(raw));
+      return UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       return null;
     }
   }
 
-  Future<AuthResult> refreshToken() async {
-    try {
-      final refresh = await _storage.read(key: _refreshKey);
-      if (refresh == null) return AuthResult.failure('No refresh token');
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh_token': refresh}),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        await saveTokens(
-          token: data['token'],
-          refreshToken: data['refresh_token'],
-        );
-        final user = UserModel.fromJson(data['user']);
-        await _writeCachedUser(data['user']);
-        return AuthResult.success(user);
-      }
-      await clearTokens();
-      return AuthResult.failure(data['message'] ?? 'Session expired');
-    } catch (e) {
-      return AuthResult.failure(e.toString());
-    }
-  }
-
-  Future<AuthResult> _exchangeAuth0AccessToken(String accessToken) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/auth0'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'access_token': accessToken}),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        await saveTokens(
-          token: data['token'],
-          refreshToken: data['refresh_token'],
-        );
-        final user = UserModel.fromJson(data['user']);
-        await _writeCachedUser(data['user']);
-        final isNewUser = data['is_new_user'] as bool? ?? false;
-        return AuthResult.success(user, isNewUser: isNewUser);
-      }
-      return AuthResult.failure(data['message'] ?? 'Google sign-in failed');
-    } catch (e) {
-      return AuthResult.failure('Network error: ${e.toString()}');
-    }
-  }
-
   Future<void> _writeCachedUser(Map<String, dynamic> userData) async {
     await _storage.write(key: _userKey, value: jsonEncode(userData));
-    await _storage.write(
-      key: _userCachedAtKey,
-      value: DateTime.now().millisecondsSinceEpoch.toString(),
-    );
+    await _storage.write(key: _userCachedAtKey, value: DateTime.now().millisecondsSinceEpoch.toString());
   }
 
-  bool _isTokenExpired(String token) {
-    try {
-      final parts = token.split('.');
-      if (parts.length != 3) return true;
-      final normalized = base64Url.normalize(parts[1]);
-      final payload = jsonDecode(
-        utf8.decode(base64Url.decode(normalized)),
-      ) as Map<String, dynamic>;
-      final exp = payload['exp'];
-      if (exp is! num) return true;
-      final expiry = DateTime.fromMillisecondsSinceEpoch(
-        exp.toInt() * 1000,
-        isUtc: true,
-      );
-      return DateTime.now().toUtc().isAfter(expiry.subtract(
-            const Duration(seconds: 30),
-          ));
-    } catch (_) {
-      return true;
-    }
+  Future<void> _clearCachedUser() async {
+    await _storage.delete(key: _userKey);
+    await _storage.delete(key: _userCachedAtKey);
   }
 
-  String _extractErrorMessage(
-    Map<String, dynamic> data,
-    String fallback,
-  ) {
-    final message = data['message']?.toString().trim();
-    final error = data['error']?.toString().trim();
-
-    if (message != null && message.isNotEmpty && error != null && error.isNotEmpty) {
-      return '$message: $error';
-    }
-    if (message != null && message.isNotEmpty) return message;
-    if (error != null && error.isNotEmpty) return error;
-    return fallback;
-  }
-
-  Future<AuthResult> requestOtp(String email, {String? username}) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/request-otp'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          if (username != null && username.trim().isNotEmpty)
-            'username': username.trim(),
-        }),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        return const AuthResult._(success: true);
-      }
-      return AuthResult.failure(
-        _extractErrorMessage(data, 'Failed to send OTP'),
-      );
-    } catch (e) {
-      return AuthResult.failure(e.toString());
-    }
-  }
-
-  Future<AuthResult> verifyOtp(String email, String otp) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/verify-otp'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'otp': otp}),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        return const AuthResult._(success: true);
-      }
-      return AuthResult.failure(
-        _extractErrorMessage(data, 'Verification failed'),
-      );
-    } catch (e) {
-      return AuthResult.failure(e.toString());
-    }
-  }
+  // ------------------------------------------------------------------ passwords
 
   Future<AuthResult> forgotPassword(String email) async {
     try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/forgot-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        return const AuthResult._(success: true);
-      }
-      return AuthResult.failure(
-        _extractErrorMessage(data, 'Failed to send reset code'),
-      );
-    } catch (e) {
-      return AuthResult.failure(e.toString());
+      await alt.forgotPassword(email);
+      return const AuthResult._(success: true);
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
     }
   }
 
-  Future<AuthResult> resetPassword(
-      String email, String otp, String newPassword) async {
+  Future<AuthResult> resetPassword(String email, String otp, String newPassword) async {
     try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/reset-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'otp': otp,
-          'new_password': newPassword,
-        }),
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        return const AuthResult._(success: true);
-      }
-      return AuthResult.failure(
-        _extractErrorMessage(data, 'Reset failed'),
-      );
-    } catch (e) {
-      return AuthResult.failure(e.toString());
+      await alt.resetPassword(email: email, code: otp, newPassword: newPassword);
+      return const AuthResult._(success: true);
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
     }
   }
 
+  /// First password for accounts created with Google or a wallet.
   Future<AuthResult> setInitialPassword(String password) async {
     try {
-      final res = await authorizedRequest(
-        method: 'POST',
-        uri: Uri.parse('$_baseUrl/auth/set-initial-password'),
-        body: {'password': password},
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        return const AuthResult._(success: true);
-      }
-      return AuthResult.failure(data['message'] ?? 'Failed to set password');
-    } catch (e) {
-      return AuthResult.failure(e.toString());
+      await alt.changePassword(newPassword: password);
+      return const AuthResult._(success: true);
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
     }
   }
 
-  Future<AuthResult> changePassword(
-      String oldPassword, String newPassword) async {
+  Future<AuthResult> changePassword(String oldPassword, String newPassword) async {
     try {
-      final res = await authorizedRequest(
-        method: 'POST',
-        uri: Uri.parse('$_baseUrl/auth/change-password'),
-        body: {
-          'old_password': oldPassword,
-          'new_password': newPassword,
-        },
-      );
-      final data = jsonDecode(res.body);
-      if (res.statusCode == 200) {
-        return const AuthResult._(success: true);
-      }
-      return AuthResult.failure(data['message'] ?? 'Password change failed');
-    } catch (e) {
-      return AuthResult.failure(e.toString());
+      await alt.changePassword(currentPassword: oldPassword, newPassword: newPassword);
+      return const AuthResult._(success: true);
+    } on AltApiException catch (e) {
+      return AuthResult.failure(e.message, code: e.code);
     }
-  }
-
-  Future<http.Response> _send({
-    required String method,
-    required Uri uri,
-    Map<String, String>? headers,
-    Object? body,
-  }) async {
-    final request = http.Request(method, uri);
-    if (headers != null) {
-      request.headers.addAll(headers);
-    }
-    if (body != null) {
-      request.body = body is String ? body : jsonEncode(body);
-    }
-    final streamed = await request.send();
-    return http.Response.fromStream(streamed);
   }
 }
 
@@ -570,25 +256,36 @@ class AuthResult {
   final bool launched;
   final UserModel? user;
   final String? error;
+  final String? code;
   final bool isNewUser;
+
+  /// Set when the email must be confirmed with the code we just sent.
+  final String? verifyEmail;
+
+  /// Set when the password was right but an authenticator code is needed.
+  final String? mfaToken;
 
   const AuthResult._({
     required this.success,
     this.launched = false,
     this.user,
     this.error,
+    this.code,
     this.isNewUser = false,
+    this.verifyEmail,
+    this.mfaToken,
   });
 
   factory AuthResult.success(UserModel user, {bool isNewUser = false}) =>
       AuthResult._(success: true, user: user, isNewUser: isNewUser);
 
-  factory AuthResult.failure(String error) =>
-      AuthResult._(success: false, error: error);
+  factory AuthResult.failure(String error, {String? code}) => AuthResult._(success: false, error: error, code: code);
 
-  factory AuthResult.launched(String message) => AuthResult._(
-        success: false,
-        launched: true,
-        error: message,
-      );
+  factory AuthResult.needsVerification(String email) =>
+      AuthResult._(success: false, verifyEmail: email, error: 'Enter the code we emailed to $email.');
+
+  factory AuthResult.twoFactor(String mfaToken) =>
+      AuthResult._(success: false, mfaToken: mfaToken, error: 'Enter the code from your authenticator app.');
+
+  factory AuthResult.launched(String message) => AuthResult._(success: false, launched: true, error: message);
 }

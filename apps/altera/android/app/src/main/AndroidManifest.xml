@@ -24,17 +24,12 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- ✅ Auth0 Callback (FIXED FOR APK) -->
-            <intent-filter android:label="flutter_auth0">
+            <!-- ALT handoff: altera://handoff?code=... signs the person in from another ALT app -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="altera"
-                    android:host="dev-5ntz6q1ho6k7jxdg.us.auth0.com"
-                    android:pathPrefix="/android/com.alteraapp.altera_app/callback" />
+                <data android:scheme="altera" android:host="handoff" />
             </intent-filter>
 
             <!-- App Launcher -->
@@ -42,6 +37,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- ALT handoff links are handled by app_links, not by the router -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -57,6 +55,19 @@
 
     <!-- Required for text processing -->
     <queries>
+        <!-- Lets ALTERA open the other ALT apps (and authenticator apps) through their links -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="alter" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="otpauth" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />

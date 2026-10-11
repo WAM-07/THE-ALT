@@ -61,6 +61,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
     _socket = io.io(AppConfig.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
+      'path': AppConfig.socketPath,
       'autoConnect': false,
       'auth': {'token': token},
     });

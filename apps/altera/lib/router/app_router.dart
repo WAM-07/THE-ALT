@@ -1,3 +1,4 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,6 +61,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      // The ALT Account Center (shared with ALTER and ALTAR).
+      GoRoute(
+        path: '/account',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final auth = ref.read(authServiceProvider);
+          return AltAccountCenterScreen(
+            client: auth.alt,
+            handoff: auth.handoff,
+            onSignedOut: () async {
+              await ref.read(authStateProvider.notifier).logout();
+              if (context.mounted) context.go('/login');
+            },
+          );
+        },
       ),
       GoRoute(
         path: '/compose',

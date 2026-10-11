@@ -17,7 +17,6 @@ import '../../widgets/post_card.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../models/post_model.dart';
 import '../../models/user_model.dart';
-import 'change_password_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final String? profileId;
@@ -354,95 +353,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               style:
                   const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         ],
-      ),
-    );
-  }
-
-  void _showSecurityInfo(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24))),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Security Settings',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            ListTile(
-                leading: const Icon(Icons.password),
-                title: const Text('Change Password'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ChangePasswordScreen(),
-                    ),
-                  );
-                }),
-            ListTile(
-                leading: const Icon(Icons.phonelink_lock),
-                title: const Text('Two-Factor Auth'),
-                trailing: Switch(value: true, onChanged: (v) {})),
-            ListTile(
-                leading: const Icon(Icons.fingerprint),
-                title: const Text('Biometric Login'),
-                trailing: Switch(value: false, onChanged: (v) {})),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showWalletInfo(BuildContext context) {
-    final user = ref.read(authStateProvider).user;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24))),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('AIT Wallet',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Balance',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  Text('450.25 AIT',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text('Address: ${user?.walletAddress ?? '0x71...f2e'}',
-                style: TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 20),
-            ElevatedButton(
-                onPressed: () {}, child: const Text('Top Up Wallet')),
-          ],
-        ),
       ),
     );
   }
@@ -1236,12 +1146,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         onTap: () => _showPersonalInfo(context)),
                     _SettingsTile(
                         icon: Icons.lock_outline_rounded,
-                        title: 'Security',
-                        onTap: () => _showSecurityInfo(context)),
+                        title: 'ALT Account & Security',
+                        subtitle: 'Password, two-factor, devices and your other ALT apps',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          context.push('/account');
+                        }),
                     _SettingsTile(
                         icon: Icons.account_balance_wallet_outlined,
-                        title: 'Wallet & AIT Tokens',
-                        onTap: () => _showWalletInfo(context)),
+                        title: 'Wallets',
+                        subtitle: 'The addresses that hold your AI identity tokens',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          context.push('/account');
+                        }),
                     _SettingsTile(
                         icon: Icons.policy_outlined,
                         title: 'Moderation & Compliance',

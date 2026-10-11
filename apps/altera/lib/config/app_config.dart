@@ -1,82 +1,40 @@
 import 'package:flutter/foundation.dart';
 
+/// Where ALTERA finds THE ALT. Everything goes through the ALT gateway:
+///   ALT Core (accounts)  -> $apiUrl/core
+///   ALTERA API           -> $apiUrl/altera
+///
+/// Set with `flutter run --dart-define-from-file=env/dev.json` (written by `npm run dev`)
+/// or `--dart-define=ALT_API_URL=http://<your-pc-lan-ip>:8080` for a physical phone.
 class AppConfig {
-  static const String _configuredApiUrl =
-      String.fromEnvironment('API_URL', defaultValue: '');
-  static const String _configuredSocketUrl =
-      String.fromEnvironment('SOCKET_URL', defaultValue: '');
+  static const String _configuredApiUrl = String.fromEnvironment('ALT_API_URL', defaultValue: '');
 
-  static String get baseUrl {
-    final url = _configuredApiUrl.isNotEmpty
-        ? _configuredApiUrl
-        : (kReleaseMode
-            ? 'https://altera-d57k.onrender.com'
-            : 'https://altera-d57k.onrender.com');
-    return _normalizeBaseUrl(url);
+  /// The ALT gateway. Android emulators reach the host PC at 10.0.2.2.
+  static String get apiUrl {
+    if (_configuredApiUrl.isNotEmpty) return _normalizeBaseUrl(_configuredApiUrl);
+    if (kIsWeb) return 'http://localhost:8080';
+    return 'http://10.0.2.2:8080';
   }
 
-  static String get socketUrl {
-    final url =
-        _configuredSocketUrl.isNotEmpty ? _configuredSocketUrl : baseUrl;
-    return _normalizeBaseUrl(url);
-  }
+  /// ALTERA's own API (feed, posts, messages, ...).
+  static String get baseUrl => '$apiUrl/altera';
+
+  /// Socket.IO connects to the gateway origin; the path routes it to ALTERA.
+  /// (A path in the URL would be treated as a Socket.IO namespace, so it goes in `path` instead.)
+  static String get socketUrl => apiUrl;
+  static const String socketPath = '/altera/socket.io';
 
   static const String geminiApiKey = String.fromEnvironment('GEMINI_KEY');
 
   static const String apiVersion = 'v1';
 
-  static const String auth0Domain = String.fromEnvironment(
-    'AUTH0_DOMAIN',
-    defaultValue: 'dev-5ntz6q1ho6k7jxdg.us.auth0.com',
-  );
-  static const String auth0ClientId = String.fromEnvironment(
-    'AUTH0_CLIENT_ID',
-    defaultValue: 'kMym7cX1CX6jNjMao6iJ4prKhB9bBPDN',
-  );
-  // Never ship a client secret in an app; Auth0 is being replaced by ALT Core sign-in.
-  static const String auth0ClientSecret = String.fromEnvironment(
-    'AUTH0_CLIENT_SECRET',
-    defaultValue: '',
-  );
-  static const String auth0Audience = String.fromEnvironment(
-    'AUTH0_AUDIENCE',
-    defaultValue: 'https://dev-5ntz6q1ho6k7jxdg.us.auth0.com/api/v2/',
-  );
-  static const String auth0RedirectUrl = String.fromEnvironment(
-    'AUTH0_REDIRECT_URL',
-    defaultValue:
-        'altera://dev-5ntz6q1ho6k7jxdg.us.auth0.com/android/com.alteraapp.altera_app/callback',
-  );
-
-  static String get auth0LogoutUrl {
-    const envUrl = String.fromEnvironment('AUTH0_LOGOUT_URL', defaultValue: '');
-    return envUrl.isNotEmpty ? envUrl : auth0AndroidRedirectUrl;
-  }
-
-  static const String auth0Scheme = String.fromEnvironment(
-    'AUTH0_SCHEME',
-    defaultValue: 'altera',
-  );
-
-  static const String auth0AndroidPackageName = 'com.alteraapp.altera_app';
-  static String get auth0AndroidRedirectUrl =>
-      '$auth0Scheme://$auth0Domain/android/$auth0AndroidPackageName/callback';
-
-  static bool get isAuth0Configured {
-    final bothSet = auth0Domain.isNotEmpty && auth0ClientId.isNotEmpty;
-    final neitherSet = auth0Domain.isEmpty && auth0ClientId.isEmpty;
-    assert(
-      bothSet || neitherSet,
-      'Auth0 domain and client ID must both be set or both be empty.',
-    );
-    return bothSet;
-  }
+  /// Google sign-in is offered only when a Google OAuth client is configured for ALT Core.
+  static const String googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID', defaultValue: '');
+  static bool get isGoogleSignInConfigured => googleServerClientId.isNotEmpty;
 
   static String resolveUrl(String? url) {
     if (url == null || url.isEmpty) return '';
-    if (url.startsWith('http://') ||
-        url.startsWith('https://') ||
-        url.startsWith('data:')) {
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
       return url;
     }
     return '$baseUrl$url';

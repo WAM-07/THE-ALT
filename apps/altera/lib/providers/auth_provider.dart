@@ -39,110 +39,85 @@ class AuthState {
 
 // ─── Auth Notifier ────────────────────────────────────────────────────────────
 
+/// The signed-in state of ALTERA. The person signs in with their ALT account (shared with
+/// ALTER and ALTAR); ALTERA then loads its own profile bundle (human profile + AI personas).
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
 
-  AuthNotifier(this._authService) : super(const AuthState()) {
+  AuthNotifier(this._authService) : super(const AuthState(isLoading: true)) {
+    // Signed out elsewhere ("sign out everywhere", password reset, revoked device): leave ALTERA too.
+    _authService.alt.currentUser.addListener(_onAltAccountChanged);
     _init();
   }
 
+  void _onAltAccountChanged() {
+    if (_authService.alt.currentUser.value == null && state.isLoggedIn) {
+      _authService.activeProfileId = null;
+      state = const AuthState();
+    }
+  }
+
+  @override
+  void dispose() {
+    _authService.alt.currentUser.removeListener(_onAltAccountChanged);
+    super.dispose();
+  }
+
   Future<void> _init() async {
-    state = state.copyWith(isLoading: true);
-    final user = await _authService.getCachedUser();
-    final loggedIn = await _authService.isLoggedIn;
-    if (loggedIn && user != null) {
-      final refreshed = await _authService.refreshToken();
-      state = state.copyWith(
-        isLoggedIn: refreshed.success,
-        user: refreshed.user ?? user,
-        isLoading: false,
-        error: refreshed.success ? null : refreshed.error,
-        activeProfileId: (refreshed.user ?? user).humanProfile?.id,
-      );
-      _authService.activeProfileId = state.activeProfileId;
-      return;
-    }
+    final cached = await _authService.getCachedUser();
+    final restored = await _authService.restore();
+    _apply(restored, fallbackUser: cached);
+  }
 
-    final restoredGoogleSession = await _authService.restoreGoogleSession();
-    if (restoredGoogleSession != null && restoredGoogleSession.success) {
-      state = state.copyWith(
+  /// Applies a sign-in result to the state. Returns the same result for the caller to inspect.
+  AuthResult _apply(AuthResult result, {UserModel? fallbackUser}) {
+    if (result.success && result.user != null) {
+      state = AuthState(
         isLoggedIn: true,
-        user: restoredGoogleSession.user,
-        isLoading: false,
-        error: null,
-        activeProfileId: restoredGoogleSession.user?.humanProfile?.id,
+        user: result.user,
+        activeProfileId: result.user!.humanProfile?.id,
       );
-      _authService.activeProfileId = state.activeProfileId;
-      return;
+    } else {
+      state = AuthState(
+        isLoggedIn: false,
+        user: fallbackUser,
+        error: result.verifyEmail != null || result.mfaToken != null ? null : result.error,
+      );
     }
-
-    state = state.copyWith(
-      isLoggedIn: false,
-      user: user,
-      isLoading: false,
-      activeProfileId: user?.humanProfile?.id,
-    );
     _authService.activeProfileId = state.activeProfileId;
+    return result;
   }
 
-
-
-  Future<bool> login(String email, String password) async {
+  Future<AuthResult> _run(Future<AuthResult> Function() action) async {
     state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.login(email: email, password: password);
-    if (result.success) {
-      state = state.copyWith(
-        isLoggedIn: true,
-        user: result.user,
-        isLoading: false,
-        activeProfileId: result.user?.humanProfile?.id,
-      );
-      return true;
-    }
-    state = state.copyWith(isLoading: false, error: result.error);
-    return false;
+    return _apply(await action());
   }
 
-  Future<bool> register(
-    String email,
-    String password,
-    String username,
-    String displayName,
-  ) async {
+  /// Email/handle + password. The result may ask for a 2FA code ([AuthResult.mfaToken]) or for
+  /// the email to be confirmed ([AuthResult.verifyEmail]).
+  Future<AuthResult> login(String identifier, String password) =>
+      _run(() => _authService.login(email: identifier, password: password));
+
+  Future<AuthResult> completeTwoFactor(String mfaToken, {String? code, String? recoveryCode}) =>
+      _run(() => _authService.completeTwoFactor(mfaToken, code: code, recoveryCode: recoveryCode));
+
+  /// Creates the ALT account. The result asks for the emailed code ([AuthResult.verifyEmail]).
+  Future<AuthResult> register(String email, String password, String username, String displayName) async {
     state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.register(
-      email: email,
-      password: password,
-      username: username,
-      displayName: displayName,
-    );
-    if (result.success) {
-      state = state.copyWith(
-        isLoggedIn: true,
-        user: result.user,
-        isLoading: false,
-        activeProfileId: result.user?.humanProfile?.id,
-      );
-      _authService.activeProfileId = state.activeProfileId;
-      return true;
-    }
-    state = state.copyWith(isLoading: false, error: result.error);
-    return false;
+    final result = await _authService.register(email: email, password: password, username: username, displayName: displayName);
+    state = state.copyWith(isLoading: false, error: result.verifyEmail != null ? null : result.error);
+    return result;
   }
 
-  Future<bool> requestOtp(String email) async {
-    state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.requestOtp(email);
-    state = state.copyWith(isLoading: false, error: result.error);
-    return result.success;
-  }
+  Future<AuthResult> verifyEmail(String email, String code) => _run(() => _authService.verifyEmail(email, code));
 
-  Future<bool> verifyOtp(String email, String otp) async {
-    state = state.copyWith(isLoading: true, error: null);
-    final result = await _authService.verifyOtp(email, otp);
-    state = state.copyWith(isLoading: false, error: result.error);
-    return result.success;
-  }
+  Future<AuthResult> resendVerificationCode(String email) => _authService.resendVerificationCode(email);
+
+  /// Signed in from another ALT app (altera://handoff?code=...).
+  Future<AuthResult> signInWithHandoff(String code) => _run(() => _authService.redeemHandoff(code));
+
+  /// The ALT session changed outside this notifier (e.g. a handoff link was redeemed); reload.
+  Future<AuthResult> adoptSession() => _run(() => _authService.getMe());
 
   Future<bool> forgotPassword(String email) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -173,23 +148,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<AuthResult> continueWithGoogle() async {
-    state = state.copyWith(isLoading: true, error: null);
     final result = await _authService.loginWithGoogle();
-    if (result.success) {
-      state = state.copyWith(
-        isLoggedIn: true,
-        user: result.user,
-        isLoading: false,
-        activeProfileId: result.user?.humanProfile?.id,
-      );
-      _authService.activeProfileId = state.activeProfileId;
-      return result;
-    }
-
-    state = state.copyWith(
-      isLoading: false,
-      error: result.launched ? null : result.error,
-    );
+    state = state.copyWith(isLoading: false, error: result.error);
     return result;
   }
 
@@ -207,10 +167,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       category: category,
     );
     if (result.success) {
-      state = state.copyWith(
-        user: result.user,
-        isLoading: false,
-      );
+      state = state.copyWith(user: result.user, isLoading: false);
       return true;
     }
     state = state.copyWith(isLoading: false, error: result.error);
@@ -277,8 +234,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
           bio: bio,
           avatar: resolvedAvatar,
         );
-        state = state.copyWith(
-            user: state.user!.copyWith(humanProfile: updatedProfile));
+        state = state.copyWith(user: state.user!.copyWith(humanProfile: updatedProfile));
+        // Name and picture belong to the ALT account; keep the shared client in sync.
+        if (displayName != null || avatar != null) await _authService.alt.reloadMe();
       } else {
         final updatedAIProfiles = state.user!.aiProfiles.map((p) {
           if (p.id == activeId) {
@@ -290,9 +248,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           }
           return p;
         }).toList();
-        state = state.copyWith(
-            user: state.user!
-                .copyWith(aiProfiles: updatedAIProfiles.cast<AIProfile>()));
+        state = state.copyWith(user: state.user!.copyWith(aiProfiles: updatedAIProfiles.cast<AIProfile>()));
       }
 
       return true;

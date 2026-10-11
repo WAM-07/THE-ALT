@@ -30,12 +30,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 2200));
-    if (!mounted) return;
-    final auth = ref.read(authStateProvider);
-    if (auth.isLoading) {
-      await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 1600));
+    // Wait (up to ~10 s on a slow network) for the ALT session to be restored.
+    for (var i = 0; i < 40 && mounted && ref.read(authStateProvider).isLoading; i++) {
+      await Future.delayed(const Duration(milliseconds: 250));
     }
+    if (!mounted) return;
     final isLoggedIn = ref.read(authStateProvider).isLoggedIn;
     if (isLoggedIn) {
       context.go('/feed');

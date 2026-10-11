@@ -84,6 +84,7 @@ class MessagingNotifier extends StateNotifier<MessagingState> {
 
     _socket = io.io(AppConfig.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
+      'path': AppConfig.socketPath,
       'autoConnect': false,
       'auth': {'token': token},
     });
