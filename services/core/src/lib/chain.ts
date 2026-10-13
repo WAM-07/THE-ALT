@@ -1,4 +1,4 @@
-import { aitRegistryAbi } from '@alt/contracts/abi';
+import { aitRegistryAbi, altMarketplaceAbi } from '@alt/contracts/abi';
 import {
   BaseError,
   ContractFunctionRevertedError,
@@ -55,6 +55,7 @@ export class ChainService {
   readonly marketplaceAddress: Address | null;
   readonly relayerAddress: Address;
   private readonly explorerUrl: string | null;
+  private readonly rpcUrl: string;
   private readonly confirmations: number;
   private readonly publicClient;
   private readonly walletClient;
@@ -73,6 +74,7 @@ export class ChainService {
     this.marketplaceAddress = cfg.marketplaceAddress ? getAddress(cfg.marketplaceAddress) : null;
     this.relayerAddress = account.address;
     this.explorerUrl = cfg.explorerUrl?.replace(/\/$/, '') ?? null;
+    this.rpcUrl = cfg.rpcUrl;
     this.confirmations = cfg.confirmations;
     this.publicClient = createPublicClient({ chain, transport: http(cfg.rpcUrl) });
     this.walletClient = createWalletClient({ chain, account, transport: http(cfg.rpcUrl) });
@@ -80,6 +82,10 @@ export class ChainService {
 
   explorerTx(hash: string) {
     return this.explorerUrl ? `${this.explorerUrl}/tx/${hash}` : null;
+  }
+
+  explorerAddress(address: string) {
+    return this.explorerUrl ? `${this.explorerUrl}/address/${address}` : null;
   }
 
   explorerToken(tokenId: bigint | string) {
@@ -192,6 +198,138 @@ export class ChainService {
     } catch (err) {
       this.explain(err, 'read the AI identity token');
     }
+  }
+
+  // ---------------------------------------------------------------- wallets and the marketplace (ALTAR)
+
+  /** Hardhat's local development chain, where ALT may hand out test POL. */
+  get isLocalDevChain() {
+    return this.chainId === 31337;
+  }
+
+  private requireMarket(): Address {
+    if (!this.marketplaceAddress) throw new AppError(503, 'MARKETPLACE_DISABLED', 'The marketplace contract is not configured on this server.');
+    return this.marketplaceAddress;
+  }
+
+  async balanceOf(address: string) {
+    try {
+      return await this.publicClient.getBalance({ address: getAddress(address) });
+    } catch (err) {
+      this.explain(err, 'read the wallet balance');
+    }
+  }
+
+  /** Earnings waiting in the marketplace (sales, rentals, royalties) for this address. */
+  async earningsOf(address: string) {
+    return this.publicClient.readContract({ address: this.requireMarket(), abi: altMarketplaceAbi, functionName: 'balances', args: [getAddress(address)] });
+  }
+
+  async platformFeeBps() {
+    return Number(await this.publicClient.readContract({ address: this.requireMarket(), abi: altMarketplaceAbi, functionName: 'platformFeeBps' }));
+  }
+
+  /** What the marketplace contract says about a token right now: for sale, for rent, rented. */
+  async marketState(tokenId: bigint) {
+    const market = this.requireMarket();
+    try {
+      const [sale, offer, renter, renterUntil] = await Promise.all([
+        this.publicClient.readContract({ address: market, abi: altMarketplaceAbi, functionName: 'sales', args: [tokenId] }),
+        this.publicClient.readContract({ address: market, abi: altMarketplaceAbi, functionName: 'rentalOffers', args: [tokenId] }),
+        this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'userOf', args: [tokenId] }),
+        this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'userExpires', args: [tokenId] }),
+      ]);
+      const [seller, price] = sale;
+      const [owner, pricePerDay, maxDays] = offer;
+      const none = '0x0000000000000000000000000000000000000000';
+      return {
+        sale: price > 0n ? { seller: seller.toLowerCase(), priceWei: price } : null,
+        rent: pricePerDay > 0n ? { owner: owner.toLowerCase(), pricePerDayWei: pricePerDay, maxDays: Number(maxDays) } : null,
+        rentedTo: renter !== none ? { address: renter.toLowerCase(), until: new Date(Number(renterUntil) * 1000) } : null,
+      };
+    } catch (err) {
+      this.explain(err, 'read the marketplace');
+    }
+  }
+
+  /** Sends test POL from ALT's relayer. Only on the local development chain, where it has no value. */
+  async giveTestFunds(to: string, value: bigint) {
+    if (!this.isLocalDevChain) throw new AppError(409, 'NOT_A_TEST_CHAIN', 'Test funds are only available on the local development chain.');
+    try {
+      const hash = await this.walletClient.sendTransaction({ to: getAddress(to), value });
+      await this.publicClient.waitForTransactionReceipt({ hash, confirmations: this.confirmations, timeout: 180_000 });
+      return hash;
+    } catch (err) {
+      this.explain(err, 'send test funds');
+    }
+  }
+
+  /**
+   * Acts as a person's ALT-managed (custodial) wallet. Contract calls are "sponsored": if the wallet
+   * can't pay the network fee, ALT's relayer tops it up with just enough first, so people don't need
+   * POL to list an AI or collect their earnings.
+   */
+  custodial(privateKey: Hex) {
+    const account = privateKeyToAccount(privateKey);
+    const wallet = createWalletClient({ chain: this.walletClient.chain, account, transport: http(this.rpcUrl) });
+    const pub = this.publicClient;
+    const relayer = this.walletClient;
+    const confirmations = this.confirmations;
+    const explain = (err: unknown, action: string): never => this.explain(err, action);
+    const requireMarket = () => this.requireMarket();
+    const registry = this.registryAddress;
+
+    const sponsor = async (gas: bigint) => {
+      const fees = await pub.estimateFeesPerGas();
+      const need = (gas * (fees.maxFeePerGas ?? fees.gasPrice ?? 0n) * 13n) / 10n;
+      const have = await pub.getBalance({ address: account.address });
+      if (have >= need) return null;
+      const hash = await relayer.sendTransaction({ to: account.address, value: need - have });
+      await pub.waitForTransactionReceipt({ hash, confirmations, timeout: 180_000 });
+      return { hash, value: need - have };
+    };
+
+    /** `value`: POL paid along with the call (buying or renting). */
+    const call = async (target: 'registry' | 'market', functionName: string, args: readonly unknown[], action: string, value?: bigint) => {
+      const address = target === 'registry' ? registry : requireMarket();
+      const abi = (target === 'registry' ? aitRegistryAbi : altMarketplaceAbi) as typeof altMarketplaceAbi;
+      try {
+        // Simulate first so a refusal (not the owner, not listed...) costs nothing and reads clearly.
+        const { request } = await pub.simulateContract({ address, abi, functionName: functionName as never, args: args as never, account, value } as never);
+        const gas = await pub.estimateContractGas({ address, abi, functionName: functionName as never, args: args as never, account, value } as never);
+        const sponsored = await sponsor(gas);
+        const hash = await wallet.writeContract(request as never);
+        const receipt = await pub.waitForTransactionReceipt({ hash, confirmations, timeout: 180_000 });
+        if (receipt.status !== 'success') throw new AppError(502, 'CHAIN_TX_FAILED', `The blockchain could not ${action}.`);
+        return { hash, sponsored };
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        return explain(err, action);
+      }
+    };
+
+    return {
+      address: account.address.toLowerCase(),
+      call,
+      /** Lets the marketplace move this wallet's tokens when one is sold (needed once per wallet). */
+      async ensureMarketApproval() {
+        const market = requireMarket();
+        const approved = await pub.readContract({ address: registry, abi: aitRegistryAbi, functionName: 'isApprovedForAll', args: [account.address, market] });
+        return approved ? null : call('registry', 'setApprovalForAll', [market, true], 'let the marketplace sell this AI');
+      },
+      /** Sends POL out of the wallet. The person pays this network fee from their own balance. */
+      async send(to: string, value: bigint) {
+        try {
+          const hash = await wallet.sendTransaction({ to: getAddress(to), value });
+          const receipt = await pub.waitForTransactionReceipt({ hash, confirmations, timeout: 180_000 });
+          if (receipt.status !== 'success') throw new AppError(502, 'CHAIN_TX_FAILED', 'The transfer failed on-chain.');
+          return hash;
+        } catch (err) {
+          if (err instanceof AppError) throw err;
+          return explain(err, 'send the POL');
+        }
+      },
+    };
   }
 
   /** True when no identity token has ever been minted on this registry (token ids start at 1). */

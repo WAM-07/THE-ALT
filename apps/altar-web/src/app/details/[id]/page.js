@@ -9,10 +9,10 @@ import { useModal } from "../../../contexts/ModalContext";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../components/ui";
 import { useTilt } from "../../../components/motion";
-import { auth, mediaUrl, pictures, publicApi } from "../../../lib/alt";
+import { altar, auth, mediaUrl, pictures, publicApi } from "../../../lib/alt";
 import PicturePicker from "../../../components/PicturePicker";
 import { useAI } from "../../../contexts/AIContext";
-import { networkName, percent, shortAddress, timeAgo } from "../../../lib/format";
+import { networkName, percent, polText, shortAddress, timeAgo } from "../../../lib/format";
 
 const OFFERS = [
   ["own", "Own", "The AIT moves to your wallet, with every right."],
@@ -28,6 +28,7 @@ export default function AgentDetails() {
   const [model, setModel] = useState(null);
   const [missing, setMissing] = useState(false);
   const [chain, setChain] = useState(null);
+  const [listing, setListing] = useState(null);
   const [offer, setOffer] = useState("own");
   const [picking, setPicking] = useState(false);
   const { reload: reloadCatalog } = useAI();
@@ -39,6 +40,10 @@ export default function AgentDetails() {
       .then((ai) => {
         if (!live) return;
         setModel(toModel(ai));
+        altar
+          .listing(ai.id)
+          .then((l) => live && setListing(l))
+          .catch(() => live && setListing(null));
         // Read the token straight from the chain, so the page shows what is true right now.
         if (ai.token) {
           publicApi(`/core/verify/token/${ai.token.tokenId}`)
@@ -92,6 +97,16 @@ export default function AgentDetails() {
     setModel(toModel(await publicApi(`/core/public/ais/${encodeURIComponent(handle)}?platform=altar`)));
     reloadCatalog();
   };
+
+  // The price for the chosen way of holding it, from ALTAR's listing (a mirror of the contract).
+  const price =
+    offer === "own" && listing?.sale
+      ? polText(listing.sale.price)
+      : offer === "rent" && listing?.rent
+        ? polText(listing.rent.pricePerDay)
+        : offer === "subscribe" && listing?.subscription
+          ? polText(listing.subscription.pricePerMonth)
+          : null;
 
   const traits = [
     ["Category", model.category],
@@ -155,9 +170,22 @@ export default function AgentDetails() {
           {isOwner ? (
             <Card style={{ animationDelay: "120ms" }} className="animate-rise p-6">
               <p className="font-display text-xl font-bold">You own this AI</p>
-              <p className="mt-2 text-ink-2">You hold its AI Identity Token. Its personality, knowledge and versions are managed in ALTER. Setting a price, a rent and a subscription opens here soon.</p>
+              <p className="mt-2 text-ink-2">
+                You hold its AI Identity Token. Its personality, knowledge and versions are managed in ALTER.{" "}
+                {listing ? "It's listed on ALTAR:" : "It isn't listed yet."}
+              </p>
+              {listing && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {listing.sale && <Chip tone="accent">For sale · {polText(listing.sale.price)}</Chip>}
+                  {listing.rent && <Chip tone="accent">For rent · {polText(listing.rent.pricePerDay, " / day")}</Chip>}
+                  {listing.subscription && <Chip>Subscription · {polText(listing.subscription.pricePerMonth, " / month")}</Chip>}
+                </div>
+              )}
               <div className="mt-5 flex flex-wrap gap-3">
-                <Button onClick={openInAlter}>Manage in ALTER</Button>
+                <Button href={`/list-ai?ai=${model.id}`}>{listing ? "Edit listing" : "List it"}</Button>
+                <Button kind="outline" onClick={openInAlter}>
+                  Manage in ALTER
+                </Button>
                 <Button kind="outline" onClick={() => setPicking(true)}>
                   Change picture
                 </Button>
@@ -193,9 +221,12 @@ export default function AgentDetails() {
                 <div className="mt-4 flex items-end justify-between gap-4">
                   <div>
                     <p className="text-xs font-medium text-ink-3">{offer === "own" ? "Price" : offer === "rent" ? "Per day" : "Per month"}</p>
-                    <p className="font-display text-3xl font-bold text-ink-3">Not listed</p>
+                    <p key={offer} className={`animate-rise font-display text-3xl font-bold ${price ? "text-ink" : "text-ink-3"}`}>
+                      {price ?? "Not offered"}
+                    </p>
+                    {offer === "rent" && listing?.rent && <p className="mt-1 text-sm text-ink-3">Up to {listing.rent.maxDays} days</p>}
                   </div>
-                  <Chip tone="soon">Opens soon</Chip>
+                  <Chip tone="soon">{price ? "Checkout opens soon" : "Not offered yet"}</Chip>
                 </div>
                 <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
                   <Button size="lg" disabled>
@@ -214,6 +245,8 @@ export default function AgentDetails() {
                     </svg>
                   </Button>
                 </div>
+                {listing?.pitch && <p className="mt-4 text-[15px] font-medium">“{listing.pitch}”</p>}
+                {listing?.terms && <p className="mt-2 whitespace-pre-line text-sm text-ink-2">{listing.terms}</p>}
                 <p className="mt-4 text-xs leading-relaxed text-ink-3">
                   On every resale, {percent(model.royaltyBps)} goes to the creator, {model.creatorName}, automatically.
                 </p>

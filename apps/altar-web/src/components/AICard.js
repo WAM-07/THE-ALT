@@ -5,6 +5,7 @@ import { Avatar, Chip, VerifiedTick } from "./ui";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useTilt } from "./motion";
+import { headlinePrice } from "../lib/format";
 
 // One verified AI in a grid: its token's artwork with the AI's own picture on top, like a
 // collectible. Prices appear when listings open (ALTAR step 2); until then it says so.
@@ -14,6 +15,7 @@ export default function AICard({ model }) {
   const mine = Boolean(user && model.owner?.id === user.id);
   const saved = wishlist?.some((w) => w.agentId === model.id);
   const tilt = useTilt(6);
+  const price = headlinePrice(model.listing);
 
   return (
     <div {...tilt} className="tilt group relative rounded-3xl border border-line bg-surface p-2 hover:shadow-card">
@@ -35,8 +37,8 @@ export default function AICard({ model }) {
           </p>
           <div className="mt-3 flex items-end justify-between rounded-2xl bg-sunken px-3 py-2">
             <div>
-              <p className="text-[11px] font-medium text-ink-3">Price</p>
-              <p className="text-sm font-semibold text-ink-2">Not listed yet</p>
+              <p className="text-[11px] font-medium text-ink-3">{price?.label ?? "Price"}</p>
+              <p className={`text-sm font-semibold ${price ? "text-ink" : "text-ink-2"}`}>{price?.text ?? "Not listed yet"}</p>
             </div>
             <div className="text-right">
               <p className="text-[11px] font-medium text-ink-3">Health</p>

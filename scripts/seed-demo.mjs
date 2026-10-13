@@ -273,8 +273,10 @@ export async function seedDemo({ gateway, log = console.log }) {
     log(`  (skipped the DM: ${err.message})`);
   }
 
-  log('filling ALTAR: more creators and verified AIs, each minted on-chain…');
+  log('filling ALTAR: more creators and verified AIs, each minted on-chain and some listed…');
   await seedMarket({ gateway, log, tokens: { wamiq: t.wamiq, ayesha: t.ayesha } });
+  // Hamza is the demo's buyer: test POL in his ALT wallet (local chain only; worth nothing).
+  await call('POST', '/core/me/wallet/test-funds', t.hamza, {}, { allow: [409] });
 
   log('an announcement from the ALT team to everyone…');
   await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
@@ -294,37 +296,37 @@ export const MARKET_PEOPLE = [
 
 const MARKET_AIS = [
   {
-    owner: 'bilal', name: 'Code Sensei', handle: 'bilal.sensei', category: 'coding', royaltyBps: 750, picture: ['mecha', 1],
+    owner: 'bilal', name: 'Code Sensei', handle: 'bilal.sensei', category: 'coding', royaltyBps: 750, picture: ['mecha', 1], listing: { sale: '25', rent: { pricePerDay: '1.5', maxDays: 7 }, subscription: '4', pitch: 'Your patient pair-programmer: Node, Python and SQL, explained step by step.' },
     bio: 'A patient pair-programmer for JavaScript, Python and SQL. Explains the why, not just the fix.',
     onboarding: { about: 'Senior backend engineer in Islamabad who mentors juniors.', roles: ['Engineer', 'Mentor'], primaryTrait: 'Patient' },
     text: 'I have been a backend engineer for eight years, mostly Node.js, Python and PostgreSQL. I mentor junior developers. I explain bugs step by step, suggest small tests first and avoid jargon.',
   },
   {
-    owner: 'bilal', name: 'Pitch Partner', handle: 'bilal.pitch', category: 'business', royaltyBps: 500, picture: ['androids', 7],
+    owner: 'bilal', name: 'Pitch Partner', handle: 'bilal.pitch', category: 'business', royaltyBps: 500, picture: ['androids', 7], listing: { sale: '18', pitch: 'Sharper pitch decks in one evening, numbers first.' },
     bio: 'Sharpens startup pitches and one-pagers. Direct, numbers-first feedback.',
     onboarding: { about: 'Founder who has pitched to investors in Karachi and Dubai.', roles: ['Founder'], primaryTrait: 'Direct' },
     text: 'I have built two small startups and pitched to many investors. I care about a clear problem, real numbers and a short story. I give direct feedback and always suggest one concrete next step.',
   },
   {
-    owner: 'zainab', name: 'Urdu Ustad', handle: 'zainab.ustad', category: 'language', royaltyBps: 600, picture: ['androids', 3],
+    owner: 'zainab', name: 'Urdu Ustad', handle: 'zainab.ustad', category: 'language', royaltyBps: 600, picture: ['androids', 3], listing: { rent: { pricePerDay: '0.8', maxDays: 30 }, subscription: '2', pitch: 'Conversational Urdu, then Ghalib, one couplet at a time.' },
     bio: 'Learn conversational Urdu and read Ghalib, one couplet at a time.',
     onboarding: { about: 'Urdu literature teacher from Lahore.', roles: ['Teacher', 'Poet'], primaryTrait: 'Warm' },
     text: 'I teach Urdu literature and love Ghalib, Faiz and Parveen Shakir. I teach with everyday phrases first, then poetry. I correct mistakes gently and give the Roman Urdu spelling alongside the script.',
   },
   {
-    owner: 'zainab', name: 'Calm Coach', handle: 'zainab.calm', category: 'wellness', royaltyBps: 400, picture: ['cores', 1],
+    owner: 'zainab', name: 'Calm Coach', handle: 'zainab.calm', category: 'wellness', royaltyBps: 400, picture: ['cores', 1], listing: { subscription: '1', pitch: 'Two minutes of calm before every exam.' },
     bio: 'Breathing exercises, study-stress check-ins and a kind voice before exams.',
     onboarding: { about: 'Yoga teacher who helps students handle exam stress.', roles: ['Coach'], primaryTrait: 'Calm' },
     text: 'I teach yoga and simple breathing exercises to university students. I speak slowly and kindly, suggest one small step at a time, and remind people to rest. I am not a doctor and say so when it matters.',
   },
   {
-    owner: 'omar', name: 'Chess Buddy', handle: 'omar.chess', category: 'gaming', royaltyBps: 1000, picture: ['mecha', 4],
+    owner: 'omar', name: 'Chess Buddy', handle: 'omar.chess', category: 'gaming', royaltyBps: 1000, picture: ['mecha', 4], listing: { sale: '40', rent: { pricePerDay: '2', maxDays: 14 }, pitch: 'A 2100-rated coach that reviews your games kindly.' },
     bio: 'Opening ideas, tactics drills and friendly post-game reviews.',
     onboarding: { about: 'Club chess player and coach, rated 2100.', roles: ['Coach', 'Player'], primaryTrait: 'Competitive' },
     text: 'I play club chess and coach beginners. I love the Sicilian and endgame puzzles. I review games by asking what the player was thinking before showing the better move.',
   },
   {
-    owner: 'ayesha', name: 'Palette', handle: 'ayesha.palette', category: 'creative', royaltyBps: 800, picture: ['cores', 3],
+    owner: 'ayesha', name: 'Palette', handle: 'ayesha.palette', category: 'creative', royaltyBps: 800, picture: ['cores', 3], listing: { sale: '12', subscription: '1.5', pitch: 'Palettes with Lahore in them: saffron, rickshaw green, old-city brick.' },
     bio: 'Colour palettes from a mood, a photo or a city. Truck-art energy included.',
     onboarding: { about: 'Digital artist and illustrator from Lahore.', roles: ['Artist'], primaryTrait: 'Creative' },
     text: 'I build colour palettes for illustrators. I name colours after things in Lahore, like saffron, rickshaw green and old-city brick, and I always explain why the colours work together.',
@@ -358,5 +360,11 @@ export async function seedMarket({ gateway, log = console.log, tokens = {} }) {
       chat: ['Hi! What can you help me with?', 'What makes you different?', 'Give me one quick tip.'],
     });
     await call('PATCH', `/core/ais/${ai.id}`, t[spec.owner], { avatarUrl: await preset('ai', ...spec.picture) });
+    if (spec.listing) {
+      // On-chain prices first (ALT Core signs with the owner's ALT wallet), then ALTAR's listing details.
+      const { sale, rent, subscription, pitch } = spec.listing;
+      if (sale || rent) await call('PUT', `/core/ais/${ai.id}/market`, t[spec.owner], { sale: sale ? { price: sale } : null, rent: rent ?? null, confirm: { password: DEMO_PASSWORD } });
+      await call('PUT', `/altar/listings/${ai.id}`, t[spec.owner], { pitch, subscriptionPrice: subscription ?? null });
+    }
   }
 }

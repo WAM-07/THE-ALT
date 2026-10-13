@@ -200,7 +200,7 @@ function Profile() {
                 ) : (
                   <div key={item.id} className="flex flex-col justify-between rounded-3xl border border-dashed border-line p-5">
                     <div>
-                      <p className="font-display text-lg font-bold">{item.agentName}</p>
+                      <p className="font-display text-lg font-bold">{item.agentName ?? "This AI"}</p>
                       <p className="mt-1 text-sm text-ink-3">No longer on ALTAR.</p>
                     </div>
                     <button onClick={() => removeFromWishlist(item.agentId)} className="mt-4 self-start text-sm font-semibold text-ink-2 hover:text-ink">

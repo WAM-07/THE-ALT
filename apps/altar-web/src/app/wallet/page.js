@@ -1,17 +1,71 @@
 "use client";
-import { useState } from "react";
-import NextStep from "../../components/NextStep";
-import { Button, Card, Chip } from "../../components/ui";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import AitArt from "../../components/AitArt";
+import ConfirmSpend from "../../components/ConfirmSpend";
+import { Avatar, Button, Card, Chip, Shape, Spinner } from "../../components/ui";
+import { CountUp } from "../../components/motion";
 import { useAuth } from "../../contexts/AuthContext";
-import { continueWithAlt } from "../../lib/alt";
+import { useAI } from "../../contexts/AIContext";
+import { continueWithAlt, mediaUrl, wallet as altWallet } from "../../lib/alt";
+import { networkName, percent, polText, shortAddress } from "../../lib/format";
 
-export default function Wallet() {
+const FAUCET = "https://faucet.polygon.technology/";
+
+// The ALT wallet every account has. ALT keeps its keys and signs for you after you confirm, so
+// there is nothing to install. Balances are read live from the chain.
+export default function WalletPage() {
   const { user } = useAuth();
+  const { aiModels } = useAI();
+  const [w, setW] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [dialog, setDialog] = useState(null); // "withdraw" | "send"
+  const [send, setSend] = useState({ to: "", amount: "" });
   const [copied, setCopied] = useState(false);
-  const address = user?.wallet?.address;
+
+  const load = useCallback(async () => {
+    try {
+      setW(await altWallet.get());
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) load();
+  }, [user, load]);
+
+  if (!user) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-sm flex-col items-center justify-center px-4 text-center">
+        <p className="font-display text-2xl font-bold">Your ALT wallet</p>
+        <p className="mt-2 text-ink-2">Sign in to see your balance, earnings and AI tokens.</p>
+        <Button className="mt-6" onClick={() => continueWithAlt("signin", "/wallet").catch(() => {})}>
+          Continue with ALT
+        </Button>
+      </div>
+    );
+  }
+
+  const getTestFunds = async () => {
+    setBusy("funds");
+    setNotice(null);
+    try {
+      const r = await altWallet.testFunds();
+      setNotice(`${polText(r.amount)} of test funds arrived. They only work on this test network.`);
+      await load();
+    } catch (err) {
+      setNotice(err.message);
+    } finally {
+      setBusy(null);
+    }
+  };
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(address);
+      await navigator.clipboard.writeText(w.address);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -19,30 +73,180 @@ export default function Wallet() {
     }
   };
 
+  if (error && !w) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-24 text-center">
+        <p className="font-display text-2xl font-bold">Couldn&apos;t open your wallet</p>
+        <p className="mt-2 text-ink-2">{error}</p>
+        <Button className="mt-6" kind="outline" onClick={load}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  if (!w) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const balance = Number(w.balance.pol);
+  const earnings = Number(w.earnings.pol);
+  const tokens = w.tokens.map((t) => ({ ...t, model: aiModels?.find((m) => m.id === t.aiId) }));
+
   return (
-    <NextStep eyebrow="Wallet" title="Your ALT wallet" intro="Every ALT account has its own wallet. It holds your AI Identity Tokens, and ALTAR payments will be made from it, on-chain.">
-      {user ? (
-        <>
-          <Card className="p-6">
-            <p className="text-sm font-medium text-ink-3">Address</p>
-            <p className="mt-1 break-all font-mono text-[15px]">{address ?? "—"}</p>
-            {address && (
-              <Button kind="outline" size="sm" className="mt-4" onClick={copy}>
-                {copied ? "Copied" : "Copy address"}
-              </Button>
-            )}
-          </Card>
-          <Card className="flex flex-wrap items-center justify-between gap-3 p-6">
-            <div>
-              <p className="font-display text-lg font-bold">Balance, earnings and withdrawals</p>
-              <p className="mt-1 text-ink-2">Arrive with buying and renting, including test funds on the local chain.</p>
+    <div className="mx-auto max-w-[1100px] px-4 pb-24 pt-8 sm:px-6 sm:pt-12">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-accent-text">Wallet</p>
+          <h1 className="font-display text-4xl font-extrabold tracking-tight">Your ALT wallet</h1>
+        </div>
+        <Chip className="py-1">
+          <span className="h-2 w-2 rounded-full bg-accent" /> {networkName(w.chainId)}
+        </Chip>
+      </div>
+
+      <div className="mt-8 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+        {/* Balance */}
+        <div className="relative overflow-hidden rounded-[32px] bg-pop p-7 text-pop-ink sm:p-9">
+          <Shape variant={0} className="absolute -right-16 -top-20 h-64 w-64 animate-morph text-accent opacity-90" />
+          <Shape variant={1} className="absolute -bottom-10 right-28 h-24 w-24 animate-spin-slow text-b4 opacity-80" />
+          <div className="relative">
+            <p className="text-sm font-semibold opacity-70">Balance</p>
+            <p className="mt-1 font-display text-5xl font-extrabold tracking-tight sm:text-6xl">
+              <CountUp value={Math.round(balance * 10000) / 10000} />
+              <span className="ml-2 text-2xl font-bold opacity-70">POL</span>
+            </p>
+            <button onClick={copy} className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 font-mono text-sm hover:bg-white/20" title={w.address}>
+              {copied ? "Copied" : shortAddress(w.address)}
+            </button>
+            <div className="mt-7 flex flex-wrap gap-2">
+              {w.testFunds && (
+                <button onClick={getTestFunds} disabled={busy === "funds"} className="inline-flex h-11 items-center rounded-full bg-accent px-5 font-semibold text-accent-ink transition hover:brightness-105 disabled:opacity-60">
+                  {busy === "funds" ? "Sending…" : `Get ${polText(w.testFunds)} test funds`}
+                </button>
+              )}
+              <button onClick={() => setDialog("send")} disabled={balance <= 0} className="inline-flex h-11 items-center rounded-full border border-white/25 px-5 font-semibold transition hover:bg-white/10 disabled:opacity-40">
+                Send
+              </button>
+              {w.explorer && (
+                <a href={w.explorer} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-full border border-white/25 px-5 font-semibold transition hover:bg-white/10">
+                  Explorer ↗
+                </a>
+              )}
             </div>
-            <Chip tone="soon">Opens soon</Chip>
-          </Card>
-        </>
-      ) : (
-        <Button onClick={() => continueWithAlt("signin", "/wallet").catch(() => {})}>Continue with ALT</Button>
+          </div>
+        </div>
+
+        {/* Earnings */}
+        <Card className="flex flex-col p-7">
+          <p className="text-sm font-semibold text-ink-3">Earnings from sales, rentals and royalties</p>
+          <p className="mt-1 font-display text-4xl font-extrabold tracking-tight">{polText(w.earnings)}</p>
+          <p className="mt-2 text-sm text-ink-2">They wait in the marketplace contract until you move them into your wallet.</p>
+          <div className="mt-auto pt-6">
+            <Button onClick={() => setDialog("withdraw")} disabled={earnings <= 0}>
+              Withdraw to my wallet
+            </Button>
+            {w.platformFeeBps !== null && <p className="mt-3 text-xs text-ink-3">ALTAR keeps {percent(w.platformFeeBps)} of each sale or rental; creators get their royalty on resales.</p>}
+          </div>
+        </Card>
+      </div>
+
+      {notice && <p className="animate-page-in mt-5 rounded-2xl border border-line bg-surface px-5 py-4 text-ink-2">{notice}</p>}
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+        {/* Tokens */}
+        <Card className="p-7">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-bold">Your AI tokens</h2>
+            <Link href="/list-ai" className="text-sm font-semibold text-accent-text hover:underline">
+              List one →
+            </Link>
+          </div>
+          {tokens.length === 0 ? (
+            <p className="mt-3 text-ink-2">No AI tokens yet. Create an AI in ALTER and deploy it to mint its token.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-line">
+              {tokens.map((t) => (
+                <li key={t.aiId}>
+                  <Link href={`/details/${t.handle}`} className="group flex items-center gap-4 py-3">
+                    <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl">
+                      <AitArt seed={t.model?.artSeed ?? t.handle} grain={false} />
+                      <Avatar src={mediaUrl(t.avatarUrl)} name={t.name} size={26} className="absolute bottom-1 right-1 ring-2 ring-white/80" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold group-hover:underline">{t.name}</span>
+                      <span className="block text-sm text-ink-3">AIT #{t.tokenId}</span>
+                    </span>
+                    <span className="text-sm font-semibold text-ink-2">{t.model?.listing?.sale ? polText(t.model.listing.sale.price) : t.model?.listing ? "Listed" : "Not listed"}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        {/* Adding funds */}
+        <Card className="p-7">
+          <h2 className="font-display text-lg font-bold">Adding funds</h2>
+          {w.testFunds ? (
+            <p className="mt-2 text-ink-2">This is ALT&apos;s local test network. Its POL has no value: use &quot;Get test funds&quot; as often as you like to try buying and renting.</p>
+          ) : (
+            <p className="mt-2 text-ink-2">
+              This is {networkName(w.chainId)}, a test network. Get free test POL from the{" "}
+              <a href={FAUCET} target="_blank" rel="noreferrer" className="font-semibold text-accent-text underline underline-offset-4">
+                Polygon faucet ↗
+              </a>{" "}
+              by pasting your wallet address.
+            </p>
+          )}
+          <div className="mt-5 space-y-3 text-sm">
+            <Row label="Network fees for listing" value="Paid by ALT" />
+            <Row label="Send POL to MetaMask" value="Use Send, with your MetaMask address" />
+            <Row label="Connect MetaMask" value={<Chip tone="soon">Later</Chip>} />
+            <Row label="Buy POL with a card" value={<Chip tone="soon">Not planned for the FYP</Chip>} />
+          </div>
+        </Card>
+      </div>
+
+      <Card className="mt-5 p-7">
+        <h2 className="font-display text-lg font-bold">Activity</h2>
+        <p className="mt-2 text-ink-2">Purchases, rentals and royalties will appear here when buying and renting open (the next ALTAR step). Each one links to its transaction on the chain.</p>
+      </Card>
+
+      {dialog === "withdraw" && (
+        <ConfirmSpend title={`Withdraw ${polText(w.earnings)}`} action="Withdraw" onClose={() => setDialog(null)} onConfirm={(confirm) => altWallet.withdraw(confirm)} onDone={(r) => (setNotice(`${polText(r.amount)} moved into your wallet.`), load())}>
+          Your earnings move from the marketplace contract into your ALT wallet.
+        </ConfirmSpend>
       )}
-    </NextStep>
+      {dialog === "send" && (
+        <ConfirmSpend
+          title="Send POL"
+          action="Send"
+          onClose={() => setDialog(null)}
+          onConfirm={(confirm) => altWallet.send(send.to.trim(), send.amount.trim(), confirm)}
+          onDone={(r) => (setNotice(`${polText(r.amount)} sent to ${shortAddress(send.to.trim())}.`), setSend({ to: "", amount: "" }), load())}
+        >
+          <label className="block text-sm font-semibold">
+            To (a wallet address, like your MetaMask)
+            <input value={send.to} onChange={(e) => setSend({ ...send, to: e.target.value })} placeholder="0x…" className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-sunken/60 px-4 font-mono text-sm text-ink outline-none focus:border-ink/30" />
+          </label>
+          <label className="mt-3 block text-sm font-semibold">
+            Amount (you have {polText(w.balance)})
+            <input value={send.amount} onChange={(e) => setSend({ ...send, amount: e.target.value })} inputMode="decimal" placeholder="1.5" className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-sunken/60 px-4 text-ink outline-none focus:border-ink/30" />
+          </label>
+          <p className="mt-2 text-xs text-ink-3">A small network fee comes out of your balance too. Sending can&apos;t be undone.</p>
+        </ConfirmSpend>
+      )}
+    </div>
   );
 }
+
+const Row = ({ label, value }) => (
+  <div className="flex items-center justify-between gap-4 border-b border-line pb-3 last:border-0">
+    <span className="text-ink-3">{label}</span>
+    <span className="text-right font-semibold">{value}</span>
+  </div>
+);

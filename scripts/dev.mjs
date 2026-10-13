@@ -68,7 +68,7 @@ const portInUse = (port) =>
     probe.listen(port, '0.0.0.0');
   });
 const busy = [];
-for (const [name, port] of [['gateway', ports.gateway], ['ALT Core', ports.core], ['ALTERA API', ports.altera], ['ALTAR web', ports.altarWeb], ['database', Number(process.env.DEV_POSTGRES_PORT || 54320)]]) {
+for (const [name, port] of [['gateway', ports.gateway], ['ALT Core', ports.core], ['ALTERA API', ports.altera], ['ALTAR API', ports.altar], ['ALTAR web', ports.altarWeb], ['database', Number(process.env.DEV_POSTGRES_PORT || 54320)]]) {
   if (await portInUse(port)) busy.push(`${name} (port ${port})`);
 }
 if (busy.length) {
@@ -216,6 +216,7 @@ const services = [
       GATEWAY_PORT: String(ports.gateway),
       CORE_URL: `http://127.0.0.1:${ports.core}`,
       ...(existsSync(path.join(root, 'services', 'altera-api', 'migrations')) ? { ALTERA_URL: `http://127.0.0.1:${ports.altera}` } : {}),
+      ALTAR_URL: `http://127.0.0.1:${ports.altar}`,
       ALTAR_WEB_URL: `http://127.0.0.1:${ports.altarWeb}`,
     },
     health: `http://127.0.0.1:${ports.gateway}/health`,
@@ -230,6 +231,16 @@ if (existsSync(path.join(root, 'services', 'altera-api', 'migrations'))) {
     health: `http://127.0.0.1:${ports.altera}/health`,
   });
 }
+
+// ALTAR API: listings, subscription prices and saved AIs (the altar schema). It reads the chain
+// (CHAIN_RPC_URL and the contract addresses set above) but never signs: ALT Core holds the keys.
+services.push({
+  name: 'altar',
+  cwd: path.join(root, 'services', 'altar-api'),
+  cmd: [process.execPath, tsx, 'watch', '--clear-screen=false', 'src/index.ts'],
+  env: { ALTAR_PORT: String(ports.altar), CORE_URL: `http://127.0.0.1:${ports.core}` },
+  health: `http://127.0.0.1:${ports.altar}/health`,
+});
 
 // ALTAR web (Next.js) is the gateway's front page: http://localhost:8080/
 services.push({

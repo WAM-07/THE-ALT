@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🟡 Step 1 of 4 done 2026-10-13: `apps/altar-web` (Soban's design) on ALT accounts and verified AIs. Plan and decisions: `Documentations/ALTAR_EVALUATION.md` §7. |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🟡 Steps 1–2 of 4 done (2026-10-13/14): `apps/altar-web` on ALT accounts and verified AIs, redesigned; `services/altar-api`; the ALT wallet and on-chain listings. Next: buying and renting. Plan: `Documentations/ALTAR_EVALUATION.md` §7. |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
@@ -317,10 +317,40 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **ALTAR:** tap your picture on the profile to open the picker (sets, upload, "Everywhere" or "Only on ALTAR", "Use my ALT picture on ALTAR"); an AI's owner gets "Change picture" on its page. Profile buttons are now Open ALTER, Open ALTERA, Wallet, Settings (last); Sign out is in Settings.
   - **Demo:** the seed gives each person and AI a particular ready-made picture (Wamiq's ALT and Muse keep their uploaded orbs).
   - **Checked:** Core 74 tests, ALTERA 16, gateway 9; ALTAR `eslint` and `next build`; in a browser, choosing an ALTAR-only picture changed ALTAR and left the ALT picture alone.
+- ✅ **ALTAR step 2: listings and the wallet** (2026-10-14).
+  - **ALT Core signs for the custodial wallet** (`http/routes/wallet.ts`, `ChainService.custodial` in `lib/chain.ts`):
+    - `GET /me/wallet`: balance, marketplace earnings, platform fee, owned AI tokens;
+    - `POST /me/wallet/test-funds`: 100 test POL, local chain only;
+    - `POST /me/wallet/withdraw`: earnings into the wallet;
+    - `POST /me/wallet/send`: POL out, e.g. to MetaMask;
+    - `GET`/`PUT /ais/:id/market`: list for sale and/or rent on `ALTMarketplace` (approval once per wallet, then `listForSale`/`listForRent`/cancel, only what changed).
+    - **Spending needs the person:** their password or a 2FA code (`CONFIRMATION_FAILED`); accounts with neither get `CONFIRMATION_UNAVAILABLE`. Rate-limited, audited, and a notification goes to the inbox.
+    - **ALT pays the network fee** for listing and withdrawing: the relayer tops the wallet up with just enough gas first. Sending POL out is paid by the person.
+  - **`services/altar-api`** (TypeScript, Fastify, zod; port 4200, `/altar` behind the gateway; schema `altar`, migration `0001`):
+    - listings: pitch, terms, the monthly subscription price, and a mirror of the on-chain sale and rent prices (re-read from the chain on every save; a listing counts only while its lister still holds the token);
+    - saved AIs (the wishlist moved off the browser; old browser lists are carried over once);
+    - it checks ALT tokens like ALTERA (JWKS plus an active session), hears sign-outs at once (`alt_sessions_revoked`), reads the chain and **never signs**.
+  - **ALTAR web:**
+    - a real **Wallet** page: balance, earnings and withdraw, send, test funds, your AI tokens, how to add funds;
+    - a real **List AI** page: sale, rent (up to N days) and subscription, pitch and terms, fee and royalty preview; it asks for the password only when an on-chain price changes;
+    - prices on cards and AI pages;
+    - **Edit listing** for owners.
+  - **Demo seed:** six AIs listed (sale, rent and/or subscription), and Hamza (the buyer) gets test POL.
+  - **Checked:**
+    - tests: Core 77 (new `test/wallet.test.ts`: list from an empty wallet, wrong password refused, a real on-chain purchase, earnings withdrawn, POL sent), `altar-api` 3, contracts 31, ALTERA 16, gateway 9;
+    - ALTAR web `eslint` and `next build`;
+    - in a browser against the running demo: Bilal got test funds and listed Code Sensei (3 transactions), and a visitor saw the prices.
+    - A full fresh `npm run demo` with the new seed was not rerun.
 
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
-- **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; prices say "Not listed" and the Buy / Rent / Subscribe buttons are disabled with "Opens soon"; activity shows only the mint; the saved list (wishlist) is kept in the browser per account.
+- **ALTAR, until steps 3–4:**
+  - Buy, Rent and Subscribe show real prices but stay disabled ("Checkout opens soon").
+  - The listing mirror is refreshed when the seller saves; an indexer that follows contract events comes with step 3.
+  - Subscription prices are saved off-chain until `ALTMarketplace` gets a subscribe function (step 4).
+  - Wallet activity is a placeholder until step 3.
+  - "Connect MetaMask" isn't built: sending POL to a MetaMask address works.
+  - The spending password is typed on ALTAR's page and goes straight to Core, never stored. Moving it into the ALT Account window, like sign-in, is a planned improvement.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **No push notifications when the app is closed.** The ALT inbox is live while an app is open; Firebase push comes after 60%.
@@ -330,6 +360,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Biometric unlock** (planned under M1 FE-4) is not built yet.
 
 ## Environment notes
+- **ALTAR API** runs on port 4200 (`ALTAR_PORT`); `npm run dev` passes it the chain settings and sets the gateway's `ALTAR_URL`. Its tests use their own database (`.data/test-postgres-altar`, port 54398) and the test chain on 8546 after Core's tests.
 - **ALTAR web** runs on port 4300 (`ALTAR_WEB_PORT`) behind the gateway. Soban's original repo stays in `altar-marketplace/` (git-ignored; it holds his live Supabase settings, never copy them).
 - **Development needs no keys.** Optional settings go in `.env`: `GOOGLE_CLIENT_IDS`, `SMTP_URL` with `MAIL_MODE=smtp`, and `ADMIN_EMAILS`.
 - **Flutter SDK is at `C:\flutter`.** It was moved out of `ALTER/flutter` because Flutter's native-asset build fails when the SDK path contains a space ("C:\THE ALT"). Add `C:\flutter\bin` to PATH.

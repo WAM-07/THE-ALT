@@ -149,6 +149,31 @@ export const pictures = {
   },
 };
 
+/**
+ * The ALT wallet and on-chain listings. ALT Core holds the wallet's keys and signs; anything that
+ * spends needs `confirm`: { password } or { code } (two-step verification).
+ */
+export const wallet = {
+  get: () => api("/core/me/wallet"),
+  testFunds: () => api("/core/me/wallet/test-funds", { method: "POST", body: {} }),
+  withdraw: (confirm) => api("/core/me/wallet/withdraw", { method: "POST", body: { confirm } }),
+  send: (to, amount, confirm) => api("/core/me/wallet/send", { method: "POST", body: { to, amount, confirm } }),
+  /** An AI's sale and rental terms as the marketplace contract has them. */
+  market: (aiId) => api(`/core/ais/${aiId}/market`),
+  setMarket: (aiId, { sale, rent }, confirm) => api(`/core/ais/${aiId}/market`, { method: "PUT", body: { sale, rent, confirm } }),
+};
+
+/** ALTAR's own service: listing details, subscription prices and saved AIs. */
+export const altar = {
+  listings: () => publicApi("/altar/listings"),
+  listing: (aiId) => publicApi(`/altar/listings/${aiId}`),
+  /** Saves pitch, terms and subscription price; sale and rent prices are read back from the chain. */
+  saveListing: (aiId, body) => api(`/altar/listings/${aiId}`, { method: "PUT", body }),
+  saved: () => api("/altar/wishlist"),
+  save: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "PUT" }),
+  unsave: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "DELETE" }),
+};
+
 /** ALT file links name the server's public address; serve them from wherever ALTAR is open. */
 export function mediaUrl(url) {
   if (!url) return null;

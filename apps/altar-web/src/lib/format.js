@@ -7,6 +7,22 @@ export const shortAddress = (addr) => (addr ? `${addr.slice(0, 6)}…${addr.slic
 
 export const percent = (bps) => `${(Number(bps) || 0) / 100}%`;
 
+/** "2.5 POL" from Core's { wei, pol } amounts (or a plain number string). */
+export function polText(amount, suffix = "") {
+  const n = Number(typeof amount === "object" && amount ? amount.pol : amount);
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 })} POL${suffix}`;
+}
+
+/** The headline price of a listing for cards: sale first, then rent, then subscription. */
+export function headlinePrice(listing) {
+  if (!listing) return null;
+  if (listing.sale) return { label: "Price", text: polText(listing.sale.price) };
+  if (listing.rent) return { label: "Rent", text: polText(listing.rent.pricePerDay, " / day") };
+  if (listing.subscription) return { label: "Subscription", text: polText(listing.subscription.pricePerMonth, " / month") };
+  return null;
+}
+
 const UNITS = [
   ["year", 31536000],
   ["month", 2592000],

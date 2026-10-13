@@ -1,0 +1,32 @@
+{
+  "name": "@alt/altar-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ALTAR API: listings (terms, subscription prices), the saved list, and later sales, rentals and reviews. Owns the altar schema.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@alt/contracts": "^0.1.0",
+    "fastify": "^5.12.5",
+    "fastify-type-provider-zod": "^7.0.0",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1",
+    "viem": "^2.57.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@alt/devkit": "^0.1.0",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
