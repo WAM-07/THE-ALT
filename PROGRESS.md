@@ -367,6 +367,23 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - ALTAR web `eslint` and `next build`;
     - in a browser on the live demo: Hamza rented Muse for 2 days and chatted, and bought Wamiq's ALT (it moved to him in ALTAR and ALTERA). The wallet showed both.
     - **Not re-proven:** the full fresh `npm run demo`. Its seed was interrupted while Core reloaded during this work.
+- ✅ **Fixes after step 3** (2026-10-14, owner's report):
+  - **`npm run demo` stopped part-way:** the seed now signs up 8 people, and Core allows 5 sign-ups a minute, so the 6th was refused. The limit stays; the seed waits as long as Core asks ("Try again in N seconds") and retries. A full demo now takes a few minutes.
+  - **Password field:** the ALT Account window showed the browser's eye (Edge) and our "Show" text. Now there is one eye icon, crossed out while the password shows, and the browser's own eye is hidden (also on ALTAR).
+
+## Where to pick up (end of 2026-10-14)
+- **First:** run `npm run demo` once and check it ends with "demo data ready" (the full fresh run with the new seed hasn't been seen end to end yet).
+- **Next step, ALTAR step 4** (`Documentations/ALTAR_EVALUATION.md` §7): add `subscribe` to `ALTMarketplace` (owner approved the contract change), a creator royalty view, reviews from real buyers and renters, and demo polish.
+- **Waiting on the owner:**
+  - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
+  - **The ALTER redesign** (no blue or purple).
+- **Smaller follow-ups:**
+  - Confirm spending in the ALT Account window instead of on ALTAR's page.
+  - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).
+  - Renters talking to an AI in ALTERA DMs.
+  - Show a seller their old chats read-only.
+  - "Connect MetaMask".
+  - Deployment (Vercel for ALTAR web, Railway/Render for the services).
 
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.

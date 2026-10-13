@@ -86,8 +86,14 @@ input {
 }
 input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus) 12%, transparent); }
 .pw { position: relative; display: block; }
-.pw input { padding-right: 64px; }
-.reveal { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); margin-top: 3px; border: 0; background: none; color: var(--muted); font: 600 12px Inter, sans-serif; padding: 6px 8px; cursor: pointer; }
+.pw input { padding-right: 48px; }
+.reveal { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); margin-top: 3px; border: 0; background: none; color: var(--muted); padding: 8px; cursor: pointer; display: grid; place-items: center; border-radius: 8px; }
+.reveal:hover { color: var(--ink); }
+.reveal svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Crossed out while the password is showing. */
+.reveal.on::after { content: ''; position: absolute; width: 22px; height: 2px; background: currentColor; transform: rotate(-45deg); border-radius: 2px; }
+/* Edge adds its own eye to password fields; ours is the only one. */
+input::-ms-reveal, input::-ms-clear { display: none; }
 
 button { font: inherit; cursor: pointer; }
 .primary {

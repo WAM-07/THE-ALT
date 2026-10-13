@@ -128,6 +128,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Edge adds its own eye to password fields; ALTAR's forms don't need a second one. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 ::selection {
   background: var(--accent);
   color: var(--accent-ink);

@@ -185,12 +185,14 @@
       fail(view, readable(err));
     }
   });
+  // One eye icon: open shows the password, crossed out hides it again.
   for (const btn of document.querySelectorAll('.reveal')) {
     btn.addEventListener('click', () => {
       const input = btn.previousElementSibling;
       const hidden = input.type === 'password';
       input.type = hidden ? 'text' : 'password';
-      btn.textContent = hidden ? 'Hide' : 'Show';
+      btn.classList.toggle('on', hidden);
+      btn.setAttribute('aria-pressed', String(hidden));
       btn.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
     });
   }

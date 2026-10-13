@@ -82,13 +82,20 @@ function orbPng(light, deep, back) {
 
 /** The public-API helpers the seed uses, bound to one gateway. */
 function demoClient(gateway) {
-  const call = async (method, path, token, body, { allow = [] } = {}) => {
+  const call = async (method, path, token, body, { allow = [] } = {}, attempt = 0) => {
     const res = await fetch(gateway + path, {
       method,
       headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();
+    // Core limits sign-ups to a few a minute; the seed creates more people than that, so it waits
+    // as long as Core asks ("Try again in N seconds") and tries again.
+    if (res.status === 429 && attempt < 5) {
+      const wait = Number(text.match(/in (\d+) seconds?/)?.[1] ?? 20);
+      await new Promise((r) => setTimeout(r, (wait + 1) * 1000));
+      return call(method, path, token, body, { allow }, attempt + 1);
+    }
     const data = text ? JSON.parse(text) : null;
     if (res.status >= 400 && !allow.includes(res.status)) throw new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 300)}`);
     return { status: res.status, data };

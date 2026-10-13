@@ -330,7 +330,7 @@ console.log(`
 `);
 
 if (demo) {
-  say('filling the demo story (about a minute; real sign-ups, AI chats and on-chain mints)…');
+  say('filling the demo story (a few minutes: real sign-ups, AI chats, on-chain mints and listings; it waits out sign-up limits)…');
   try {
     await seedDemo({ gateway: url, log: (m) => say(m) });
     const rows = DEMO_PEOPLE.map((p) => `    ${p.email.padEnd(20)} ${p.role}`).join('\n');
