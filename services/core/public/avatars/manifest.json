@@ -1,0 +1,149 @@
+{
+  "generatedBy": "scripts/make-avatars.mjs",
+  "sets": [
+    {
+      "kind": "human",
+      "id": "chibi",
+      "name": "Chibi crew",
+      "credit": "ALT original",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "human",
+      "id": "lorelei",
+      "name": "Lorelei",
+      "credit": "Lorelei by Lisa Wischofsky (CC0 1.0), via DiceBear",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "human",
+      "id": "adventurer",
+      "name": "Adventurer",
+      "credit": "Adventurer by Lisa Wischofsky, licensed CC BY 4.0, via DiceBear",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "human",
+      "id": "notionists",
+      "name": "Notionists",
+      "credit": "Notionists by Zoish (CC0 1.0), via DiceBear",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "human",
+      "id": "big-smile",
+      "name": "Big Smile",
+      "credit": "Big Smile by Ashley Seo, licensed CC BY 4.0, via DiceBear",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "ai",
+      "id": "mecha",
+      "name": "Mecha minis",
+      "credit": "ALT original",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "ai",
+      "id": "androids",
+      "name": "Androids",
+      "credit": "ALT original",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "ai",
+      "id": "cores",
+      "name": "AI cores",
+      "credit": "ALT original",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    },
+    {
+      "kind": "ai",
+      "id": "bottts",
+      "name": "Bottts",
+      "credit": "Bottts by Pablo Stanley (free for personal and commercial use), via DiceBear",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "05.png",
+        "06.png",
+        "07.png",
+        "08.png"
+      ]
+    }
+  ]
+}

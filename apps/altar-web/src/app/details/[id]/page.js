@@ -9,7 +9,9 @@ import { useModal } from "../../../contexts/ModalContext";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../components/ui";
 import { useTilt } from "../../../components/motion";
-import { auth, mediaUrl, publicApi } from "../../../lib/alt";
+import { auth, mediaUrl, pictures, publicApi } from "../../../lib/alt";
+import PicturePicker from "../../../components/PicturePicker";
+import { useAI } from "../../../contexts/AIContext";
 import { networkName, percent, shortAddress, timeAgo } from "../../../lib/format";
 
 const OFFERS = [
@@ -27,11 +29,13 @@ export default function AgentDetails() {
   const [missing, setMissing] = useState(false);
   const [chain, setChain] = useState(null);
   const [offer, setOffer] = useState("own");
+  const [picking, setPicking] = useState(false);
+  const { reload: reloadCatalog } = useAI();
   const tilt = useTilt(5);
 
   useEffect(() => {
     let live = true;
-    publicApi(`/core/public/ais/${encodeURIComponent(handle)}`)
+    publicApi(`/core/public/ais/${encodeURIComponent(handle)}?platform=altar`)
       .then((ai) => {
         if (!live) return;
         setModel(toModel(ai));
@@ -82,6 +86,13 @@ export default function AgentDetails() {
     }
   };
 
+  const savePicture = async ({ url, file }) => {
+    if (file) await pictures.uploadForAi(model.id, file);
+    else await pictures.chooseForAi(model.id, url);
+    setModel(toModel(await publicApi(`/core/public/ais/${encodeURIComponent(handle)}?platform=altar`)));
+    reloadCatalog();
+  };
+
   const traits = [
     ["Category", model.category],
     ["Version", `v${model.version ?? 1}`],
@@ -93,6 +104,7 @@ export default function AgentDetails() {
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 lg:pt-10">
+      {picking && <PicturePicker kind="ai" title={`${model.name}'s picture`} name={model.name} current={model.image} onClose={() => setPicking(false)} onSave={savePicture} />}
       <nav className="mb-6 flex items-center gap-2 text-sm text-ink-3" aria-label="Breadcrumb">
         <Link href="/#explore" className="hover:text-ink">
           Explore
@@ -146,6 +158,9 @@ export default function AgentDetails() {
               <p className="mt-2 text-ink-2">You hold its AI Identity Token. Its personality, knowledge and versions are managed in ALTER. Setting a price, a rent and a subscription opens here soon.</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Button onClick={openInAlter}>Manage in ALTER</Button>
+                <Button kind="outline" onClick={() => setPicking(true)}>
+                  Change picture
+                </Button>
                 <Button href="/profile" kind="outline">
                   My AIs
                 </Button>

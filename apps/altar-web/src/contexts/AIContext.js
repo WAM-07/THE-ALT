@@ -24,7 +24,7 @@ export const AIProvider = ({ children }) => {
 
   const reload = useCallback(async () => {
     try {
-      const list = await publicApi("/core/public/ais?limit=100");
+      const list = await publicApi("/core/public/ais?limit=100&platform=altar");
       setAIModels(list.map(toModel));
       setError(null);
     } catch (err) {

@@ -20,6 +20,9 @@
     "read-pdf": "node tools/read_pdf.js"
   },
   "devDependencies": {
+    "@dicebear/collection": "9.4.2",
+    "@dicebear/core": "9.4.2",
+    "@resvg/resvg-js": "2.6.2",
     "pdf2json": "^4.0.2"
   }
 }

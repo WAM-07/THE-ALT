@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
-import { continueWithAlt, mediaUrl } from "../lib/alt";
+import { continueWithAlt } from "../lib/alt";
 import { Avatar, btnClass } from "./ui";
 
 export function Logo({ className = "" }) {
@@ -118,7 +118,7 @@ export default function Header() {
                 aria-label="Your profile"
                 className={`rounded-full ring-offset-2 ring-offset-canvas transition hover:ring-2 hover:ring-ink/20 ${pathname === "/profile" ? "ring-2 ring-accent" : ""}`}
               >
-                <Avatar src={mediaUrl(user.avatarUrl)} name={user.name} size={40} />
+                <Avatar src={user.picture} name={user.name} size={40} />
               </Link>
             </>
           ) : (

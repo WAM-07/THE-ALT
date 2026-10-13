@@ -7,6 +7,7 @@ import { audit, publish } from '../../lib/audit.js';
 import { sha256 } from '../../lib/crypto.js';
 import { AppError, badRequest, conflict, notFound } from '../../lib/errors.js';
 import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media.js';
+import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
 import { moderate } from '../../modules/ai/moderation.js';
@@ -30,6 +31,8 @@ import { requireService, requireUser } from '../auth-guard.js';
 import { Handle } from '../schemas.js';
 
 const AiId = z.object({ id: z.uuid() });
+/** The platform asking, so a person's per-platform picture can be used. */
+const PictureOn = z.enum(['alter', 'altera', 'altar']);
 const TEXT_TYPES = new Set(['text/plain', 'text/markdown', 'text/csv', 'application/json']);
 const MAX_DATASET_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_CHARS = 200_000;
@@ -62,9 +65,17 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     };
   }
 
-  /** Public names for a set of people (owners and creators shown next to an AI). */
-  async function peopleById(ids: string[]) {
-    const { rows } = await ctx.db.query('SELECT id, handle, display_name, avatar_url FROM core.users WHERE id = ANY($1::uuid[])', [[...new Set(ids)]]);
+  /**
+   * Public names for a set of people (owners and creators shown next to an AI). With `platform`, a
+   * picture the person chose for that platform wins over their global one.
+   */
+  async function peopleById(ids: string[], platform?: string) {
+    const { rows } = await ctx.db.query(
+      `SELECT u.id, u.handle, u.display_name, COALESCE(pa.avatar_url, u.avatar_url) AS avatar_url
+         FROM core.users u LEFT JOIN core.platform_avatars pa ON pa.user_id = u.id AND pa.platform::text = $2
+        WHERE u.id = ANY($1::uuid[])`,
+      [[...new Set(ids)], platform ?? null],
+    );
     return (id: string) => {
       const p = rows.find((x) => x.id === id);
       return p ? { id: p.id as string, handle: p.handle as string, displayName: p.display_name as string, avatarUrl: (p.avatar_url as string | null) ?? null } : null;
@@ -161,6 +172,9 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
           [req.auth!.userId, b.handle, b.name, b.description ?? null, b.category, b.royaltyBps, persona],
         );
         const ai = rows[0]!;
+        // A ready-made robot or sci-fi picture until the owner chooses one.
+        ai.avatar_url = defaultAvatar(ctx, 'ai', ai.id);
+        await client.query('UPDATE core.personal_ais SET avatar_url = $2 WHERE id = $1', [ai.id, ai.avatar_url]);
         for (const [scope, granted] of Object.entries(b.consents ?? {})) {
           await client.query(
             'INSERT INTO core.consent_events (user_id, ai_id, scope, granted, policy_version, ip) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -209,6 +223,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       if (req.body.avatarUrl && !isTrustedMediaUrl(ctx, req.body.avatarUrl)) {
         throw badRequest('UNTRUSTED_AVATAR', 'Upload the picture to ALT first (POST /ais/:id/avatar).');
       }
+      // AIs use the robot and sci-fi sets, never the people ones.
+      if (req.body.avatarUrl) checkAvatarUrl(ctx, req.body.avatarUrl, 'ai');
       const ai = await tx(ctx.db, async (client) => {
         const ai = await requireOwnedAi(client, req.auth!.userId, req.params.id, true);
         assertMutable(ai);
@@ -223,7 +239,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
              draft_config = COALESCE($8, draft_config),
              owner_confirmed_at = CASE WHEN $9 THEN NULL ELSE owner_confirmed_at END
            WHERE id = $1`,
-          [ai.id, b.name ?? null, b.description !== undefined, b.description ?? null, b.category ?? null, b.avatarUrl !== undefined, b.avatarUrl ?? null, b.persona ?? null, personaChanged],
+          [ai.id, b.name ?? null, b.description !== undefined, b.description ?? null, b.category ?? null, b.avatarUrl !== undefined, b.avatarUrl === null ? defaultAvatar(ctx, 'ai', ai.id) : (b.avatarUrl ?? null), b.persona ?? null, personaChanged],
         );
         if (!personaChanged && ai.status === 'verified') {
           // Presentation (name, avatar...) syncs to other platforms in real time; behaviour waits for a version.
@@ -746,12 +762,19 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.get(
     '/public/ais/:handle',
-    { schema: { tags: ['directory'], summary: 'Public profile of a verified AI', params: z.object({ handle: z.string().min(3).max(30) }) } },
+    {
+      schema: {
+        tags: ['directory'],
+        summary: 'Public profile of a verified AI (with ?platform=, people pictures as that platform shows them)',
+        params: z.object({ handle: z.string().min(3).max(30) }),
+        querystring: z.object({ platform: PictureOn.optional() }),
+      },
+    },
     async (req) => {
       const { rows } = await ctx.db.query<AiRow>(`SELECT * FROM core.personal_ais WHERE handle = $1 AND deleted_at IS NULL AND status = 'verified'`, [req.params.handle]);
       const ai = rows[0];
       if (!ai) throw notFound('AI');
-      const person = await peopleById([ai.owner_id, ai.creator_id]);
+      const person = await peopleById([ai.owner_id, ai.creator_id], req.query.platform);
       const persona = parsePersona(ai.draft_config);
       const version = ai.current_version_id ? await ctx.db.query('SELECT persona_config FROM core.ai_versions WHERE id = $1', [ai.current_version_id]) : null;
       const published = parsePersona(version?.rows[0]?.persona_config ?? persona);
@@ -761,7 +784,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.get(
     '/public/ais',
-    { schema: { tags: ['directory'], summary: 'Verified AIs', querystring: z.object({ q: z.string().max(60).optional(), limit: z.coerce.number().int().min(1).max(100).default(30) }) } },
+    { schema: { tags: ['directory'], summary: 'Verified AIs', querystring: z.object({ q: z.string().max(60).optional(), limit: z.coerce.number().int().min(1).max(100).default(30), platform: PictureOn.optional() }) } },
     async (req) => {
       const q = req.query.q ? `%${req.query.q}%` : null;
       const { rows } = await ctx.db.query<AiRow>(
@@ -770,7 +793,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
          ORDER BY created_at DESC LIMIT $2`,
         [q, req.query.limit],
       );
-      const person = await peopleById(rows.flatMap((ai) => [ai.owner_id, ai.creator_id]));
+      const person = await peopleById(rows.flatMap((ai) => [ai.owner_id, ai.creator_id]), req.query.platform);
       return Promise.all(rows.map(async (ai) => ({ ...(await summary(ai)), owner: person(ai.owner_id), creator: person(ai.creator_id) })));
     },
   );

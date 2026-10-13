@@ -6,7 +6,8 @@ import type { Ctx } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit, publish } from '../../lib/audit.js';
 import { notify } from '../../lib/notify.js';
-import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media.js';
+import { AVATAR_MAX_BYTES, saveAvatar } from '../../lib/media.js';
+import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { badRequest, conflict, notFound, unauthorized } from '../../lib/errors.js';
 import { revokeAllSessions, revokeSession } from '../../modules/accounts/sessions.js';
 import { consumeSiwe, createSiweNonce } from '../../modules/accounts/siwe.js';
@@ -41,7 +42,10 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
             displayName: DisplayName.optional(),
             handle: Handle.optional(),
             bio: z.string().max(500).nullable().optional(),
-            /** An image already hosted by an ALT service (e.g. uploaded through ALTERA) or Cloudinary. */
+            /**
+             * An image already hosted by an ALT service (uploaded, or one of the ready-made "human"
+             * pictures from GET /avatars/presets) or Cloudinary. null goes back to a ready-made one.
+             */
             avatarUrl: z.url().max(500).nullable().optional(),
           })
           .refine((b) => Object.keys(b).length > 0, 'Nothing to update'),
@@ -49,9 +53,9 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
     },
     async (req) => {
       const b = req.body;
-      if (b.avatarUrl && !isTrustedMediaUrl(ctx, b.avatarUrl)) {
-        throw badRequest('AVATAR_URL_NOT_ALLOWED', 'Upload the picture through an ALT app instead.');
-      }
+      if (b.avatarUrl) checkAvatarUrl(ctx, b.avatarUrl, 'human');
+      // Nobody is left with a blank circle: removing the picture brings back a ready-made one.
+      const avatarUrl = b.avatarUrl === null ? defaultAvatar(ctx, 'human', req.auth!.userId) : b.avatarUrl;
       const user = await tx(ctx.db, async (client) => {
         const before = await findUserById(client, req.auth!.userId, true);
         if (!before) throw unauthorized();
@@ -62,7 +66,7 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
           `UPDATE core.users SET display_name = COALESCE($2, display_name), handle = COALESCE($3, handle),
                   bio = CASE WHEN $5 THEN $4 ELSE bio END,
                   avatar_url = CASE WHEN $7 THEN $6 ELSE avatar_url END WHERE id = $1`,
-          [before.id, b.displayName ?? null, b.handle ?? null, b.bio ?? null, b.bio !== undefined, b.avatarUrl ?? null, b.avatarUrl !== undefined],
+          [before.id, b.displayName ?? null, b.handle ?? null, b.bio ?? null, b.bio !== undefined, avatarUrl ?? null, b.avatarUrl !== undefined],
         );
         await audit(client, {
           action: 'account.profile_updated',
@@ -79,17 +83,67 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
     },
   );
 
+  const OnePlatform = z.enum(['alter', 'altera', 'altar']);
+
+  /** Sets (or, with null, removes) the picture a person shows on one platform only. */
+  async function setPlatformAvatar(userId: string, platform: z.infer<typeof OnePlatform>, url: string | null) {
+    await tx(ctx.db, async (client) => {
+      if (url) {
+        await client.query(
+          `INSERT INTO core.platform_avatars (user_id, platform, avatar_url) VALUES ($1, $2, $3)
+           ON CONFLICT (user_id, platform) DO UPDATE SET avatar_url = EXCLUDED.avatar_url, updated_at = now()`,
+          [userId, platform, url],
+        );
+      } else {
+        await client.query('DELETE FROM core.platform_avatars WHERE user_id = $1 AND platform = $2', [userId, platform]);
+      }
+      await publish(client, 'user.updated', { userId, fields: ['platformAvatars'], platform });
+    });
+  }
+
   r.post(
     '/me/avatar',
-    { preHandler: authed, schema: { tags: ['account'], summary: 'Upload a profile picture (PNG, JPEG or WebP, up to 5 MB)', consumes: ['multipart/form-data'] } },
+    {
+      preHandler: authed,
+      schema: {
+        tags: ['account'],
+        summary: 'Upload a profile picture (PNG, JPEG or WebP, up to 5 MB); with ?platform=, for that platform only',
+        consumes: ['multipart/form-data'],
+        querystring: z.object({ platform: OnePlatform.optional() }),
+      },
+    },
     async (req) => {
       const file = await req.file({ limits: { fileSize: AVATAR_MAX_BYTES, files: 1 } });
       const url = await saveAvatar(ctx, file, req.auth!.userId);
+      if (req.query.platform) {
+        await setPlatformAvatar(req.auth!.userId, req.query.platform, url);
+        return { avatarUrl: url, platform: req.query.platform };
+      }
       await tx(ctx.db, async (client) => {
         await client.query('UPDATE core.users SET avatar_url = $2 WHERE id = $1', [req.auth!.userId, url]);
         await publish(client, 'user.updated', { userId: req.auth!.userId, fields: ['avatarUrl'] });
       });
       return { avatarUrl: url };
+    },
+  );
+
+  r.put(
+    '/me/avatar/:platform',
+    {
+      preHandler: authed,
+      schema: {
+        tags: ['account'],
+        summary: 'Use a different picture on one platform (an ALT-hosted image or a ready-made "human" one); null goes back to the global picture',
+        params: z.object({ platform: OnePlatform }),
+        body: z.object({ avatarUrl: z.url().max(500).nullable() }),
+      },
+    },
+    async (req) => {
+      if (req.body.avatarUrl) checkAvatarUrl(ctx, req.body.avatarUrl, 'human');
+      await setPlatformAvatar(req.auth!.userId, req.params.platform, req.body.avatarUrl);
+      const user = await findUserById(ctx.db, req.auth!.userId);
+      if (!user) throw unauthorized();
+      return loadMe(ctx.db, user);
     },
   );
 

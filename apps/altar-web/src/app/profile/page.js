@@ -9,7 +9,8 @@ import { useWishlist } from "../../contexts/WishlistContext";
 import AICard from "../../components/AICard";
 import AitArt from "../../components/AitArt";
 import { Avatar, Button, Chip, Empty, Spinner, btnClass } from "../../components/ui";
-import { api, auth, continueWithAlt, mediaUrl } from "../../lib/alt";
+import { api, auth, continueWithAlt, pictures } from "../../lib/alt";
+import PicturePicker from "../../components/PicturePicker";
 import { shortAddress } from "../../lib/format";
 
 const STATUS = {
@@ -32,7 +33,7 @@ export default function ProfilePage() {
 
 // The signed-in person's ALT account: the AIs they own and the ones they saved.
 function Profile() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { showAlert } = useModal();
   const { aiModels } = useAI();
   const { wishlist, removeFromWishlist } = useWishlist();
@@ -41,6 +42,7 @@ function Profile() {
   const tab = params.get("tab") === "saved" ? "saved" : "owned";
   const [ais, setAis] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -91,7 +93,28 @@ function Profile() {
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Avatar src={mediaUrl(user.avatarUrl)} name={user.name} size={112} className="relative -mt-14 ring-[6px] ring-canvas" />
+            <button onClick={() => setPicking(true)} className="group/pic relative -mt-14 block rounded-full" aria-label="Change your picture">
+              <Avatar src={user.picture} name={user.name} size={112} className="ring-[6px] ring-canvas" />
+              <span className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-canvas bg-pop text-pop-ink transition group-hover/pic:scale-110">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+                </svg>
+              </span>
+            </button>
+            {picking && (
+              <PicturePicker
+                kind="human"
+                title="Your picture"
+                name={user.name}
+                current={user.picture}
+                onClose={() => setPicking(false)}
+                onSave={({ url, file }, scope) => {
+                  const where = { altarOnly: scope === "altar" };
+                  return file ? pictures.upload(file, where) : pictures.choose(url, where);
+                }}
+                onUseGlobal={user.hasAltarPicture ? () => pictures.choose(null, { altarOnly: true }) : undefined}
+              />
+            )}
             <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">{user.name}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-ink-3">
               <span>@{user.handle}</span>
@@ -109,6 +132,9 @@ function Profile() {
             <Button kind="outline" size="sm" onClick={() => open("altera", "ALTERA")}>
               Open ALTERA
             </Button>
+            <Link href="/wallet" className={btnClass("outline", "sm")}>
+              Wallet
+            </Link>
             <Link href="/settings" className={btnClass("outline", "sm")} aria-label="Settings">
               <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="3" />
@@ -116,12 +142,6 @@ function Profile() {
               </svg>
               Settings
             </Link>
-            <Link href="/wallet" className={btnClass("outline", "sm")}>
-              Wallet
-            </Link>
-            <Button kind="ghost" size="sm" onClick={logout}>
-              Sign out
-            </Button>
           </div>
         </div>
 

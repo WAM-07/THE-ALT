@@ -27,12 +27,14 @@ const emit = (user) => listeners.forEach((fn) => fn(user));
 
 async function send(path, { method = "GET", body, token } = {}) {
   const headers = { accept: "application/json" };
-  if (body !== undefined) headers["content-type"] = "application/json";
+  // Files go as multipart form data (the browser sets that content type); everything else as JSON.
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isForm) headers["content-type"] = "application/json";
   if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     credentials: "same-origin",
     cache: "no-store",
   });
@@ -115,6 +117,35 @@ export const auth = {
       accessToken = null;
       emit(null);
     }
+  },
+};
+
+/**
+ * Profile pictures. They live in the ALT account, so a change shows in ALTER, ALTERA and ALTAR;
+ * a person may also pick a different one for ALTAR only. People and AIs choose from separate
+ * ready-made sets ("human" and "ai"), or upload their own.
+ */
+export const pictures = {
+  presets: (kind) => publicApi(`/core/avatars/presets?kind=${kind}`).then((r) => r.sets),
+  /** Everywhere, or (altarOnly) just on ALTAR; null goes back to the default. Announces the updated account. */
+  async choose(avatarUrl, { altarOnly = false } = {}) {
+    const me = altarOnly
+      ? await api("/core/me/avatar/altar", { method: "PUT", body: { avatarUrl } })
+      : await api("/core/me", { method: "PATCH", body: { avatarUrl } });
+    emit(me);
+  },
+  async upload(file, { altarOnly = false } = {}) {
+    const form = new FormData();
+    form.append("file", file);
+    await api(`/core/me/avatar${altarOnly ? "?platform=altar" : ""}`, { method: "POST", body: form });
+    emit(await api("/core/me"));
+  },
+  /** An AI's picture (its owner only). */
+  chooseForAi: (aiId, avatarUrl) => api(`/core/ais/${aiId}`, { method: "PATCH", body: { avatarUrl } }),
+  async uploadForAi(aiId, file) {
+    const form = new FormData();
+    form.append("file", file);
+    return api(`/core/ais/${aiId}/avatar`, { method: "POST", body: form });
   },
 };
 

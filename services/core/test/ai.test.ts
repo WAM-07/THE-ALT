@@ -211,6 +211,13 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
     expect(pub).toMatchObject({ handle: verified.handle, verified: true, traits: ['Logical'], owner: { handle: u.handle } });
     const listed = (await t.app.inject({ method: 'GET', url: '/public/ais' })).json();
     expect(listed.find((x: { id: string }) => x.id === ai.id)).toMatchObject({ owner: { handle: u.handle }, creator: { handle: u.handle }, token: { owner: wallet }, royaltyBps: 500 });
+    // A picture chosen for ALTAR only shows on ALTAR; everywhere else keeps the global one.
+    const globalPic = (await call('GET', '/me', u.accessToken)).json().avatarUrl;
+    const altarPic = 'http://localhost:8080/core/avatars/human/lorelei/01.png';
+    await call('PUT', '/me/avatar/altar', u.accessToken, { avatarUrl: altarPic });
+    const onAltar = (await t.app.inject({ method: 'GET', url: '/public/ais?platform=altar' })).json().find((x: { id: string }) => x.id === ai.id);
+    expect(onAltar.owner.avatarUrl).toBe(altarPic);
+    expect((await t.app.inject({ method: 'GET', url: `/public/ais/${verified.handle}` })).json().owner.avatarUrl).toBe(globalPic);
 
     // Behaviour changes go in by version: edit draft, build v2, publish it on-chain.
     await call('PATCH', `/ais/${ai.id}`, u.accessToken, { persona: { ...verified.persona, traits: ['Logical', 'Curious'] } });

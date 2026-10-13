@@ -3,6 +3,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { Ctx, Platform, Role } from '../../context.js';
 import { encrypt, randomToken } from '../../lib/crypto.js';
 import { conflict } from '../../lib/errors.js';
+import { defaultAvatar } from '../../lib/avatars.js';
 
 export interface UserRow {
   id: string;
@@ -114,6 +115,9 @@ export async function createUser(ctx: Ctx, client: pg.PoolClient, input: NewUser
     [input.handle, input.displayName, input.email ?? null, input.emailVerified ? new Date() : null, input.passwordHash ?? null, [...roles]],
   );
   const user = normalise(rows[0])!;
+  // A ready-made picture until the person picks or uploads one (Google sign-in replaces it with theirs).
+  user.avatar_url = defaultAvatar(ctx, 'human', user.id);
+  await client.query('UPDATE core.users SET avatar_url = $2 WHERE id = $1', [user.id, user.avatar_url]);
 
   const privateKey = generatePrivateKey();
   const address = privateKeyToAccount(privateKey).address.toLowerCase();
@@ -135,12 +139,13 @@ export async function touchPlatform(q: pg.Pool | pg.PoolClient, userId: string, 
 
 /** The signed-in user's own view of their account. */
 export async function loadMe(q: pg.Pool | pg.PoolClient, user: UserRow) {
-  const [wallets, platforms] = await Promise.all([
+  const [wallets, platforms, platformAvatars] = await Promise.all([
     q.query(
       'SELECT address, kind, is_primary, label, created_at FROM core.wallets WHERE user_id = $1 ORDER BY is_primary DESC, created_at',
       [user.id],
     ),
     q.query('SELECT platform, joined_at, last_seen_at FROM core.platform_memberships WHERE user_id = $1 ORDER BY joined_at', [user.id]),
+    q.query('SELECT platform, avatar_url FROM core.platform_avatars WHERE user_id = $1', [user.id]),
   ]);
   return {
     id: user.id,
@@ -150,6 +155,8 @@ export async function loadMe(q: pg.Pool | pg.PoolClient, user: UserRow) {
     displayName: user.display_name,
     bio: user.bio,
     avatarUrl: user.avatar_url,
+    /** Pictures chosen for one platform only; each platform falls back to `avatarUrl`. */
+    platformAvatars: Object.fromEntries(platformAvatars.rows.map((p) => [p.platform as Platform, p.avatar_url as string])),
     roles: user.roles,
     twoFactorEnabled: user.two_fa_enabled,
     hasPassword: Boolean(user.password_hash),

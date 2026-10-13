@@ -306,8 +306,20 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Account picture** (top right) opens the profile page directly (owner's choice); Saved, Wallet, Settings and Sign out are on the profile page. The header gains a shadow once the page scrolls.
   - Helpers in `src/components/motion.js`, keyframes in `globals.css`. Everything stops for people whose system asks for reduced motion.
   - Checked in headless Chrome mid-animation (1440px and 375px), hover tilt, the menu and the tabs; `eslint` (no errors) and `next build` pass.
+- ✅ **Profile pictures: ready-made sets, global with per-platform choice** (2026-10-13, owner's decisions).
+  - **72 ready-made pictures** in separate sets so people and AIs never look alike (`services/core/public/avatars`, built by `scripts/make-avatars.mjs`):
+    - **People:** Chibi crew (ALT original), Lorelei and Notionists (CC0), Adventurer and Big Smile (CC BY 4.0; the picker shows the credit).
+    - **AIs:** Mecha minis, Androids and AI cores (ALT originals), Bottts (free for commercial use).
+    - Famous anime characters were not used: they are copyrighted by their studios.
+  - **Global by default:** the picture lives in the ALT account (`core.users.avatar_url`), so ALTER, ALTERA and ALTAR show the same face. **Per platform, optionally:** `core.platform_avatars` (migration `core/0004`) holds a picture for one platform only; ALTAR asks for people with `?platform=altar`, and ALTERA's `altera.users` view prefers the ALTERA one (migration `altera/0003`).
+  - **Never blank:** new accounts and AIs get a ready-made picture; removing a picture brings one back; Core fills in older accounts and AIs at start-up (`jobs/default-avatars.ts`).
+  - **Core API:** `GET /avatars/presets?kind=human|ai`, the images at `/avatars/<kind>/<set>/<nn>.png`, `PUT /me/avatar/:platform`, `POST /me/avatar?platform=`, and `platformAvatars` in `/me`. People can't use AI pictures and AIs can't use people pictures (`AVATAR_WRONG_SET`). Touches `modules/accounts/users.ts` (sign-up default, `/me`), as the owner's request required. Tests: `test/avatars.test.ts` plus a check in `ai.test.ts`.
+  - **ALTAR:** tap your picture on the profile to open the picker (sets, upload, "Everywhere" or "Only on ALTAR", "Use my ALT picture on ALTAR"); an AI's owner gets "Change picture" on its page. Profile buttons are now Open ALTER, Open ALTERA, Wallet, Settings (last); Sign out is in Settings.
+  - **Demo:** the seed gives each person and AI a particular ready-made picture (Wamiq's ALT and Muse keep their uploaded orbs).
+  - **Checked:** Core 74 tests, ALTERA 16, gateway 9; ALTAR `eslint` and `next build`; in a browser, choosing an ALTAR-only picture changed ALTAR and left the ALT picture alone.
 
 ## Known mocks / not real yet
+- **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
 - **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; prices say "Not listed" and the Buy / Rent / Subscribe buttons are disabled with "Opens soon"; activity shows only the mint; the saved list (wishlist) is kept in the browser per account.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.

@@ -62,14 +62,6 @@ function encodePng(W, pixel) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
-/** A simple person avatar: a coloured head and shoulders on a tinted background. */
-function avatarPng([r, g, b], [br, bg, bb]) {
-  return encodePng(256, (x, y) => {
-    const inner = Math.hypot(x - 128, y - 118) < 70 || (Math.hypot(x - 128, y - 260) < 120 && y > 170);
-    return inner ? [r, g, b] : [br, bg, bb];
-  });
-}
-
 /** An AI's picture: a glossy orb, lit from the top left, glowing on a solid background. */
 function orbPng(light, deep, back) {
   const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
@@ -142,21 +134,28 @@ function demoClient(gateway) {
     throw new Error(`${spec.name} took too long to mint`);
   }
 
-  return { call, upload, sleep, signUp, intoAltera, makeAi };
+  /** One of ALT's ready-made pictures, e.g. preset('human', 'chibi', 1). */
+  let sets = null;
+  async function preset(kind, set, n) {
+    sets ??= (await call('GET', '/core/avatars/presets')).data.sets;
+    return sets.find((s) => s.kind === kind && s.id === set).pictures[n - 1];
+  }
+
+  return { call, upload, sleep, signUp, intoAltera, makeAi, preset };
 }
 
 export async function seedDemo({ gateway, log = console.log }) {
-  const { call, upload, sleep, signUp, intoAltera, makeAi } = demoClient(gateway);
+  const { call, upload, sleep, signUp, intoAltera, makeAi, preset } = demoClient(gateway);
   const started = Date.now();
   const t = {};
   log('creating ALT accounts (sign-up, e-mail code)…');
   for (const p of DEMO_PEOPLE) t[p.key] = await signUp(p);
   const adminToken = await signUp({ email: DEMO_ADMIN_EMAIL, handle: 'alt_admin', name: 'ALT Team' });
+  // Everyone starts with a ready-made picture; these pick particular ones so the demo looks the same each time.
+  for (const [key, set, n] of [['wamiq', 'chibi', 1], ['ayesha', 'chibi', 2], ['hamza', 'adventurer', 5], ['sara', 'chibi', 3]]) {
+    await call('PATCH', '/core/me', t[key], { avatarUrl: await preset('human', set, n) });
+  }
 
-  await upload('/core/me/avatar', t.wamiq, avatarPng([255, 255, 255], [110, 40, 217]));
-  await upload('/core/me/avatar', t.ayesha, avatarPng([255, 255, 255], [244, 63, 94]));
-  await upload('/core/me/avatar', t.hamza, avatarPng([255, 255, 255], [14, 165, 233]));
-  await upload('/core/me/avatar', t.sara, avatarPng([255, 255, 255], [245, 158, 11]));
 
   log('building personal AIs in ALTER and minting their identity tokens…');
   const wamiqAi = await makeAi(t.wamiq, {
@@ -288,60 +287,53 @@ export async function seedDemo({ gateway, log = console.log }) {
 
 /** More creators with verified AIs, so ALTAR has a real catalogue to browse (each one is minted on-chain). */
 export const MARKET_PEOPLE = [
-  { key: 'bilal', email: 'bilal@demo.alt', handle: 'bilal', name: 'Bilal Ahmed', colour: [16, 120, 90] },
-  { key: 'zainab', email: 'zainab@demo.alt', handle: 'zainab', name: 'Zainab Khan', colour: [190, 70, 120] },
-  { key: 'omar', email: 'omar@demo.alt', handle: 'omar', name: 'Omar Farooq', colour: [40, 90, 200] },
+  { key: 'bilal', email: 'bilal@demo.alt', handle: 'bilal', name: 'Bilal Ahmed', picture: ['adventurer', 6] },
+  { key: 'zainab', email: 'zainab@demo.alt', handle: 'zainab', name: 'Zainab Khan', picture: ['big-smile', 3] },
+  { key: 'omar', email: 'omar@demo.alt', handle: 'omar', name: 'Omar Farooq', picture: ['chibi', 6] },
 ];
 
 const MARKET_AIS = [
   {
-    owner: 'bilal', name: 'Code Sensei', handle: 'bilal.sensei', category: 'coding', royaltyBps: 750,
+    owner: 'bilal', name: 'Code Sensei', handle: 'bilal.sensei', category: 'coding', royaltyBps: 750, picture: ['mecha', 1],
     bio: 'A patient pair-programmer for JavaScript, Python and SQL. Explains the why, not just the fix.',
     onboarding: { about: 'Senior backend engineer in Islamabad who mentors juniors.', roles: ['Engineer', 'Mentor'], primaryTrait: 'Patient' },
     text: 'I have been a backend engineer for eight years, mostly Node.js, Python and PostgreSQL. I mentor junior developers. I explain bugs step by step, suggest small tests first and avoid jargon.',
-    orb: [[120, 230, 200], [10, 110, 90], [10, 32, 30]],
   },
   {
-    owner: 'bilal', name: 'Pitch Partner', handle: 'bilal.pitch', category: 'business', royaltyBps: 500,
+    owner: 'bilal', name: 'Pitch Partner', handle: 'bilal.pitch', category: 'business', royaltyBps: 500, picture: ['androids', 7],
     bio: 'Sharpens startup pitches and one-pagers. Direct, numbers-first feedback.',
     onboarding: { about: 'Founder who has pitched to investors in Karachi and Dubai.', roles: ['Founder'], primaryTrait: 'Direct' },
     text: 'I have built two small startups and pitched to many investors. I care about a clear problem, real numbers and a short story. I give direct feedback and always suggest one concrete next step.',
-    orb: [[255, 214, 120], [200, 120, 20], [40, 28, 10]],
   },
   {
-    owner: 'zainab', name: 'Urdu Ustad', handle: 'zainab.ustad', category: 'language', royaltyBps: 600,
+    owner: 'zainab', name: 'Urdu Ustad', handle: 'zainab.ustad', category: 'language', royaltyBps: 600, picture: ['androids', 3],
     bio: 'Learn conversational Urdu and read Ghalib, one couplet at a time.',
     onboarding: { about: 'Urdu literature teacher from Lahore.', roles: ['Teacher', 'Poet'], primaryTrait: 'Warm' },
     text: 'I teach Urdu literature and love Ghalib, Faiz and Parveen Shakir. I teach with everyday phrases first, then poetry. I correct mistakes gently and give the Roman Urdu spelling alongside the script.',
-    orb: [[255, 170, 210], [180, 40, 110], [40, 12, 30]],
   },
   {
-    owner: 'zainab', name: 'Calm Coach', handle: 'zainab.calm', category: 'wellness', royaltyBps: 400,
+    owner: 'zainab', name: 'Calm Coach', handle: 'zainab.calm', category: 'wellness', royaltyBps: 400, picture: ['cores', 1],
     bio: 'Breathing exercises, study-stress check-ins and a kind voice before exams.',
     onboarding: { about: 'Yoga teacher who helps students handle exam stress.', roles: ['Coach'], primaryTrait: 'Calm' },
     text: 'I teach yoga and simple breathing exercises to university students. I speak slowly and kindly, suggest one small step at a time, and remind people to rest. I am not a doctor and say so when it matters.',
-    orb: [[190, 220, 255], [60, 110, 200], [14, 22, 44]],
   },
   {
-    owner: 'omar', name: 'Chess Buddy', handle: 'omar.chess', category: 'gaming', royaltyBps: 1000,
+    owner: 'omar', name: 'Chess Buddy', handle: 'omar.chess', category: 'gaming', royaltyBps: 1000, picture: ['mecha', 4],
     bio: 'Opening ideas, tactics drills and friendly post-game reviews.',
     onboarding: { about: 'Club chess player and coach, rated 2100.', roles: ['Coach', 'Player'], primaryTrait: 'Competitive' },
     text: 'I play club chess and coach beginners. I love the Sicilian and endgame puzzles. I review games by asking what the player was thinking before showing the better move.',
-    orb: [[230, 230, 230], [70, 70, 80], [18, 18, 22]],
   },
   {
-    owner: 'ayesha', name: 'Palette', handle: 'ayesha.palette', category: 'creative', royaltyBps: 800,
+    owner: 'ayesha', name: 'Palette', handle: 'ayesha.palette', category: 'creative', royaltyBps: 800, picture: ['cores', 3],
     bio: 'Colour palettes from a mood, a photo or a city. Truck-art energy included.',
     onboarding: { about: 'Digital artist and illustrator from Lahore.', roles: ['Artist'], primaryTrait: 'Creative' },
     text: 'I build colour palettes for illustrators. I name colours after things in Lahore, like saffron, rickshaw green and old-city brick, and I always explain why the colours work together.',
-    orb: [[255, 190, 110], [230, 80, 60], [44, 18, 12]],
   },
   {
-    owner: 'wamiq', name: 'Study Buddy', handle: 'wamiq.study', category: 'education', royaltyBps: 300,
+    owner: 'wamiq', name: 'Study Buddy', handle: 'wamiq.study', category: 'education', royaltyBps: 300, picture: ['mecha', 2],
     bio: 'Turns lecture notes into flashcards and quizzes for CS courses.',
     onboarding: { about: 'Final-year CS student who likes making revision notes.', roles: ['Student'], primaryTrait: 'Organised' },
     text: 'I make short revision notes and flashcards for computer science courses: data structures, databases and operating systems. I quiz one question at a time and explain the answer in two lines.',
-    orb: [[170, 240, 120], [60, 140, 40], [16, 34, 12]],
   },
 ];
 
@@ -350,12 +342,12 @@ const MARKET_AIS = [
  * through the real APIs. `tokens` can pass sessions for people the demo already signed up.
  */
 export async function seedMarket({ gateway, log = console.log, tokens = {} }) {
-  const { upload, signUp, makeAi } = demoClient(gateway);
+  const { call, signUp, makeAi, preset } = demoClient(gateway);
   const t = { ...tokens };
   for (const p of MARKET_PEOPLE) {
     if (t[p.key]) continue;
     t[p.key] = await signUp(p);
-    await upload('/core/me/avatar', t[p.key], avatarPng([255, 255, 255], p.colour));
+    await call('PATCH', '/core/me', t[p.key], { avatarUrl: await preset('human', ...p.picture) });
   }
   for (const spec of MARKET_AIS) {
     if (!t[spec.owner]) continue;
@@ -365,6 +357,6 @@ export async function seedMarket({ gateway, log = console.log, tokens = {} }) {
       data: [{ title: 'About me', category: 'personality', text: spec.text }],
       chat: ['Hi! What can you help me with?', 'What makes you different?', 'Give me one quick tip.'],
     });
-    await upload(`/core/ais/${ai.id}/avatar`, t[spec.owner], orbPng(...spec.orb));
+    await call('PATCH', `/core/ais/${ai.id}`, t[spec.owner], { avatarUrl: await preset('ai', ...spec.picture) });
   }
 }

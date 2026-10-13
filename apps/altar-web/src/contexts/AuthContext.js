@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { auth, onSession, refresh } from "../lib/alt";
+import { auth, mediaUrl, onSession, refresh } from "../lib/alt";
 
 // The signed-in ALT account. ALTAR has no accounts of its own: sign-in, sign-up, 2FA and
 // sessions all belong to ALT Core, so one account works across ALTER, ALTERA and ALTAR.
@@ -11,6 +11,9 @@ const shape = (me) =>
   me && {
     ...me,
     name: me.displayName,
+    // ALTAR shows the picture chosen for ALTAR, if any, otherwise the ALT account's picture.
+    picture: mediaUrl(me.platformAvatars?.altar ?? me.avatarUrl),
+    hasAltarPicture: Boolean(me.platformAvatars?.altar),
     wallet: me.wallets?.find((w) => w.isPrimary) ?? me.wallets?.[0] ?? null,
   };
 
