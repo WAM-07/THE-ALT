@@ -275,6 +275,20 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **The sign-up code "never arrived"** because development doesn't send email. The code screens now link to the dev mailbox (`/core/dev/mail`) when it exists. Real email needs `MAIL_MODE=smtp` and `SMTP_URL` in `.env`.
 - **Owner's answers (2026-10-13):** the subscription function may be added to `ALTMarketplace` (step 4); the seller's private documents stay sealed from buyers; Soban's app was never online, so his Supabase needs no rotation.
 
+- ✅ **"Continue with ALT": one sign-in window for every platform** (2026-10-13, owner's request; touches sign-in, so it was named in the task).
+  - **The ALT Account window** is static pages served by Core at `/core/account/` (`services/core/public/account/`). It shows ALT's own look (green, orange and ink bars) with the platform named: "to continue to ALTAR". It covers sign-in, 2FA, sign-up with the email code, and forgot password, with plain-language errors.
+  - **How it hands back:**
+    1. It signs in with a short "app" session (no cookie) for the target platform.
+    2. It asks Core for a handoff code, then ends its own session with `DELETE /me/sessions/:id`. It deliberately avoids `/auth/logout`, which would clear the web cookie of an ALT site on the same origin.
+    3. It returns the code: `postMessage` to the opener (same origin, with `state` checked) on the web; the app's `alter://` / `altera://handoff` link on phones; or ALTAR's `/handoff` page when popups are blocked.
+  - **Security headers:** `frame-ancestors 'none'`, `script-src 'self'`, `form-action 'none'`, and `Cross-Origin-Opener-Policy: unsafe-none` so the popup keeps its opener. Covered by `test/account-page.test.ts`.
+  - **ALTAR:** the sign-in and sign-up pages and the header buttons open it as a popup (`continueWithAlt` in `src/lib/alt.js`). ALTAR has no password form at all.
+  - **ALTER and ALTERA:** "Continue with ALT" and "Create an ALT account" open it in an in-app browser tab (`AltAccountWindow` and `ContinueWithAltButton` in `alt_account`). The old form stays behind "Use email and password in …" as a fallback, and is the only option on web and desktop builds. Android activities are now `singleTask`, so the return link reuses the running app and closes the tab.
+  - **Verified live:**
+    - ALTAR in headless Chrome: popup, sign-in, back on My AIs.
+    - Android emulator: ALTER (data wiped first) came back signed in as Wamiq; ALTERA came back signed in as Hamza on the feed.
+  - **Not yet:** Google sign-in inside the window; the app's handoff link doesn't yet check a `state` value (a crafted link could sign the app into another account; this predates the window).
+
 ## Known mocks / not real yet
 - **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; the licence options on a detail page say "Soon"; the wishlist is saved in the browser per account.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).

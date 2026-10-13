@@ -1,0 +1,120 @@
+/* ALT Account: the one sign-in window every ALT platform opens. ALT's own look mixes the
+   platforms' colours (ALTAR green, ALTERA orange) on a calm neutral base. */
+:root {
+  --bg: #f3f2ee;
+  --card: #ffffff;
+  --ink: #15171a;
+  --muted: #5e646b;
+  --faint: #8b9198;
+  --line: #e3e2dc;
+  --field: #f8f8f5;
+  --focus: #15171a;
+  --green: #1f9a5c;
+  --orange: #f0802a;
+  --danger: #c2413a;
+  --shadow: 0 1px 2px rgb(20 22 26 / 0.04), 0 18px 50px rgb(20 22 26 / 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1011;
+    --card: #17191b;
+    --ink: #f1f0ec;
+    --muted: #a5a9ae;
+    --faint: #767b81;
+    --line: #2a2d30;
+    --field: #1d2023;
+    --focus: #f1f0ec;
+    --danger: #ff7b72;
+    --shadow: 0 18px 50px rgb(0 0 0 / 0.45);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.shell { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; }
+.card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 28px 24px 24px;
+  box-shadow: var(--shadow);
+}
+@media (min-width: 420px) { .card { padding: 36px 34px 30px; } }
+
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.mark { display: inline-grid; grid-template-columns: repeat(3, 7px); gap: 3px; }
+.mark i { display: block; width: 7px; height: 22px; border-radius: 3px; }
+.mark i:nth-child(1) { background: var(--green); }
+.mark i:nth-child(2) { background: var(--orange); }
+.mark i:nth-child(3) { background: var(--ink); }
+.word { font-weight: 800; letter-spacing: -0.02em; font-size: 17px; }
+.word b { font-weight: 500; color: var(--muted); }
+
+.for { margin: -6px 0 18px; color: var(--muted); font-size: 13px; }
+.chip { display: inline-block; font-weight: 800; letter-spacing: 0.04em; font-size: 12px; padding: 2px 9px; border-radius: 999px; color: #fff; background: var(--ink); }
+.chip.altar { background: var(--green); }
+.chip.altera { background: var(--orange); }
+.chip.alter { background: var(--ink); color: var(--card); }
+
+h1 { font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; font-weight: 800; }
+.lead { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
+.lead code { font-size: 12.5px; background: var(--field); padding: 1px 5px; border-radius: 5px; }
+
+label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+label small { display: block; font-weight: 400; color: var(--faint); margin-top: 5px; font-size: 12px; }
+input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus) 12%, transparent); }
+.pw { position: relative; display: block; }
+.pw input { padding-right: 64px; }
+.reveal { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); margin-top: 3px; border: 0; background: none; color: var(--muted); font: 600 12px Inter, sans-serif; padding: 6px 8px; cursor: pointer; }
+
+button { font: inherit; cursor: pointer; }
+.primary {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 12px;
+  padding: 13px 16px;
+  background: var(--ink);
+  color: var(--card);
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  transition: transform 0.1s, opacity 0.15s;
+}
+.primary:hover { opacity: 0.92; }
+.primary:active { transform: scale(0.99); }
+.primary[disabled] { opacity: 0.55; cursor: progress; }
+.link { border: 0; background: none; padding: 0; color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.link.small { font-size: 12.5px; color: var(--muted); font-weight: 600; margin: -4px 0 12px; }
+.switch { margin: 18px 0 0; text-align: center; color: var(--muted); font-size: 13.5px; }
+.error { margin: 4px 0 6px; padding: 10px 12px; border-radius: 10px; font-size: 13px; color: var(--danger); background: color-mix(in oklab, var(--danger) 10%, transparent); }
+.devmail { font-size: 12.5px; color: var(--muted); background: var(--field); border: 1px dashed var(--line); border-radius: 10px; padding: 9px 12px; margin: -8px 0 16px; }
+.devmail a { color: var(--ink); font-weight: 700; }
+
+.done { text-align: center; padding: 8px 0 4px; }
+.tick { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 50%; background: var(--green); color: #fff; font-size: 26px; font-weight: 800; margin-bottom: 12px; }
+
+.foot { max-width: 400px; margin: 18px 0 0; text-align: center; font-size: 12px; color: var(--faint); }

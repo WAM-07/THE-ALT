@@ -17,6 +17,8 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _creating = false;
   bool _busy = false;
+  // On phones the ALT Account window is the main way in; the form here is the fallback.
+  bool _manual = !AltAccountWindow.supported;
   bool _obscure = true;
   final _form = GlobalKey<FormState>();
   final _identifier = TextEditingController();
@@ -138,6 +140,15 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  /// "Continue with ALT": the ALT Account window signs the person in and comes back through
+  /// alter://handoff, which main.dart already turns into a session.
+  Future<void> _openAltWindow({bool signUp = false}) async {
+    if (!await AltAccountWindow.open(altAccount, signUp: signUp) && mounted) {
+      _toast('Couldn’t open the ALT sign-in window. Use your email and password here instead.');
+      setState(() => _manual = true);
+    }
+  }
+
   String? _required(String? v) => (v == null || v.trim().isEmpty) ? 'Required' : null;
 
   @override
@@ -166,33 +177,49 @@ class _AuthScreenState extends State<AuthScreen> {
                     style: Ds.callout,
                   ),
                   const SizedBox(height: 32),
-                  AnimatedSize(
-                    duration: Ds.calm,
-                    curve: Ds.ease,
-                    child: Glass(
-                      padding: const EdgeInsets.all(18),
-                      radius: Ds.r4 - 4,
-                      child: Form(
-                        key: _form,
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _creating ? _createFields() : _signInFields()),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Center(
-                    child: Pressable(
-                      onTap: _busy ? null : () => setState(() => _creating = !_creating),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text.rich(
-                          TextSpan(children: [
-                            TextSpan(text: _creating ? 'Already have an ALT account?  ' : 'New to ALT?  ', style: Ds.callout),
-                            TextSpan(text: _creating ? 'Sign in' : 'Create an account', style: Ds.callout.copyWith(color: Ds.text, fontWeight: FontWeight.w600)),
-                          ]),
+                  if (!_manual) ...[
+                    ContinueWithAltButton(onPressed: _openAltWindow),
+                    const SizedBox(height: 12),
+                    Btn('Create an ALT account', kind: BtnKind.secondary, expand: true, onTap: () => _openAltWindow(signUp: true)),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: Pressable(
+                        onTap: () => setState(() => _manual = true),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Text('Use email and password in ALTER', style: Ds.caption.copyWith(color: Ds.textSecondary)),
                         ),
                       ),
                     ),
-                  ),
+                  ] else ...[
+                    AnimatedSize(
+                      duration: Ds.calm,
+                      curve: Ds.ease,
+                      child: Glass(
+                        padding: const EdgeInsets.all(18),
+                        radius: Ds.r4 - 4,
+                        child: Form(
+                          key: _form,
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _creating ? _createFields() : _signInFields()),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: Pressable(
+                        onTap: _busy ? null : () => setState(() => _creating = !_creating),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Text.rich(
+                            TextSpan(children: [
+                              TextSpan(text: _creating ? 'Already have an ALT account?  ' : 'New to ALT?  ', style: Ds.callout),
+                              TextSpan(text: _creating ? 'Sign in' : 'Create an account', style: Ds.callout.copyWith(color: Ds.text, fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 28),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     const Icon(Icons.lock_outline_rounded, size: 13, color: Ds.textTertiary),

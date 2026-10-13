@@ -35,6 +35,13 @@ void main() {
     }
 
     expect(find.byType(AuthScreen), findsOneWidget);
+    // On phones the ALT Account window is the way in; the in-app form is one tap away.
+    expect(find.text('Continue with ALT'), findsOneWidget);
+    expect(find.text('Create an ALT account'), findsOneWidget);
+    final manual = find.text('Use email and password in ALTER');
+    await tester.ensureVisible(manual);
+    await tester.tap(manual);
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Sign in'), findsOneWidget);
 
     final create = find.textContaining('Create an account', findRichText: true);

@@ -740,3 +740,4 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
   - Each app has its own primary colour: ALTAR green, ALTERA orange; ALT Core screens may mix them. ALTER gets a redesign later (no blue or purple).
   - **Selling an AI transfers its AIT**: the seller keeps no access or rights. **Renting** gives one person sole use for set days; the owner keeps ownership. **Subscriptions** give many people monthly use. **Royalties** go to the original creator.
   - **An AI never leaves ALT as a file.** There is no model download: what is sold or rented is the right, enforced by Core's persona engine against the token's on-chain owner and user. See the evaluation doc, section 7.
+  - **One sign-in window for all platforms** (owner, 2026-10-13): "Continue with ALT", like "Continue with Google". Core serves the ALT Account window; platforms receive only a one-time handoff code, never the password.

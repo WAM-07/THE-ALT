@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useState } from "react";
 
 // The sign-in, sign-up and handoff screens share Soban's ALTAR card.
 export function AuthCard({ badge, subtitle, children }) {
@@ -39,46 +38,6 @@ export function AuthCard({ badge, subtitle, children }) {
   );
 }
 
-const inputClass =
-  "w-full border border-white/10 bg-black/40 p-4 rounded-2xl text-white outline-none focus:border-green-500/50 focus:bg-black/80 focus:ring-4 ring-green-500/5 transition-all font-bold placeholder:text-gray-700";
-
-export function Field({ label, type = "text", hint, ...props }) {
-  const [show, setShow] = useState(false);
-  const isPassword = type === "password";
-  return (
-    <div className="space-y-2 group">
-      <label className="text-[9px] font-black uppercase tracking-widest text-white/40 ml-4 group-focus-within:text-green-400 transition-colors">{label}</label>
-      <div className="relative">
-        <input type={isPassword && show ? "text" : type} className={inputClass + (isPassword ? " pr-14" : "")} {...props} />
-        {isPassword && (
-          <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} className="absolute right-5 top-1/2 -translate-y-1/2 text-white/20 hover:text-green-400 transition-colors">
-            {show ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-            )}
-          </button>
-        )}
-        <div className="absolute inset-0 rounded-2xl border border-green-500/0 group-focus-within:border-green-500/20 pointer-events-none transition-all"></div>
-      </div>
-      {hint && <p className="text-[10px] text-white/30 ml-4">{hint}</p>}
-    </div>
-  );
-}
-
-export function SubmitButton({ busy, children }) {
-  return (
-    <button
-      type="submit"
-      disabled={busy}
-      className="group relative bg-gradient-to-r from-green-600 to-green-400 text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all shadow-[0_10px_30px_rgba(34,197,94,0.2)] hover:shadow-[0_15px_40px_rgba(34,197,94,0.3)] hover:-translate-y-1 active:scale-95 mt-2 overflow-hidden disabled:opacity-60 disabled:hover:translate-y-0"
-    >
-      <span className="relative z-10">{busy ? "One moment…" : children}</span>
-      <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12"></div>
-    </button>
-  );
-}
-
 export const ErrorText = ({ children }) =>
   children ? <p role="alert" className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3">{children}</p> : null;
 
@@ -90,19 +49,3 @@ export const OneAccountNote = () => (
   </div>
 );
 
-/** In development ALT doesn't send emails; point people at the dev mailbox where the code waits. */
-export function DevMailHint() {
-  const [dev, setDev] = useState(false);
-  useEffect(() => {
-    fetch("/core/dev/mail", { cache: "no-store" })
-      .then((r) => setDev(r.ok))
-      .catch(() => setDev(false));
-  }, []);
-  if (!dev) return null;
-  return (
-    <p className="text-[11px] text-center text-white/60 bg-green-500/5 border border-green-500/20 rounded-2xl px-4 py-3 leading-relaxed">
-      Development mode: ALT doesn&apos;t send real emails.{" "}
-      <a href="/core/dev/mail" target="_blank" rel="noreferrer" className="text-green-400 font-bold underline">Open the dev mailbox ↗</a> to read your code.
-    </p>
-  );
-}

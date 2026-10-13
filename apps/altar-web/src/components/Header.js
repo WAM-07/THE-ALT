@@ -6,7 +6,7 @@ import { useRegion } from "../contexts/RegionContext";
 import { useWishlist } from "../contexts/WishlistContext";
 import { usePathname } from "next/navigation";
 import WishlistModal from "./WishlistModal";
-import { mediaUrl } from "../lib/alt";
+import { continueWithAlt, mediaUrl } from "../lib/alt";
 import ThemePicker from "./ThemePicker";
 
 export default function Header() {
@@ -156,10 +156,10 @@ export default function Header() {
                 </div>
               ) : (
                 <div className="flex items-center gap-4 sm:gap-8">
-                  <Link href="/signin" className="hidden sm:inline text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors">{t('signIn')}</Link>
-                  <Link href="/signup" className="bg-white text-black px-4 sm:px-8 py-3 rounded-2xl text-[10px] whitespace-nowrap font-black uppercase tracking-[0.2em] hover:bg-green-400 hover:shadow-[0_10px_30px_rgba(34,197,94,0.3)] transition-all active:scale-95">
+                  <button onClick={() => continueWithAlt("signin").catch(() => {})} className="hidden sm:inline text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors">{t('signIn')}</button>
+                  <button onClick={() => continueWithAlt("signup").catch(() => {})} className="bg-white text-black px-4 sm:px-8 py-3 rounded-2xl text-[10px] whitespace-nowrap font-black uppercase tracking-[0.2em] hover:bg-green-400 hover:shadow-[0_10px_30px_rgba(34,197,94,0.3)] transition-all active:scale-95">
                     {t('joinAltar')}
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -176,7 +176,7 @@ export default function Header() {
                 <Link href="/wallet" className={pathname === "/wallet" ? "text-green-400" : "hover:text-white"}>{t('wallet')}</Link>
               </>
             ) : (
-              <Link href="/signin" className="hover:text-white">{t('signIn')}</Link>
+              <button onClick={() => continueWithAlt("signin").catch(() => {})} className="uppercase hover:text-white">{t('signIn')}</button>
             )}
           </div>
         </div>

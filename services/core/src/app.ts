@@ -17,6 +17,7 @@ import { localIpfs, pinataIpfs, type IpfsStore } from './lib/ipfs.js';
 import { createMailer, type Mailer } from './lib/mailer.js';
 import { NotificationHub } from './lib/notify.js';
 import { notificationRoutes } from './http/routes/notifications.js';
+import { accountPageRoutes } from './http/routes/account-page.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
 import { createLlmRouter, type LlmProvider, LlmRouter } from './modules/ai/llm.js';
@@ -163,6 +164,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => chainRoutes(i, ctx));
   await app.register(async (i) => aiRoutes(i, ctx));
   await app.register(async (i) => notificationRoutes(i, ctx));
+  await app.register(async (i) => accountPageRoutes(i));
 
   return app;
 }

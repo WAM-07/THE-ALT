@@ -22,6 +22,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _isLoading = false;
+  // On phones the ALT Account window is the main way in; this form is the fallback.
+  bool _manual = !AltAccountWindow.supported;
   String? _emailError;
   String? _passError;
 
@@ -222,6 +224,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return null;
   }
 
+  /// "Continue with ALT": the ALT Account window signs the person in and comes back through
+  /// altera://handoff, which app.dart already turns into a session.
+  Future<void> _openAltWindow({bool signUp = false}) async {
+    final opened = await AltAccountWindow.open(ref.read(authServiceProvider).alt, signUp: signUp);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn’t open the ALT sign-in window. Use your email and password instead.')),
+      );
+      setState(() => _manual = true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -274,6 +288,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   SizedBox(height: MediaQuery.of(context).size.height * 0.06),
 
+                  if (!_manual) ...[
+                    ContinueWithAltButton(onPressed: _openAltWindow),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: () => _openAltWindow(signUp: true),
+                        style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                        child: const Text('Create an ALT account'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => setState(() => _manual = true),
+                      child: const Text('Use email and password in ALTERA'),
+                    ),
+                  ] else
                   // Form
                   Form(
                     key: _formKey,
@@ -370,6 +402,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   SizedBox(height: MediaQuery.of(context).size.height * 0.06),
 
                   // Signup Link
+                  if (_manual)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

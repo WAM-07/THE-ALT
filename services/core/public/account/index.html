@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="referrer" content="no-referrer" />
+  <title>ALT Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="account.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="card" aria-live="polite">
+      <header class="brand">
+        <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="word">ALT <b>Account</b></span>
+      </header>
+
+      <p class="for" id="for" hidden>to continue to <span class="chip" id="platform-chip"></span></p>
+
+      <div id="views">
+        <!-- Sign in -->
+        <form class="view" id="signin" novalidate>
+          <h1>Sign in</h1>
+          <p class="lead">One account for ALTER, ALTERA and ALTAR.</p>
+          <label>Email or handle<input name="identifier" autocomplete="username" required /></label>
+          <label>Password
+            <span class="pw"><input name="password" type="password" autocomplete="current-password" required /><button type="button" class="reveal" aria-label="Show password">Show</button></span>
+          </label>
+          <button type="button" class="link small" data-go="forgot">Forgot password?</button>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Continue</button>
+          <p class="switch">New to ALT? <button type="button" class="link" data-go="signup">Create an account</button></p>
+        </form>
+
+        <!-- Two-step code -->
+        <form class="view" id="mfa" novalidate hidden>
+          <h1>Two-step verification</h1>
+          <p class="lead">Enter the code from your authenticator app, or a recovery code like <code>abcd-1234</code>.</p>
+          <label>Code<input name="code" autocomplete="one-time-code" inputmode="text" required /></label>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Continue</button>
+          <p class="switch"><button type="button" class="link" data-go="signin">← Back</button></p>
+        </form>
+
+        <!-- Create account -->
+        <form class="view" id="signup" novalidate hidden>
+          <h1>Create your ALT account</h1>
+          <p class="lead">Use it everywhere in THE ALT ECOSYSTEM.</p>
+          <label>Name<input name="displayName" autocomplete="name" maxlength="80" required /></label>
+          <label>Handle<input name="handle" autocomplete="username" maxlength="30" required /><small>3–30 letters, numbers, _ or .</small></label>
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label>Password
+            <span class="pw"><input name="password" type="password" autocomplete="new-password" required /><button type="button" class="reveal" aria-label="Show password">Show</button></span>
+            <small>At least 8 characters, with a letter and a number.</small>
+          </label>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Create account</button>
+          <p class="switch">Already on ALT? <button type="button" class="link" data-go="signin">Sign in</button></p>
+        </form>
+
+        <!-- Email code -->
+        <form class="view" id="verify" novalidate hidden>
+          <h1>Check your email</h1>
+          <p class="lead">We sent a 6-digit code to <b class="email"></b>.</p>
+          <p class="devmail" hidden>Development mode: ALT doesn't send real emails. <a href="/core/dev/mail" target="_blank" rel="noreferrer">Open the dev mailbox ↗</a></p>
+          <label>Code<input name="code" autocomplete="one-time-code" inputmode="numeric" maxlength="6" required /></label>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Confirm</button>
+          <p class="switch"><button type="button" class="link" data-action="resend">Send a new code</button></p>
+        </form>
+
+        <!-- Forgot password -->
+        <form class="view" id="forgot" novalidate hidden>
+          <h1>Reset your password</h1>
+          <p class="lead">We'll email you a code.</p>
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Send code</button>
+          <p class="switch"><button type="button" class="link" data-go="signin">← Back to sign in</button></p>
+        </form>
+
+        <form class="view" id="reset" novalidate hidden>
+          <h1>Choose a new password</h1>
+          <p class="lead">Enter the code sent to <b class="email"></b>. Every device will be signed out.</p>
+          <p class="devmail" hidden>Development mode: ALT doesn't send real emails. <a href="/core/dev/mail" target="_blank" rel="noreferrer">Open the dev mailbox ↗</a></p>
+          <label>Code<input name="code" autocomplete="one-time-code" inputmode="numeric" maxlength="6" required /></label>
+          <label>New password
+            <span class="pw"><input name="newPassword" type="password" autocomplete="new-password" required /><button type="button" class="reveal" aria-label="Show password">Show</button></span>
+          </label>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit">Save password</button>
+        </form>
+
+        <!-- Done -->
+        <div class="view done" id="done" hidden>
+          <span class="tick" aria-hidden="true">✓</span>
+          <h1 id="done-title">You're signed in</h1>
+          <p class="lead" id="done-text"></p>
+          <a class="primary" id="back" hidden>Back</a>
+        </div>
+      </div>
+    </section>
+    <p class="foot">ALT never shares your password with ALTER, ALTERA or ALTAR. They only receive a one-time sign-in code.</p>
+  </main>
+  <script src="account.js"></script>
+</body>
+</html>

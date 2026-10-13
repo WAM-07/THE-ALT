@@ -135,3 +135,66 @@ export const nextPath = (fallback = "/profile") => {
   const next = new URLSearchParams(window.location.search).get("next");
   return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : fallback;
 };
+
+/**
+ * "Continue with ALT": opens the ALT Account window (served by ALT Core) as a popup, like
+ * "Continue with Google". The window signs the person in or registers them and posts back a
+ * one-time handoff code, which becomes ALTAR's own session. ALTAR never sees the password.
+ * If popups are blocked, the window opens full-page and comes back through /handoff instead.
+ * Resolves to the signed-in user, or null if the person closed the window.
+ */
+export function continueWithAlt(mode = "signin", next = null) {
+  const state = crypto.randomUUID();
+  const url = (ret) => `/core/account/?platform=altar&mode=${mode}&return=${ret}&state=${state}`;
+  try {
+    if (next) sessionStorage.setItem("altar_next", next);
+  } catch {
+    // Storage blocked: after sign-in the person lands on My AIs.
+  }
+  const w = 460;
+  const h = 700;
+  const left = Math.max(0, window.screenX + (window.outerWidth - w) / 2);
+  const top = Math.max(0, window.screenY + (window.outerHeight - h) / 2);
+  const popup = window.open(url("popup"), "alt-account", `popup=yes,width=${w},height=${h},left=${left},top=${top}`);
+  if (!popup) {
+    window.location.href = url("redirect");
+    return new Promise(() => {});
+  }
+  popup.focus();
+  return new Promise((resolve, reject) => {
+    const done = () => {
+      window.removeEventListener("message", onMessage);
+      clearInterval(watch);
+    };
+    const onMessage = async (e) => {
+      // Only the window we opened, on our own origin, answering our own request.
+      if (e.origin !== window.location.origin || e.source !== popup) return;
+      if (e.data?.type !== "alt:handoff" || e.data.state !== state) return;
+      done();
+      try {
+        resolve((await auth.redeemHandoff(e.data.code)).user);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    const watch = setInterval(() => {
+      if (popup.closed) {
+        done();
+        resolve(null);
+      }
+    }, 500);
+  });
+}
+
+/** Where /handoff should go after a full-page sign-in (set by continueWithAlt). */
+export function takeNextPath(fallback = "/profile") {
+  try {
+    const next = sessionStorage.getItem("altar_next");
+    sessionStorage.removeItem("altar_next");
+    if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")) return next;
+  } catch {
+    // ignore
+  }
+  return fallback;
+}

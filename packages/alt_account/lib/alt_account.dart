@@ -16,4 +16,5 @@ export 'src/models.dart';
 export 'src/token_store.dart';
 export 'src/ui/account_center.dart';
 export 'src/ui/code_dialog.dart';
+export 'src/ui/continue_with_alt.dart';
 export 'src/ui/inbox_screen.dart';
