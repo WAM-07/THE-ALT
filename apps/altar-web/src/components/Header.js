@@ -7,6 +7,7 @@ import { useWishlist } from "../contexts/WishlistContext";
 import { usePathname } from "next/navigation";
 import WishlistModal from "./WishlistModal";
 import { mediaUrl } from "../lib/alt";
+import ThemePicker from "./ThemePicker";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -60,7 +61,7 @@ export default function Header() {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-4 sm:px-8 transition-all duration-500">
-        <div className="max-w-[1400px] mx-auto bg-black/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-[2rem] transition-all duration-500 hover:border-green-500/20 group/nav overflow-hidden">
+        <div className="max-w-[1400px] mx-auto bg-black/40 in-data-[theme=daylight]:bg-black/90 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-[2rem] transition-all duration-500 hover:border-green-500/20 group/nav overflow-hidden">
           {/* Animated Inner Shine */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/nav:translate-x-full transition-transform duration-1000"></div>
 
@@ -243,6 +244,11 @@ export default function Header() {
                       {currencies.map(c => <option key={c.code} value={c.code} className="bg-black text-white">{c.code}</option>)}
                     </select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 ml-4">Theme</label>
+                  <ThemePicker compact />
                 </div>
 
                 <button

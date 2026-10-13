@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAI } from "../contexts/AIContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
 import AICard from "../components/AICard";
 import AiImage from "../components/AiImage";
 import Link from "next/link";
@@ -15,6 +16,7 @@ const noise = (i, k) => {
 export default function Home() {
   const { aiModels, error } = useAI();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [activeCategory, setSearchCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("marketplace");
@@ -46,16 +48,17 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#1dbf73] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#62646a] font-bold animate-pulse">Loading verified AIs...</p>
+          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/40 font-bold animate-pulse">Loading verified AIs...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-black min-h-screen font-sans text-white selection:bg-green-500/30">
-      <section className="relative pt-40 pb-28 px-6 overflow-hidden">
+    <div className="bg-canvas min-h-screen font-sans text-white selection:bg-green-500/30">
+      {/* In the light theme the hero stays dark (Forest), like a storefront banner. */}
+      <section data-theme={theme === "daylight" ? "forest" : undefined} className="relative pt-40 pb-28 px-6 overflow-hidden bg-canvas text-white">
         {/* Animated Background Grid */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] -z-20 pointer-events-none"></div>
 

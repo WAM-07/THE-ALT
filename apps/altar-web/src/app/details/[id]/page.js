@@ -52,7 +52,7 @@ export default function AgentDetails() {
   if (!model) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center pt-32">
-        <div className="w-12 h-12 border-4 border-[#1dbf73] border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -73,7 +73,7 @@ export default function AgentDetails() {
   };
 
   return (
-    <div className="bg-black min-h-screen pt-36 pb-24 font-sans text-white">
+    <div className="bg-canvas min-h-screen pt-36 pb-24 font-sans text-white">
       <div className="max-w-6xl mx-auto px-6">
         <Link href="/" className="inline-flex items-center text-white/70 hover:text-green-400 font-bold mb-8 transition-colors uppercase tracking-widest text-xs">
           ← Back to the marketplace

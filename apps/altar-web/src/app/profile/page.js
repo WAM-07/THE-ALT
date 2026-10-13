@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useModal } from "../../contexts/ModalContext";
 import { toModel } from "../../contexts/AIContext";
 import AiImage from "../../components/AiImage";
+import ThemePicker from "../../components/ThemePicker";
 import { api, auth, mediaUrl } from "../../lib/alt";
 
 const STATUS = {
@@ -32,7 +33,7 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black p-6 font-sans">
+      <div className="min-h-screen flex items-center justify-center bg-canvas p-6 font-sans">
         <div className="bg-black p-10 rounded-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 text-center max-w-sm">
           <h2 className="text-2xl font-black text-white">Sign in to see your AIs</h2>
           <Link href="/signin?next=/profile" className="block w-full mt-8 bg-gradient-to-r from-green-600 to-green-400 text-white py-4 rounded-2xl font-black uppercase hover:shadow-lg hover:shadow-green-500/25 transition-all">
@@ -55,7 +56,7 @@ export default function Profile() {
   const avatar = mediaUrl(user.avatarUrl);
 
   return (
-    <div className="min-h-screen bg-black px-6 pt-36 pb-24 font-sans text-white">
+    <div className="min-h-screen bg-canvas px-6 pt-36 pb-24 font-sans text-white">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Account */}
         <div className="lg:col-span-1">
@@ -83,6 +84,12 @@ export default function Profile() {
               </button>
             </div>
             <p className="mt-4 text-[10px] text-white/30 text-center leading-relaxed">Password, 2FA and devices are managed in the ALT Account Center inside ALTER or ALTERA.</p>
+          </div>
+
+          <div className="mt-6 bg-black shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-3xl border border-white/10 p-6">
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">Appearance</h2>
+            <ThemePicker />
+            <p className="mt-4 text-[10px] text-white/30 leading-relaxed">Saved in this browser. Switch and browse to compare.</p>
           </div>
         </div>
 

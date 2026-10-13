@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "../../lib/alt";
-import { AuthCard, ErrorText, Field, OneAccountNote, SubmitButton } from "../../components/AuthCard";
+import { AuthCard, DevMailHint, ErrorText, Field, OneAccountNote, SubmitButton } from "../../components/AuthCard";
 
 // Creates an ALT account (the same one ALTER and ALTERA use), then confirms the email code.
 export default function SignUp() {
@@ -57,6 +57,7 @@ export default function SignUp() {
         ) : (
           <>
             <p className="text-xs text-white/60 text-center leading-relaxed">We sent a 6-digit code to <b className="text-white">{form.email}</b>.</p>
+            <DevMailHint />
             <Field label="Email code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" inputMode="numeric" autoComplete="one-time-code" autoFocus required />
           </>
         )}

@@ -266,6 +266,15 @@ Work one step at a time, then stop for the owner's review before starting the ne
     A gateway test covers the routing.
   - **Phones:** Soban's header had no menu below 1024px. It now has a compact row, and the search bar and toggle fit at 320px.
 
+- ✅ **ALTAR themes to compare** (2026-10-13, owner's request). My AIs → Appearance, or the region button in the header, switches between:
+  - **Original:** Soban's pure black with one green;
+  - **Forest:** layered green-blacks, softer text, a deeper green scale;
+  - **Daylight:** a light marketplace with a dark hero.
+
+  Each theme redefines Tailwind's colour names in `globals.css` (`black` = card, `white` = text, `green-*` = brand scale, plus `canvas`/`raised`/`popup`), so Soban's markup is unchanged. The choice is saved per browser and applied before first paint. Checked on home, grid and detail pages at 1440px.
+  - **The sign-up code "never arrived"** because development doesn't send email. The code screens now link to the dev mailbox (`/core/dev/mail`) when it exists. Real email needs `MAIL_MODE=smtp` and `SMTP_URL` in `.env`.
+- **Owner's answers (2026-10-13):** the subscription function may be added to `ALTMarketplace` (step 4); the seller's private documents stay sealed from buyers; Soban's app was never online, so his Supabase needs no rotation.
+
 ## Known mocks / not real yet
 - **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; the licence options on a detail page say "Soon"; the wishlist is saved in the browser per account.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).

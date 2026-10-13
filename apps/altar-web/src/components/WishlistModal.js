@@ -13,7 +13,7 @@ export default function WishlistModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={onClose}></div>
-      <div className="relative w-full max-w-[600px] bg-[#050505] border border-white/10 rounded-[40px] shadow-[0_0_100px_rgba(0,0,0,0.9)] overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div className="relative w-full max-w-[600px] bg-popup border border-white/10 rounded-[40px] shadow-[0_0_100px_rgba(0,0,0,0.9)] overflow-hidden animate-in fade-in zoom-in duration-300">
 
         {/* Header */}
         <div className="p-8 border-b border-white/5 flex justify-between items-center bg-black/40">

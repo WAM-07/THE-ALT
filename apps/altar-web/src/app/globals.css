@@ -1,17 +1,82 @@
 @import "tailwindcss";
 
+/*
+ * ALTAR themes. Soban's screens use Tailwind's own colour names (black, white, green); each theme
+ * redefines what those names mean, so the same markup renders in every theme.
+ *   black  = card surface      white = text and lines      green = ALTAR's brand scale
+ *   canvas = page background   raised = inset panels        popup = dialogs
+ * Pick a theme in My AIs → Appearance (or the region button). html[data-theme] holds the choice;
+ * any element can carry data-theme to keep its own look (the light theme's dark hero does).
+ */
 @theme {
-  /* Only link variables that you have actually defined in :root */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-canvas: #000000;
+  --color-raised: #0a0a0a;
+  --color-popup: #050505;
 }
 
 :root {
   --background: #000000;
   --foreground: #ffffff;
-  --emerald-500: #10b981;
-  --emerald-400: #34d399;
-  --emerald-600: #059669;
+}
+
+/* Forest: dark with depth. Green-tinted off-blacks in layers, warm off-white text, a deeper green scale. */
+[data-theme="forest"] {
+  color-scheme: dark;
+  --background: #08100c;
+  --foreground: #edf3ee;
+  --color-canvas: #08100c;
+  --color-black: #0f1813;
+  --color-raised: #15211a;
+  --color-popup: #111c16;
+  --color-white: #edf3ee;
+  --color-gray-700: #4d5d53;
+  --color-green-50: #effbf3;
+  --color-green-100: #d6f5e0;
+  --color-green-200: #ade9c3;
+  --color-green-300: #7fd9a2;
+  --color-green-400: #4fc583;
+  --color-green-500: #2aa866;
+  --color-green-600: #1f8a53;
+  --color-green-700: #1b6e45;
+  --color-green-800: #185839;
+  --color-green-900: #14482f;
+  --color-green-950: #0a2a1b;
+  --color-emerald-400: #6fd6b0;
+  --color-emerald-500: #3fb88f;
+}
+
+/* Daylight: a light marketplace. Soft grey-green page, white cards, ink text, greens dark enough to read on white. */
+[data-theme="daylight"] {
+  color-scheme: light;
+  --background: #f3f6f4;
+  --foreground: #12201a;
+  --color-canvas: #f3f6f4;
+  --color-black: #ffffff;
+  --color-raised: #eef3f0;
+  --color-popup: #ffffff;
+  --color-white: #12201a;
+  --color-gray-700: #9aa8a0;
+  --color-green-50: #effbf3;
+  --color-green-100: #d6f5e0;
+  --color-green-200: #a7e3bd;
+  --color-green-300: #1f8a53;
+  --color-green-400: #1b7a49;
+  --color-green-500: #1f9a5c;
+  --color-green-600: #17804b;
+  --color-green-700: #136a3e;
+  --color-green-800: #105633;
+  --color-green-900: #0d4529;
+  --color-green-950: #072a19;
+  --color-emerald-400: #23986d;
+  --color-emerald-500: #1c8460;
+}
+/* Glows and heavy black shadows read as smudges on white: soften every shadow in the light theme. */
+[data-theme="daylight"] * {
+  --tw-shadow-color: rgb(18 32 26 / 0.07);
+}
+/* Elements that keep their own theme inside Daylight (the hero) get their shadows back. */
+[data-theme="daylight"] [data-theme="forest"] * {
+  --tw-shadow-color: initial;
 }
 
 body {
@@ -32,7 +97,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in oklab, var(--color-white) 15%, transparent);
   border-radius: 10px;
 }
 
@@ -169,7 +234,7 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus, 
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 100px #000000 inset !important;
-  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0 100px var(--color-black) inset !important;
+  -webkit-text-fill-color: var(--color-white) !important;
   transition: background-color 5000s ease-in-out 0s;
 }

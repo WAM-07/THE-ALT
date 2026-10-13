@@ -58,7 +58,7 @@ export default function AICard({ model }) {
         <p className="mt-2 text-xs text-white/50 line-clamp-2 min-h-[32px]">{model.description || "A verified personal AI."}</p>
 
         <div className="flex items-center gap-2 mt-4">
-          <div className="flex items-center bg-[#0a0a0a] px-2.5 py-1 rounded-xl border border-white/10">
+          <div className="flex items-center bg-raised px-2.5 py-1 rounded-xl border border-white/10">
             <span className="text-[10px] font-black text-white">v{model.version ?? 1}</span>
           </div>
           <span className="text-[11px] font-bold text-white/60 tracking-wide truncate">
@@ -72,7 +72,7 @@ export default function AICard({ model }) {
             <span className="uppercase tracking-wider">{t('health')}</span>
             <span className="text-green-400">{Math.round(model.healthScore ?? 0)}%</span>
           </div>
-          <div className="w-full bg-[#0a0a0a] rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-raised rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-gradient-to-r from-green-600 to-green-400 h-1.5 rounded-full"
               style={{ width: `${Math.round(model.healthScore ?? 0)}%` }}

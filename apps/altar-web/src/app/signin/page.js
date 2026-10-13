@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, nextPath } from "../../lib/alt";
-import { AuthCard, ErrorText, Field, OneAccountNote, SubmitButton } from "../../components/AuthCard";
+import { AuthCard, DevMailHint, ErrorText, Field, OneAccountNote, SubmitButton } from "../../components/AuthCard";
 
 export default function SignIn() {
   const router = useRouter();
@@ -65,6 +65,7 @@ export default function SignIn() {
         {stage === "verify" && (
           <>
             <p className="text-xs text-white/60 text-center leading-relaxed">We sent a 6-digit code to <b className="text-white">{email}</b>.</p>
+            <DevMailHint />
             <Field label="Email code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" inputMode="numeric" autoComplete="one-time-code" autoFocus required />
           </>
         )}

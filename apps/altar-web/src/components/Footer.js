@@ -4,7 +4,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full bg-black border-t border-white/5 py-12 px-6 mt-auto">
+    <footer className="w-full bg-canvas border-t border-white/5 py-12 px-6 mt-auto">
       <div className="max-w-[1400px] mx-auto flex flex-col items-center gap-6">
 
         {/* Aesthetic Divider with Glow */}

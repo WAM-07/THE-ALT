@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // The sign-in, sign-up and handoff screens share Soban's ALTAR card.
 export function AuthCard({ badge, subtitle, children }) {
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 pt-32 font-sans text-white overflow-hidden relative">
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 pt-32 font-sans text-white overflow-hidden relative">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-500/10 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-green-500/5 rounded-full blur-[150px] animate-flicker"></div>
@@ -89,3 +89,20 @@ export const OneAccountNote = () => (
     <div className="h-px bg-white/10 flex-1"></div>
   </div>
 );
+
+/** In development ALT doesn't send emails; point people at the dev mailbox where the code waits. */
+export function DevMailHint() {
+  const [dev, setDev] = useState(false);
+  useEffect(() => {
+    fetch("/core/dev/mail", { cache: "no-store" })
+      .then((r) => setDev(r.ok))
+      .catch(() => setDev(false));
+  }, []);
+  if (!dev) return null;
+  return (
+    <p className="text-[11px] text-center text-white/60 bg-green-500/5 border border-green-500/20 rounded-2xl px-4 py-3 leading-relaxed">
+      Development mode: ALT doesn&apos;t send real emails.{" "}
+      <a href="/core/dev/mail" target="_blank" rel="noreferrer" className="text-green-400 font-bold underline">Open the dev mailbox ↗</a> to read your code.
+    </p>
+  );
+}

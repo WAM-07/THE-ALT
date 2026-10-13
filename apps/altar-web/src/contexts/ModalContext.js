@@ -50,7 +50,7 @@ export const ModalProvider = ({ children }) => {
             onClick={modal.type === 'alert' ? modal.onConfirm : modal.onCancel}
           ></div>
           
-          <div className="relative w-full max-w-md bg-[#050505] border border-green-500/20 rounded-[40px] p-10 shadow-[0_0_100px_rgba(34,197,94,0.1)] overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="relative w-full max-w-md bg-popup border border-green-500/20 rounded-[40px] p-10 shadow-[0_0_100px_rgba(34,197,94,0.1)] overflow-hidden animate-in zoom-in-95 duration-300">
             {/* Structural Accents */}
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-green-500/5 blur-[100px] rounded-full"></div>
             <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-green-500/5 blur-[100px] rounded-full"></div>
