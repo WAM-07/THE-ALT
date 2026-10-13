@@ -6,7 +6,9 @@ import { createPublicClient, createWalletClient, defineChain, http, parseEther, 
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { afterAll, beforeAll, describe, expect, it, inject } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createChainReader } from '../src/chain.js';
 import { loadConfig } from '../src/config.js';
+import { indexMarketplace } from '../src/indexer.js';
 
 const chainCfg = inject('chain');
 const chain = defineChain({ id: 31337, name: 'test', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: { default: { http: [chainCfg.rpcUrl] } } });
@@ -31,7 +33,7 @@ beforeAll(async () => {
       .setExpirationTime('10m')
       .sign(privateKey);
   const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: inject('databaseUrl'), CHAIN_RPC_URL: chainCfg.rpcUrl, AIT_REGISTRY_ADDRESS: registry, ALT_MARKETPLACE_ADDRESS: market });
-  app = await buildApp(config, { keySet: createLocalJWKSet({ keys: [jwk] }), logger: false });
+  app = await buildApp(config, { keySet: createLocalJWKSet({ keys: [jwk] }), logger: false, indexer: false });
   await app.ready();
   db = new pg.Pool({ connectionString: inject('databaseUrl') });
 });
@@ -141,5 +143,53 @@ describe('saved AIs', () => {
     expect((await req('PUT', `/wishlist/${randomUUID()}`, p.token)).statusCode).toBe(404);
     expect((await req('DELETE', `/wishlist/${aiId}`, p.token)).statusCode).toBe(204);
     expect((await req('GET', '/wishlist', p.token)).json()).toEqual([]);
+  });
+});
+
+describe('marketplace history', () => {
+  it('records sales, resales (with the creator royalty) and rentals from the contract events', async () => {
+    const reader = createChainReader({ rpcUrl: chainCfg.rpcUrl, registry, marketplace: market });
+    const index = () => indexMarketplace(db, reader);
+    await index(); // catch up with earlier tests
+    const [creator, buyer, third, renter] = [await person(), await person(), await person(), await person()];
+    const { aiId, tokenId } = await verifiedAi(creator);
+    const buy = (who: Person, price: string) => who.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'buy', args: [tokenId], value: parseEther(price) });
+
+    // The creator sells to the buyer (no royalty on a creator's own sale).
+    await wait(await creator.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSale', args: [tokenId, parseEther('1')] }));
+    await req('PUT', `/listings/${aiId}`, creator.token, { pitch: 'First owner', subscriptionPrice: '0.1' });
+    await wait(await buy(buyer, '1'));
+    await db.query('UPDATE core.personal_ais SET owner_id = $2 WHERE id = $1', [aiId, buyer.user]); // what ALT Core does on the Transfer
+    expect(await index()).toBe(1);
+    expect(await index()).toBe(0); // reading the same blocks again changes nothing
+    // The seller's listing (and subscription price) left with the sale.
+    expect((await db.query('SELECT 1 FROM altar.listings WHERE ai_id = $1', [aiId])).rowCount).toBe(0);
+
+    // The buyer resells to a third person: the creator earns the royalty (5%).
+    await wait(await buyer.wallet.writeContract({ address: registry, abi: aitRegistryAbi, functionName: 'setApprovalForAll', args: [market, true] }));
+    await wait(await buyer.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSale', args: [tokenId, parseEther('2')] }));
+    await wait(await buy(third, '2'));
+    await db.query('UPDATE core.personal_ais SET owner_id = $2 WHERE id = $1', [aiId, third.user]);
+
+    // The third person rents it out; someone rents it for a day.
+    await wait(await third.wallet.writeContract({ address: registry, abi: aitRegistryAbi, functionName: 'setApprovalForAll', args: [market, true] }));
+    await wait(await third.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForRent', args: [tokenId, parseEther('0.1'), 3] }));
+    await wait(await renter.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'rent', args: [tokenId, 1], value: parseEther('0.1') }));
+    expect(await index()).toBe(2);
+
+    const history = (await req('GET', `/activity?aiId=${aiId}`)).json();
+    expect(history.map((h: { kind: string; amount: { pol: string } }) => `${h.kind} ${h.amount.pol}`)).toEqual(['rental 0.1', 'sale 2', 'sale 1']);
+    expect(history[1]).toMatchObject({ royalty: { pol: '0.1' }, from: { handle: expect.stringMatching(/^p_/) } });
+    expect(history[2].royalty.pol).toBe('0');
+
+    const roles = async (p: Person) => (await req('GET', '/me/activity', p.token)).json().map((h: { role: string }) => h.role);
+    // The creator earns on the resale and on the rental too (someone else is paid both times).
+    expect(await roles(creator)).toEqual(['royalty', 'royalty', 'sold']);
+    expect(history[0].royalty.pol).toBe('0.005');
+    expect(await roles(buyer)).toEqual(['sold', 'bought']);
+    expect(await roles(third)).toEqual(['rented_out', 'bought']);
+    expect(await roles(renter)).toEqual(['rented']);
+    const rentals = (await req('GET', '/me/rentals', renter.token)).json();
+    expect(rentals).toEqual([expect.objectContaining({ kind: 'rental', days: 1, ai: expect.objectContaining({ id: aiId }) })]);
   });
 });

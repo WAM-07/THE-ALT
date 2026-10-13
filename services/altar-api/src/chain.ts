@@ -1,5 +1,5 @@
 import { aitRegistryAbi, altMarketplaceAbi } from '@alt/contracts/abi';
-import { createPublicClient, getAddress, http, type Address } from 'viem';
+import { createPublicClient, getAddress, http, parseEventLogs, type Address } from 'viem';
 import { AltarError } from './errors.js';
 
 /** What the marketplace contract says about one token. */
@@ -18,7 +18,29 @@ export function createChainReader(cfg: { rpcUrl: string; registry: string; marke
   const registry = getAddress(cfg.registry) as Address;
   const market = getAddress(cfg.marketplace) as Address;
 
+  const blockTimes = new Map<bigint, Date>();
+  const blockTime = async (n: bigint) => {
+    let at = blockTimes.get(n);
+    if (!at) {
+      at = new Date(Number((await client.getBlock({ blockNumber: n })).timestamp) * 1000);
+      blockTimes.set(n, at);
+      if (blockTimes.size > 5_000) blockTimes.clear();
+    }
+    return at;
+  };
+
   return {
+    chainId: () => client.getChainId(),
+    // No cached value: the indexer must see blocks mined a moment ago.
+    head: () => client.getBlockNumber({ cacheTime: 0 }),
+
+    /** The marketplace's events between two blocks, oldest first, with each block's time. */
+    async events(fromBlock: bigint, toBlock: bigint) {
+      const logs = await client.getLogs({ address: market, fromBlock, toBlock });
+      const parsed = parseEventLogs({ abi: altMarketplaceAbi, logs, eventName: ['Sold', 'Rented', 'ListedForSale', 'SaleCancelled', 'ListedForRent', 'RentalOfferCancelled'] });
+      return Promise.all(parsed.map(async (e) => ({ ...e, at: await blockTime(e.blockNumber) })));
+    },
+
     async offer(tokenId: bigint): Promise<OnChainOffer> {
       try {
         const [owner, sale, rent] = await Promise.all([

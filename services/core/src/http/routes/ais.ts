@@ -329,7 +329,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.get('/ais/:id/datasets', { preHandler: authed, schema: { tags: ['datasets'], summary: 'Data added to this AI', params: AiId } }, async (req) => {
     const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
-    const { rows } = await ctx.db.query('SELECT * FROM core.datasets WHERE ai_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC', [ai.id]);
+    // Only what this person added: after a sale, the previous owner's files stay sealed from the buyer.
+    const { rows } = await ctx.db.query('SELECT * FROM core.datasets WHERE ai_id = $1 AND owner_id = $2 AND deleted_at IS NULL ORDER BY created_at DESC', [ai.id, req.auth!.userId]);
     return rows.map(datasetOut);
   });
 
@@ -418,7 +419,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     { preHandler: authed, schema: { tags: ['datasets'], summary: 'Read back what you added (owner only)', params: z.object({ id: z.uuid(), datasetId: z.uuid() }) } },
     async (req, reply) => {
       const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
-      const { rows } = await ctx.db.query('SELECT mime_type, file_name FROM core.datasets WHERE id = $1 AND ai_id = $2 AND deleted_at IS NULL', [req.params.datasetId, ai.id]);
+      const { rows } = await ctx.db.query('SELECT mime_type, file_name FROM core.datasets WHERE id = $1 AND ai_id = $2 AND owner_id = $3 AND deleted_at IS NULL', [req.params.datasetId, ai.id, req.auth!.userId]);
       if (!rows[0]) throw notFound('Item');
       reply.header('cache-control', 'private, no-store').type(rows[0].mime_type ?? 'application/octet-stream');
       return reply.send(await readDatasetFile(ctx, req.params.datasetId));
@@ -445,8 +446,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       const { rows } = await tx(ctx.db, async (client) => {
         const res = await client.query(
           `UPDATE core.datasets SET included = COALESCE($3, included), title = COALESCE($4, title), training_category = COALESCE($5, training_category)
-            WHERE id = $1 AND ai_id = $2 AND deleted_at IS NULL RETURNING *`,
-          [req.params.datasetId, ai.id, req.body.included ?? null, req.body.title ?? null, req.body.category ?? null],
+            WHERE id = $1 AND ai_id = $2 AND owner_id = $6 AND deleted_at IS NULL RETURNING *`,
+          [req.params.datasetId, ai.id, req.body.included ?? null, req.body.title ?? null, req.body.category ?? null, req.auth!.userId],
         );
         if (!res.rows[0]) throw notFound('Item');
         if (req.body.included !== undefined) {
@@ -470,10 +471,10 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req) => {
       const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
       await tx(ctx.db, async (client) => {
-        const { rowCount } = await client.query('UPDATE core.datasets SET deleted_at = now(), included = false WHERE id = $1 AND ai_id = $2 AND deleted_at IS NULL', [
-          req.params.datasetId,
-          ai.id,
-        ]);
+        const { rowCount } = await client.query(
+          'UPDATE core.datasets SET deleted_at = now(), included = false WHERE id = $1 AND ai_id = $2 AND owner_id = $3 AND deleted_at IS NULL',
+          [req.params.datasetId, ai.id, req.auth!.userId],
+        );
         if (!rowCount) throw notFound('Item');
         await audit(client, { action: 'dataset.deleted', actorUserId: req.auth!.userId, entityType: 'ai', entityId: ai.id, data: { datasetId: req.params.datasetId } });
       });

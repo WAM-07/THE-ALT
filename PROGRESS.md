@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🟡 Steps 1–2 of 4 done (2026-10-13/14): `apps/altar-web` on ALT accounts and verified AIs, redesigned; `services/altar-api`; the ALT wallet and on-chain listings. Next: buying and renting. Plan: `Documentations/ALTAR_EVALUATION.md` §7. |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🟡 Steps 1–3 of 4 done (2026-10-13/14): `apps/altar-web` redesigned on ALT accounts; `services/altar-api`; the ALT wallet and on-chain listings; buying, reselling with royalties, renting and rental chat. Next: subscriptions, reviews and the demo polish. Plan: `Documentations/ALTAR_EVALUATION.md` §7. |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
@@ -341,14 +341,41 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - ALTAR web `eslint` and `next build`;
     - in a browser against the running demo: Bilal got test funds and listed Code Sensei (3 transactions), and a visitor saw the prices.
     - A full fresh `npm run demo` with the new seed was not rerun.
+- ✅ **ALTAR step 3: buying and renting** (2026-10-14). The roadmap's Milestone 7 "done when" story passes end to end in `services/core/test/market.test.ts`:
+  1. A sells to B.
+  2. B resells to C, and A receives the royalty automatically.
+  3. D rents for a day and chats.
+  4. The rental ends and D loses access.
+  5. Every step is in the transaction history.
+  - **ALT Core:**
+    - `POST /ais/:id/market/buy` and `/market/rent` (password or 2FA; the buyer pays the price, ALT pays the network fee; `expectedPrice` guards against a price change at checkout).
+    - **Rights follow the token** (`modules/market/holders.ts`): `syncToken` reads `ownerOf`/`userOf` and moves `core.personal_ais.owner_id` to the new holder's ALT account (a "consumer" role is added), mirrors the renter and the end of the rental (`core.ai_identity_tokens.user_address`/`user_expires`, migration `0005`), audits it, notifies both sides and tells ALTERA (`alt_ai_events`).
+    - A background indexer (`indexRegistry`, every 4 s) catches transfers made outside ALTAR too.
+    - **Talking on ALTAR** (`http/routes/conversations.ts`): `GET /ais/:id/access`, plus conversations for the owner (any time) or the renter (until the rental ends). Each person sees only their own conversations, and always the published version (channel `altar_rental`). After a rental, old conversations stay readable and sending is refused.
+    - **The seller's private files stay sealed:** the AI file routes only show, change or delete items the caller added.
+    - **Dev-chain replay** now mints to the creator and hands the token back to its current owner, so royalties survive a restart.
+  - **`altar-api`:** an indexer turns `Sold` and `Rented` events into `altar.transactions` (amount, royalty, fee, days, tx hash; `altar.rentals` is a view; migration `0002`). It keeps listings in step with the contract and drops a sold AI's old listing. New routes: `GET /activity?aiId=`, `/me/activity` (bought, sold, rented, rented out, royalty) and `/me/rentals`.
+  - **ALTERA follows the owner:** a sold AI's persona moves to the buyer with auto-replies switched off (`services/ai_sync.js`).
+  - **ALTAR web:**
+    - real Buy and Rent (a days picker with the total) on AI pages;
+    - a "You're renting" banner and a chat page (`/chat/[handle]`) with time left;
+    - a Rented tab on the profile;
+    - wallet and AI-page activity from the chain.
+  - **Demo seed:** Hamza rents Urdu Ustad for a day.
+  - **Checked:**
+    - tests: Core 80 (new `market.test.ts`), `altar-api` 4 (sale, royalty resale and rental indexed, re-reading is harmless), contracts 31, ALTERA 16, gateway 9;
+    - ALTAR web `eslint` and `next build`;
+    - in a browser on the live demo: Hamza rented Muse for 2 days and chatted, and bought Wamiq's ALT (it moved to him in ALTAR and ALTERA). The wallet showed both.
+    - **Not re-proven:** the full fresh `npm run demo`. Its seed was interrupted while Core reloaded during this work.
 
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
-- **ALTAR, until steps 3–4:**
-  - Buy, Rent and Subscribe show real prices but stay disabled ("Checkout opens soon").
-  - The listing mirror is refreshed when the seller saves; an indexer that follows contract events comes with step 3.
-  - Subscription prices are saved off-chain until `ALTMarketplace` gets a subscribe function (step 4).
-  - Wallet activity is a placeholder until step 3.
+- **ALTAR, until step 4:**
+  - Subscription prices are saved off-chain and Subscribe stays disabled until `ALTMarketplace` gets a subscribe function.
+  - Renters talk to the AI only on ALTAR (not in ALTERA DMs).
+  - A seller loses their old ALTER chat history with a sold AI; keeping it read-only is not built.
+  - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.
+  - Rentals are not replayed when the local dev chain restarts.
   - "Connect MetaMask" isn't built: sending POL to a MetaMask address works.
   - The spending password is typed on ALTAR's page and goes straight to Core, never stored. Moving it into the ALT Account window, like sign-in, is a planned improvement.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).

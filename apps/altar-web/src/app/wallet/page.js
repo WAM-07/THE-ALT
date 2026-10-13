@@ -7,8 +7,8 @@ import { Avatar, Button, Card, Chip, Shape, Spinner } from "../../components/ui"
 import { CountUp } from "../../components/motion";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAI } from "../../contexts/AIContext";
-import { continueWithAlt, mediaUrl, wallet as altWallet } from "../../lib/alt";
-import { networkName, percent, polText, shortAddress } from "../../lib/format";
+import { altar, continueWithAlt, mediaUrl, wallet as altWallet } from "../../lib/alt";
+import { networkName, percent, polText, shortAddress, timeAgo } from "../../lib/format";
 
 const FAUCET = "https://faucet.polygon.technology/";
 
@@ -24,11 +24,16 @@ export default function WalletPage() {
   const [dialog, setDialog] = useState(null); // "withdraw" | "send"
   const [send, setSend] = useState({ to: "", amount: "" });
   const [copied, setCopied] = useState(false);
+  const [activity, setActivity] = useState(null);
 
   const load = useCallback(async () => {
     try {
       setW(await altWallet.get());
       setError(null);
+      altar
+        .myActivity()
+        .then(setActivity)
+        .catch(() => setActivity([]));
     } catch (err) {
       setError(err.message);
     }
@@ -213,7 +218,43 @@ export default function WalletPage() {
 
       <Card className="mt-5 p-7">
         <h2 className="font-display text-lg font-bold">Activity</h2>
-        <p className="mt-2 text-ink-2">Purchases, rentals and royalties will appear here when buying and renting open (the next ALTAR step). Each one links to its transaction on the chain.</p>
+        {activity === null ? (
+          <Spinner className="mt-4" />
+        ) : activity.length === 0 ? (
+          <p className="mt-2 text-ink-2">Your purchases, sales, rentals and royalties will appear here.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line">
+            {activity.map((a) => {
+              const [label, sign] = {
+                bought: [`Bought ${a.ai?.name ?? "an AI"}`, "−"],
+                sold: [`Sold ${a.ai?.name ?? "an AI"}`, "+"],
+                rented: [`Rented ${a.ai?.name ?? "an AI"} for ${a.days} ${a.days === 1 ? "day" : "days"}`, "−"],
+                rented_out: [`${a.ai?.name ?? "Your AI"} was rented for ${a.days} ${a.days === 1 ? "day" : "days"}`, "+"],
+                royalty: [`Royalty from ${a.ai?.name ?? "your AI"}`, "+"],
+              }[a.role];
+              // What reached (or left) this person: the seller's share after fee and royalty, the royalty itself, or the full price.
+              const amount =
+                a.role === "royalty"
+                  ? a.royalty.pol
+                  : a.role === "sold" || a.role === "rented_out"
+                    ? String(Number(a.amount.pol) - Number(a.fee.pol) - Number(a.royalty.pol))
+                    : a.amount.pol;
+              return (
+                <li key={`${a.id}-${a.role}`} className="flex items-center gap-4 py-3">
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold ${sign === "+" ? "bg-accent/15 text-accent-text" : "bg-sunken text-ink-2"}`}>{sign}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{label}</p>
+                    <p className="text-sm text-ink-3">{timeAgo(a.occurredAt)}</p>
+                  </div>
+                  <span className={`font-semibold ${sign === "+" ? "text-accent-text" : ""}`}>
+                    {sign}
+                    {polText(amount)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Card>
 
       {dialog === "withdraw" && (

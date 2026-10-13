@@ -2,13 +2,16 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { replayLocalChain } from './jobs/replay-local-chain.js';
 import { assignDefaultAvatars } from './jobs/default-avatars.js';
+import { startRegistryIndexer } from './modules/market/holders.js';
 
 const config = loadConfig();
 // The job worker starts below, once the local dev chain (if any) has caught up with the database.
 const app = await buildApp({ config, jobs: false });
 
+let stopIndexer: () => void = () => {};
 const shutdown = async (signal: string) => {
   app.log.info(`${signal} received, shutting down`);
+  stopIndexer();
   await app.close();
   process.exit(0);
 };
@@ -27,4 +30,8 @@ try {
 } catch (err) {
   app.log.error({ err }, 'could not give ready-made pictures to older accounts');
 }
-if (config.jobsEnabled) await app.jobs.start();
+if (config.jobsEnabled) {
+  await app.jobs.start();
+  // Ownership and rentals follow the chain, including transfers made outside ALTAR.
+  if (app.ctx.chain) stopIndexer = startRegistryIndexer(app.ctx, (msg) => app.log.info(msg));
+}

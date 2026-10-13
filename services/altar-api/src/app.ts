@@ -9,6 +9,7 @@ import { createAuth } from './auth.js';
 import { createChainReader, type ChainReader } from './chain.js';
 import type { Config } from './config.js';
 import { AltarError, conflict, notFound } from './errors.js';
+import { startIndexer } from './indexer.js';
 
 /** A POL amount typed by a person ("2.5"), as wei. */
 const Pol = z
@@ -53,7 +54,7 @@ const LIVE = `SELECT l.* FROM altar.listings l
                 JOIN core.personal_ais a ON a.id = l.ai_id
                WHERE a.status = 'verified' AND a.deleted_at IS NULL AND a.owner_id = l.seller_id`;
 
-export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey; chain?: ChainReader | null; logger?: boolean } = {}) {
+export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey; chain?: ChainReader | null; logger?: boolean; indexer?: boolean } = {}) {
   const db = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
   const chain = opts.chain !== undefined ? opts.chain : config.chain ? createChainReader(config.chain) : null;
   const { requireUser, forget } = createAuth({ db, issuer: config.issuer, jwksUrl: config.jwksUrl, ...(opts.keySet ? { keySet: opts.keySet } : {}) });
@@ -76,7 +77,10 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
   events.on('error', (err) => app.log.error({ err }, 'lost the sign-out listener'));
   await events.connect();
   await events.query('LISTEN alt_sessions_revoked');
+  // Sales and rentals arrive from the marketplace contract (tests run the indexer by hand).
+  const stopIndexer = chain && opts.indexer !== false ? startIndexer(db, chain, (msg) => app.log.info(msg)) : () => {};
   app.addHook('onClose', async () => {
+    stopIndexer();
     await events.end().catch(() => {});
     await db.end();
   });
@@ -223,6 +227,62 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
       return reply.status(204).send();
     },
   );
+
+  // ---------------------------------------------------------------- what happened (from the contract's events)
+
+  /** A sale or rental, with the people involved by their public ALT names. */
+  const ACTIVITY = `SELECT t.*, a.handle AS ai_handle, a.name AS ai_name,
+                           fu.handle AS from_handle, fu.display_name AS from_name, tu.handle AS to_handle, tu.display_name AS to_name
+                      FROM altar.transactions t
+                      LEFT JOIN core.personal_ais a ON a.id = t.ai_id
+                      LEFT JOIN core.users fu ON fu.id = t.from_user_id
+                      LEFT JOIN core.users tu ON tu.id = t.to_user_id`;
+  const activityOut = (t: Record<string, unknown>, me?: string) => ({
+    id: String(t.id),
+    kind: t.kind as 'sale' | 'rental',
+    ai: t.ai_id ? { id: t.ai_id as string, handle: t.ai_handle as string, name: t.ai_name as string } : null,
+    tokenId: String(t.token_id),
+    from: { address: t.from_address as string, handle: (t.from_handle as string | null) ?? null, name: (t.from_name as string | null) ?? null },
+    to: { address: t.to_address as string, handle: (t.to_handle as string | null) ?? null, name: (t.to_name as string | null) ?? null },
+    amount: pol(t.amount_wei as string)!,
+    royalty: pol(t.royalty_wei as string)!,
+    fee: pol(t.fee_wei as string)!,
+    days: (t.days as number | null) ?? null,
+    expiresAt: t.expires_at ? (t.expires_at as Date).toISOString() : null,
+    txHash: t.tx_hash as string,
+    occurredAt: (t.occurred_at as Date).toISOString(),
+    // How it involved the caller, for their own activity list.
+    ...(me
+      ? {
+          role:
+            t.to_user_id === me
+              ? t.kind === 'sale' ? 'bought' : 'rented'
+              : t.from_user_id === me
+                ? t.kind === 'sale' ? 'sold' : 'rented_out'
+                : 'royalty',
+        }
+      : {}),
+  });
+
+  r.get(
+    '/activity',
+    { schema: { tags: ['activity'], summary: "An AI's sales and rentals, newest first", querystring: z.object({ aiId: z.uuid() }) } },
+    async (req) => (await db.query(`${ACTIVITY} WHERE t.ai_id = $1 ORDER BY t.occurred_at DESC, t.id DESC LIMIT 50`, [req.query.aiId])).rows.map((t) => activityOut(t)),
+  );
+
+  r.get('/me/activity', { preHandler: requireUser, schema: { tags: ['activity'], summary: 'Your purchases, sales, rentals and royalties' } }, async (req) => {
+    const me = req.caller!.userId;
+    const { rows } = await db.query(
+      `${ACTIVITY} WHERE t.from_user_id = $1 OR t.to_user_id = $1 OR (t.royalty_user_id = $1 AND t.royalty_wei > 0) ORDER BY t.occurred_at DESC, t.id DESC LIMIT 100`,
+      [me],
+    );
+    return rows.map((t) => activityOut(t, me));
+  });
+
+  r.get('/me/rentals', { preHandler: requireUser, schema: { tags: ['activity'], summary: 'AIs you are renting right now' } }, async (req) => {
+    const { rows } = await db.query(`${ACTIVITY} WHERE t.kind = 'rental' AND t.to_user_id = $1 AND t.expires_at > now() ORDER BY t.expires_at`, [req.caller!.userId]);
+    return rows.map((t) => activityOut(t, req.caller!.userId));
+  });
 
   // ---------------------------------------------------------------- saved AIs
 

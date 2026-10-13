@@ -275,8 +275,13 @@ export async function seedDemo({ gateway, log = console.log }) {
 
   log('filling ALTAR: more creators and verified AIs, each minted on-chain and some listed…');
   await seedMarket({ gateway, log, tokens: { wamiq: t.wamiq, ayesha: t.ayesha } });
-  // Hamza is the demo's buyer: test POL in his ALT wallet (local chain only; worth nothing).
-  await call('POST', '/core/me/wallet/test-funds', t.hamza, {}, { allow: [409] });
+  // Hamza is the demo's buyer: test POL in his ALT wallet (local chain only; worth nothing), and a
+  // one-day rental of Urdu Ustad, so ALTAR shows a live rental he can chat in.
+  const funds = await call('POST', '/core/me/wallet/test-funds', t.hamza, {}, { allow: [409] });
+  if (funds.status === 200) {
+    const ustad = (await call('GET', '/core/public/ais/zainab.ustad')).data;
+    await call('POST', `/core/ais/${ustad.id}/market/rent`, t.hamza, { days: 1, confirm: { password: DEMO_PASSWORD } });
+  }
 
   log('an announcement from the ALT team to everyone…');
   await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });

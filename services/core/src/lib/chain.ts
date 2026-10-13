@@ -279,10 +279,12 @@ export class ChainService {
     const requireMarket = () => this.requireMarket();
     const registry = this.registryAddress;
 
-    const sponsor = async (gas: bigint) => {
+    /** Tops the wallet up so it can pay `value` (its own money) plus the network fee (ALT's). */
+    const sponsor = async (gas: bigint, value = 0n) => {
       const fees = await pub.estimateFeesPerGas();
-      const need = (gas * (fees.maxFeePerGas ?? fees.gasPrice ?? 0n) * 13n) / 10n;
+      const need = (gas * (fees.maxFeePerGas ?? fees.gasPrice ?? 0n) * 13n) / 10n + value;
       const have = await pub.getBalance({ address: account.address });
+      if (have < value) throw new AppError(400, 'INSUFFICIENT_FUNDS', 'Your ALT wallet does not have enough POL for this.');
       if (have >= need) return null;
       const hash = await relayer.sendTransaction({ to: account.address, value: need - have });
       await pub.waitForTransactionReceipt({ hash, confirmations, timeout: 180_000 });
@@ -297,7 +299,7 @@ export class ChainService {
         // Simulate first so a refusal (not the owner, not listed...) costs nothing and reads clearly.
         const { request } = await pub.simulateContract({ address, abi, functionName: functionName as never, args: args as never, account, value } as never);
         const gas = await pub.estimateContractGas({ address, abi, functionName: functionName as never, args: args as never, account, value } as never);
-        const sponsored = await sponsor(gas);
+        const sponsored = await sponsor(gas, value ?? 0n);
         const hash = await wallet.writeContract(request as never);
         const receipt = await pub.waitForTransactionReceipt({ hash, confirmations, timeout: 180_000 });
         if (receipt.status !== 'success') throw new AppError(502, 'CHAIN_TX_FAILED', `The blockchain could not ${action}.`);
@@ -330,6 +332,40 @@ export class ChainService {
         }
       },
     };
+  }
+
+  async blockNumber() {
+    return this.publicClient.getBlockNumber({ cacheTime: 0 });
+  }
+
+  /** Who holds a token and who is renting it right now (ERC-4907; no renter once the rental ends). */
+  async holders(tokenId: bigint) {
+    try {
+      const [owner, user, expires] = await Promise.all([
+        this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'ownerOf', args: [tokenId] }),
+        this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'userOf', args: [tokenId] }),
+        this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'userExpires', args: [tokenId] }),
+      ]);
+      const none = /^0x0{40}$/i.test(user);
+      return { owner: owner.toLowerCase(), user: none ? null : user.toLowerCase(), userExpires: none ? null : new Date(Number(expires) * 1000) };
+    } catch (err) {
+      this.explain(err, 'read who holds the AI identity token');
+    }
+  }
+
+  /**
+   * Tokens whose holder or renter changed between two blocks (Transfer and UpdateUser events), for
+   * Core's indexer. New mints are left out: the mint job records those itself.
+   */
+  async registryChanges(fromBlock: bigint, toBlock: bigint) {
+    const logs = await this.publicClient.getLogs({ address: this.registryAddress, fromBlock, toBlock });
+    const events = parseEventLogs({ abi: aitRegistryAbi, logs, eventName: ['Transfer', 'UpdateUser'] });
+    const tokens = new Map<bigint, string>();
+    for (const e of events) {
+      if (e.eventName === 'Transfer' && /^0x0{40}$/i.test(e.args.from)) continue;
+      tokens.set(e.args.tokenId, e.transactionHash);
+    }
+    return [...tokens].map(([tokenId, txHash]) => ({ tokenId, txHash }));
   }
 
   /** True when no identity token has ever been minted on this registry (token ids start at 1). */

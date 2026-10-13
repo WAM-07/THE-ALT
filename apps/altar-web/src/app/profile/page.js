@@ -9,7 +9,7 @@ import { useWishlist } from "../../contexts/WishlistContext";
 import AICard from "../../components/AICard";
 import AitArt from "../../components/AitArt";
 import { Avatar, Button, Chip, Empty, Spinner, btnClass } from "../../components/ui";
-import { api, auth, continueWithAlt, pictures } from "../../lib/alt";
+import { altar, api, auth, continueWithAlt, pictures } from "../../lib/alt";
 import PicturePicker from "../../components/PicturePicker";
 import { shortAddress } from "../../lib/format";
 
@@ -39,10 +39,20 @@ function Profile() {
   const { wishlist, removeFromWishlist } = useWishlist();
   const params = useSearchParams();
   const router = useRouter();
-  const tab = params.get("tab") === "saved" ? "saved" : "owned";
+  const tab = ["saved", "rented"].includes(params.get("tab")) ? params.get("tab") : "owned";
+  const [rentals, setRentals] = useState(null);
   const [ais, setAis] = useState(null);
   const [copied, setCopied] = useState(false);
   const [picking, setPicking] = useState(false);
+
+  // AIs the person is renting right now (from ALTAR's record of the contract's events).
+  useEffect(() => {
+    if (!user) return;
+    altar
+      .myRentals()
+      .then(setRentals)
+      .catch(() => setRentals([]));
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -83,7 +93,7 @@ function Profile() {
 
   const verifiedCount = ais?.filter((a) => a.verified).length ?? 0;
   const savedModels = wishlist.map((w) => ({ item: w, model: aiModels?.find((m) => m.id === w.agentId) }));
-  const setTab = (t) => router.replace(t === "saved" ? "/profile?tab=saved" : "/profile", { scroll: false });
+  const setTab = (t) => router.replace(t === "owned" ? "/profile" : `/profile?tab=${t}`, { scroll: false });
 
   return (
     <div className="pb-24">
@@ -149,6 +159,7 @@ function Profile() {
           {[
             ["owned", "My AIs", ais?.length],
             ["saved", "Saved", wishlist.length],
+            ["rented", "Rented", rentals?.length],
           ].map(([id, label, count]) => (
             <button
               key={id}
@@ -187,6 +198,33 @@ function Profile() {
                   )}
                 </div>
               </>
+            )
+          ) : tab === "rented" ? (
+            rentals === null ? (
+              <Spinner />
+            ) : rentals.length === 0 ? (
+              <Empty title="Not renting anything" action={<Button href="/#explore">Find an AI to rent</Button>}>
+                Rent an AI for a few days to talk to it on ALTAR. The owner keeps it; you get it to yourself.
+              </Empty>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+                {rentals.map((r) => {
+                  const model = aiModels?.find((m) => m.id === r.ai?.id);
+                  return (
+                    <Link key={r.id} href={`/chat/${r.ai?.handle}`} className="group overflow-hidden rounded-3xl border border-line bg-surface transition hover:-translate-y-1 hover:shadow-card">
+                      <div className="relative h-28">
+                        <AitArt seed={model?.artSeed ?? r.ai?.handle} />
+                        <Avatar src={model?.image} name={r.ai?.name} size={52} className="absolute -bottom-6 left-4 ring-4 ring-surface" />
+                      </div>
+                      <div className="p-4 pt-8">
+                        <p className="truncate font-display text-lg font-bold">{r.ai?.name}</p>
+                        <p className="text-sm text-ink-3">Until {new Date(r.expiresAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</p>
+                        <p className="mt-3 text-sm font-semibold text-accent-text">Chat now →</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )
           ) : savedModels.length === 0 ? (
             <Empty title="Nothing saved yet" action={<Button href="/#explore">Explore AIs</Button>}>

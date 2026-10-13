@@ -1,5 +1,7 @@
 import type { Ctx } from '../context.js';
+import type { Hex } from 'viem';
 import { tx } from '../db.js';
+import { decrypt } from '../lib/crypto.js';
 
 /** Hardhat's chain id: the throwaway chain `npm run dev` starts. Never a real network. */
 export const LOCAL_CHAIN_ID = 31337;
@@ -8,6 +10,8 @@ interface TokenRow {
   ai_id: string;
   token_id: string;
   owner_address: string;
+  creator_address: string;
+  creator_key_enc: string | null;
   royalty_bps: number;
 }
 
@@ -22,8 +26,9 @@ export async function replayLocalChain(ctx: Ctx, log: (msg: string) => void) {
   if (!chain || chain.chainId !== LOCAL_CHAIN_ID || ctx.config.env === 'production') return 0;
 
   const { rows } = await ctx.db.query<TokenRow>(
-    `SELECT t.ai_id, t.token_id::text, t.owner_address, a.royalty_bps
+    `SELECT t.ai_id, t.token_id::text, t.owner_address, t.creator_address, w.private_key_enc AS creator_key_enc, a.royalty_bps
        FROM core.ai_identity_tokens t JOIN core.personal_ais a ON a.id = t.ai_id
+       LEFT JOIN core.wallets w ON w.address = t.creator_address AND w.kind = 'custodial'
       WHERE t.chain_id = $1 AND lower(t.contract_address) = lower($2)
       ORDER BY t.token_id`,
     [LOCAL_CHAIN_ID, chain.registryAddress],
@@ -45,13 +50,18 @@ export async function replayLocalChain(ctx: Ctx, log: (msg: string) => void) {
       [row.ai_id],
     );
     if (!versions.length) continue;
-    const hash = await chain.sendMint(row.owner_address, row.ai_id, versions[0]!.manifest_cid, row.royalty_bps);
+    // Minted to its creator, so royalties still go to the right person, then handed to whoever owns it
+    // now (a sale on the old chain). Rentals are not replayed.
+    const hash = await chain.sendMint(row.creator_address, row.ai_id, versions[0]!.manifest_cid, row.royalty_bps);
     const { tokenId } = await chain.confirmMint(hash);
+    if (row.owner_address !== row.creator_address && row.creator_key_enc) {
+      await chain.custodial(decrypt(ctx.config.encryptionKey, row.creator_key_enc) as Hex).call('registry', 'transferFrom', [row.creator_address, row.owner_address, tokenId], 'return the AI to its owner');
+    }
     for (const v of versions.slice(1)) await chain.publishVersion(tokenId, v.manifest_cid);
     const identity = await chain.readIdentity(tokenId);
     await tx(ctx.db, async (client) => {
       await client.query(
-        'UPDATE core.ai_identity_tokens SET token_id = $2, mint_tx_hash = $3, creator_address = $4, version = $5, synced_at = now() WHERE ai_id = $1',
+        'UPDATE core.ai_identity_tokens SET token_id = $2, mint_tx_hash = $3, creator_address = $4, version = $5, user_address = NULL, user_expires = NULL, synced_at = now() WHERE ai_id = $1',
         [row.ai_id, tokenId.toString(), hash, identity.creator.toLowerCase(), Number(identity.version)],
       );
       await client.query(`SELECT pg_notify('alt_ai_events', $1)`, [JSON.stringify({ aiId: row.ai_id, event: 'verified' })]);

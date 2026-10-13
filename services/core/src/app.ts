@@ -20,6 +20,7 @@ import { notificationRoutes } from './http/routes/notifications.js';
 import { accountPageRoutes } from './http/routes/account-page.js';
 import { avatarRoutes } from './http/routes/avatars.js';
 import { walletRoutes } from './http/routes/wallet.js';
+import { conversationRoutes } from './http/routes/conversations.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
 import { createLlmRouter, type LlmProvider, LlmRouter } from './modules/ai/llm.js';
@@ -169,6 +170,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => accountPageRoutes(i));
   await app.register(async (i) => avatarRoutes(i, ctx));
   await app.register(async (i) => walletRoutes(i, ctx));
+  await app.register(async (i) => conversationRoutes(i, ctx));
 
   return app;
 }

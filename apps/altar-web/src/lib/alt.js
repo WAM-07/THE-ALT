@@ -161,6 +161,18 @@ export const wallet = {
   /** An AI's sale and rental terms as the marketplace contract has them. */
   market: (aiId) => api(`/core/ais/${aiId}/market`),
   setMarket: (aiId, { sale, rent }, confirm) => api(`/core/ais/${aiId}/market`, { method: "PUT", body: { sale, rent, confirm } }),
+  /** Buys a listed AI; `expectedPrice` (POL) makes sure the price didn't change at checkout. */
+  buy: (aiId, confirm, expectedPrice) => api(`/core/ais/${aiId}/market/buy`, { method: "POST", body: { confirm, expectedPrice } }),
+  rent: (aiId, days, confirm, expectedPricePerDay) => api(`/core/ais/${aiId}/market/rent`, { method: "POST", body: { days, confirm, expectedPricePerDay } }),
+};
+
+/** Talking to an AI on ALTAR: its owner always, a renter until the rental ends. */
+export const conversations = {
+  access: (aiId) => api(`/core/ais/${aiId}/access`),
+  list: (aiId) => api(`/core/ais/${aiId}/conversations`),
+  start: (aiId) => api(`/core/ais/${aiId}/conversations`, { method: "POST", body: {} }),
+  messages: (aiId, id) => api(`/core/ais/${aiId}/conversations/${id}/messages`),
+  say: (aiId, id, content) => api(`/core/ais/${aiId}/conversations/${id}/messages`, { method: "POST", body: { content } }),
 };
 
 /** ALTAR's own service: listing details, subscription prices and saved AIs. */
@@ -169,6 +181,10 @@ export const altar = {
   listing: (aiId) => publicApi(`/altar/listings/${aiId}`),
   /** Saves pitch, terms and subscription price; sale and rent prices are read back from the chain. */
   saveListing: (aiId, body) => api(`/altar/listings/${aiId}`, { method: "PUT", body }),
+  /** Sales and rentals, read from the marketplace contract's events. */
+  activity: (aiId) => publicApi(`/altar/activity?aiId=${aiId}`),
+  myActivity: () => api("/altar/me/activity"),
+  myRentals: () => api("/altar/me/rentals"),
   saved: () => api("/altar/wishlist"),
   save: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "PUT" }),
   unsave: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "DELETE" }),

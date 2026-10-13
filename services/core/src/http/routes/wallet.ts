@@ -7,10 +7,11 @@ import type { Ctx } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit } from '../../lib/audit.js';
 import { decrypt } from '../../lib/crypto.js';
-import { AppError, badRequest, conflict, unauthorized } from '../../lib/errors.js';
+import { AppError, badRequest, conflict, notFound, unauthorized } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
 import { verifyTotp } from '../../lib/totp.js';
-import { requireOwnedAi } from '../../modules/ai/repo.js';
+import { loadAi, requireOwnedAi } from '../../modules/ai/repo.js';
+import { syncToken } from '../../modules/market/holders.js';
 import { findUserById, type UserRow } from '../../modules/accounts/users.js';
 import { requireUser } from '../auth-guard.js';
 import { requireChain } from './chain.js';
@@ -223,6 +224,76 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
         );
       }
       return { ...(await marketView(tokenId)), txs };
+    },
+  );
+
+  // ---------------------------------------------------------------- buying and renting on ALTAR
+
+  /** A verified AI and its token, for someone who doesn't own it. */
+  async function tokenToAcquire(userId: string, aiId: string) {
+    const ai = await loadAi(ctx.db, aiId);
+    if (!ai || ai.status !== 'verified') throw notFound('AI');
+    if (ai.owner_id === userId) throw conflict('ALREADY_YOURS', 'You already own this AI.');
+    const { rows } = await ctx.db.query<{ token_id: string }>('SELECT token_id FROM core.ai_identity_tokens WHERE ai_id = $1', [ai.id]);
+    if (!rows[0]) throw notFound('AI');
+    return { ai, tokenId: BigInt(rows[0].token_id) };
+  }
+
+  r.post(
+    '/ais/:id/market/buy',
+    {
+      preHandler: authed,
+      config: spendLimit,
+      schema: {
+        tags: ['wallet'],
+        summary: 'Buy an AI listed for sale: its token moves to your ALT wallet (you pay the price; ALT pays the network fee)',
+        params: z.object({ id: z.uuid() }),
+        body: z.object({ confirm: Confirm, expectedPrice: Pol.optional() }),
+      },
+    },
+    async (req) => {
+      const { ai, tokenId } = await tokenToAcquire(req.auth!.userId, req.params.id);
+      const w = await custodialOf(req.auth!.userId);
+      await confirmSpend(w.user, req.body.confirm);
+      const chain = requireChain(ctx);
+      const { sale } = await chain.marketState(tokenId);
+      if (!sale) throw conflict('NOT_FOR_SALE', `${ai.name} is not for sale right now.`);
+      // The price shown to the buyer must still be the price; a seller can't raise it mid-checkout.
+      if (req.body.expectedPrice !== undefined && req.body.expectedPrice !== sale.priceWei) throw conflict('PRICE_CHANGED', 'The price changed. Check it and try again.');
+      const { hash } = await w.signer().call('market', 'buy', [tokenId], 'buy this AI', sale.priceWei);
+      await syncToken(ctx, tokenId, hash);
+      await record(req.auth!.userId, 'market.bought', req.ip, { aiId: ai.id, tokenId: tokenId.toString(), hash, priceWei: sale.priceWei.toString() });
+      return { hash, aiId: ai.id, price: pol(sale.priceWei), balance: pol(await chain.balanceOf(w.address)) };
+    },
+  );
+
+  r.post(
+    '/ais/:id/market/rent',
+    {
+      preHandler: authed,
+      config: spendLimit,
+      schema: {
+        tags: ['wallet'],
+        summary: 'Rent an AI for some days: you alone may talk to it until then (the owner keeps the token)',
+        params: z.object({ id: z.uuid() }),
+        body: z.object({ days: z.number().int().min(1).max(365), confirm: Confirm, expectedPricePerDay: Pol.optional() }),
+      },
+    },
+    async (req) => {
+      const { ai, tokenId } = await tokenToAcquire(req.auth!.userId, req.params.id);
+      const w = await custodialOf(req.auth!.userId);
+      await confirmSpend(w.user, req.body.confirm);
+      const chain = requireChain(ctx);
+      const { rent, rentedTo } = await chain.marketState(tokenId);
+      if (!rent) throw conflict('NOT_FOR_RENT', `${ai.name} is not offered for rent right now.`);
+      if (rentedTo) throw conflict('ALREADY_RENTED', `${ai.name} is rented until ${rentedTo.until.toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
+      if (req.body.days > rent.maxDays) throw badRequest('TOO_MANY_DAYS', `${ai.name} can be rented for at most ${rent.maxDays} days.`);
+      if (req.body.expectedPricePerDay !== undefined && req.body.expectedPricePerDay !== rent.pricePerDayWei) throw conflict('PRICE_CHANGED', 'The price changed. Check it and try again.');
+      const total = rent.pricePerDayWei * BigInt(req.body.days);
+      const { hash } = await w.signer().call('market', 'rent', [tokenId, req.body.days], 'rent this AI', total);
+      const synced = await syncToken(ctx, tokenId, hash);
+      await record(req.auth!.userId, 'market.rented', req.ip, { aiId: ai.id, tokenId: tokenId.toString(), hash, days: req.body.days, paidWei: total.toString() });
+      return { hash, aiId: ai.id, paid: pol(total), until: synced?.renterUntil?.toISOString() ?? null, balance: pol(await chain.balanceOf(w.address)) };
     },
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toModel } from "../../../contexts/AIContext";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -9,7 +9,8 @@ import { useModal } from "../../../contexts/ModalContext";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../components/ui";
 import { useTilt } from "../../../components/motion";
-import { altar, auth, mediaUrl, pictures, publicApi } from "../../../lib/alt";
+import { altar, auth, continueWithAlt, conversations, mediaUrl, pictures, publicApi, wallet } from "../../../lib/alt";
+import ConfirmSpend from "../../../components/ConfirmSpend";
 import PicturePicker from "../../../components/PicturePicker";
 import { useAI } from "../../../contexts/AIContext";
 import { networkName, percent, polText, shortAddress, timeAgo } from "../../../lib/format";
@@ -29,6 +30,14 @@ export default function AgentDetails() {
   const [missing, setMissing] = useState(false);
   const [chain, setChain] = useState(null);
   const [listing, setListing] = useState(null);
+  const [activity, setActivity] = useState([]);
+  const [access, setAccess] = useState(null);
+  const [days, setDays] = useState(1);
+  const [checkout, setCheckout] = useState(null); // "buy" | "rent"
+  const [notice, setNotice] = useState(null);
+  // Bumped after a purchase or rental, to read everything again.
+  const [version, setVersion] = useState(0);
+  const router = useRouter();
   const [offer, setOffer] = useState("own");
   const [picking, setPicking] = useState(false);
   const { reload: reloadCatalog } = useAI();
@@ -44,6 +53,10 @@ export default function AgentDetails() {
           .listing(ai.id)
           .then((l) => live && setListing(l))
           .catch(() => live && setListing(null));
+        altar
+          .activity(ai.id)
+          .then((a) => live && setActivity(a))
+          .catch(() => live && setActivity([]));
         // Read the token straight from the chain, so the page shows what is true right now.
         if (ai.token) {
           publicApi(`/core/verify/token/${ai.token.tokenId}`)
@@ -55,7 +68,20 @@ export default function AgentDetails() {
     return () => {
       live = false;
     };
-  }, [handle]);
+  }, [handle, version]);
+
+  // Whether the signed-in person may talk to it (owner, or renter until when).
+  useEffect(() => {
+    if (!user || !model?.id) return;
+    let live = true;
+    conversations
+      .access(model.id)
+      .then((a) => live && setAccess(a))
+      .catch(() => live && setAccess(null));
+    return () => {
+      live = false;
+    };
+  }, [user, model?.id, version]);
 
   if (missing) {
     return (
@@ -119,6 +145,32 @@ export default function AgentDetails() {
 
   return (
     <div className="mx-auto max-w-[1320px] px-4 pb-24 pt-6 sm:px-6 lg:pt-10">
+      {checkout === "buy" && listing?.sale && (
+        <ConfirmSpend
+          title={`Buy ${model.name}`}
+          action={`Pay ${polText(listing.sale.price)}`}
+          onClose={() => setCheckout(null)}
+          onConfirm={(confirm) => wallet.buy(model.id, confirm, listing.sale.price.pol)}
+          onDone={() => {
+            setNotice(null);
+            reloadCatalog();
+            setVersion((v) => v + 1);
+          }}
+        >
+          You pay <b className="text-ink">{polText(listing.sale.price)}</b> from your ALT wallet and {model.name}&apos;s identity token moves to you, with every right. ALT pays the network fee.
+        </ConfirmSpend>
+      )}
+      {checkout === "rent" && listing?.rent && (
+        <ConfirmSpend
+          title={`Rent ${model.name}`}
+          action={`Pay ${polText(String(Number(listing.rent.pricePerDay.pol) * days))}`}
+          onClose={() => setCheckout(null)}
+          onConfirm={(confirm) => wallet.rent(model.id, days, confirm, listing.rent.pricePerDay.pol)}
+          onDone={() => router.push(`/chat/${model.handle}`)}
+        >
+          You pay <b className="text-ink">{polText(String(Number(listing.rent.pricePerDay.pol) * days))}</b> for {days} {days === 1 ? "day" : "days"} of sole use. You can talk to {model.name} on ALTAR until then; the owner keeps the token.
+        </ConfirmSpend>
+      )}
       {picking && <PicturePicker kind="ai" title={`${model.name}'s picture`} name={model.name} current={model.image} onClose={() => setPicking(false)} onSave={savePicture} />}
       <nav className="mb-6 flex items-center gap-2 text-sm text-ink-3" aria-label="Breadcrumb">
         <Link href="/#explore" className="hover:text-ink">
@@ -166,6 +218,16 @@ export default function AgentDetails() {
               {!sameMaker && <Person label="Creator" person={model.creator} you={user && model.creator?.id === user.id} />}
             </div>
           </div>
+
+          {access?.role === "renter" && (
+            <Card className="animate-page-in flex flex-wrap items-center justify-between gap-4 border-accent/40 bg-accent/10 p-6">
+              <div>
+                <p className="font-display text-xl font-bold">You&apos;re renting {model.name}</p>
+                <p className="mt-1 text-ink-2">Talk to it until {new Date(access.until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.</p>
+              </div>
+              <Button href={`/chat/${model.handle}`}>Chat now</Button>
+            </Card>
+          )}
 
           {isOwner ? (
             <Card style={{ animationDelay: "120ms" }} className="animate-rise p-6">
@@ -226,11 +288,35 @@ export default function AgentDetails() {
                     </p>
                     {offer === "rent" && listing?.rent && <p className="mt-1 text-sm text-ink-3">Up to {listing.rent.maxDays} days</p>}
                   </div>
-                  <Chip tone="soon">{price ? "Checkout opens soon" : "Not offered yet"}</Chip>
+                  {offer === "subscribe" && price && <Chip tone="soon">Opens soon</Chip>}
                 </div>
+                {offer === "rent" && listing?.rent && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sunken/60 p-3">
+                    <div className="flex items-center gap-2" role="group" aria-label="Days">
+                      <button onClick={() => setDays((d) => Math.max(1, d - 1))} className="h-9 w-9 rounded-full border border-line bg-surface font-bold" aria-label="One day less">
+                        −
+                      </button>
+                      <span className="min-w-20 text-center font-semibold">
+                        {days} {days === 1 ? "day" : "days"}
+                      </span>
+                      <button onClick={() => setDays((d) => Math.min(listing.rent.maxDays, d + 1))} className="h-9 w-9 rounded-full border border-line bg-surface font-bold" aria-label="One day more">
+                        +
+                      </button>
+                    </div>
+                    <p className="text-sm text-ink-2">
+                      Total <b className="text-ink">{polText(String(Number(listing.rent.pricePerDay.pol) * days))}</b>
+                    </p>
+                  </div>
+                )}
+                {notice && <p className="animate-page-in mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-2">{notice}</p>}
                 <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
-                  <Button size="lg" disabled>
-                    {offer === "own" ? "Buy" : offer === "rent" ? "Rent" : "Subscribe"}
+                  <Button
+                    size="lg"
+                    disabled={!price || offer === "subscribe" || (offer === "rent" && access?.role === "renter")}
+                    onClick={() => (user ? setCheckout(offer === "own" ? "buy" : "rent") : continueWithAlt("signin", `/details/${model.handle}`).catch(() => {}))}
+                  >
+                    {!user && price && offer !== "subscribe" ? "Sign in to " : ""}
+                    {offer === "own" ? (user && price ? `Buy for ${price}` : "Buy") : offer === "rent" ? (user && price ? `Rent for ${days} ${days === 1 ? "day" : "days"}` : "Rent") : "Subscribe"}
                   </Button>
                   <Button
                     kind="outline"
@@ -304,7 +390,22 @@ export default function AgentDetails() {
           {token && (
             <Card style={{ animationDelay: "570ms" }} className="animate-rise p-6">
               <h2 className="font-display text-lg font-bold">Activity</h2>
-              <div className="mt-4 flex items-center gap-4 rounded-2xl bg-sunken/60 p-4 text-sm">
+              {activity.map((a) => (
+                <div key={a.id} className="mt-3 flex items-center gap-4 rounded-2xl bg-sunken/60 p-4 text-sm">
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold ${a.kind === "sale" ? "bg-pop text-pop-ink" : "bg-b3 text-white"}`}>{a.kind === "sale" ? "⇄" : "⏱"}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">
+                      {a.kind === "sale" ? `Sold to ${a.to.name ?? shortAddress(a.to.address)}` : `Rented by ${a.to.name ?? shortAddress(a.to.address)} for ${a.days} ${a.days === 1 ? "day" : "days"}`} · {polText(a.amount)}
+                    </p>
+                    <p className="truncate text-ink-3">
+                      {a.kind === "sale" ? `from ${a.from.name ?? shortAddress(a.from.address)}` : `from ${a.from.name ?? shortAddress(a.from.address)}`}
+                      {Number(a.royalty.pol) > 0 && ` · ${polText(a.royalty)} royalty to the creator`}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-ink-3">{timeAgo(a.occurredAt)}</span>
+                </div>
+              ))}
+              <div className="mt-3 flex items-center gap-4 rounded-2xl bg-sunken/60 p-4 text-sm">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-bold text-accent-ink">✦</span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">Minted by {model.creatorName}</p>
@@ -312,7 +413,7 @@ export default function AgentDetails() {
                 </div>
                 <span className="shrink-0 text-ink-3">{timeAgo(token.mintedAt)}</span>
               </div>
-              <p className="mt-3 text-xs text-ink-3">Sales, rentals and subscriptions will be listed here as they happen.</p>
+              <p className="mt-3 text-xs text-ink-3">Read from the marketplace contract&apos;s events.</p>
             </Card>
           )}
         </div>
