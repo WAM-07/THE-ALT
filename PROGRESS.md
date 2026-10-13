@@ -303,7 +303,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Ticker:** a tilted ribbon of the latest mints slides past under the hero (real tokens; pauses under the mouse).
   - **Token art moves:** always in the hero, on the AI page and on the profile banner; in grids only while a card is hovered. Grain is a static overlay, so the motion stays smooth.
   - **Cards** tilt towards the cursor with a soft light (`useTilt`); sections and grid cards fade up as they scroll in (`Reveal`); pages fade in (`app/template.js`); the Own / Rent / Subscribe tab slides.
-  - **Account button:** avatar with a ▾ that opens the menu (profile is its first entry), with a small pop-in; the header gains a shadow once the page scrolls.
+  - **Account picture** (top right) opens the profile page directly (owner's choice); Saved, Wallet, Settings and Sign out are on the profile page. The header gains a shadow once the page scrolls.
   - Helpers in `src/components/motion.js`, keyframes in `globals.css`. Everything stops for people whose system asks for reduced motion.
   - Checked in headless Chrome mid-animation (1440px and 375px), hover tilt, the menu and the tabs; `eslint` (no errors) and `next build` pass.
 

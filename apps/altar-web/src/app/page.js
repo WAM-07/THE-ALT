@@ -444,7 +444,7 @@ function Creators({ creators }) {
               ))}
             </div>
             <div className="px-5 pb-5">
-              <Avatar src={mediaUrl(person.avatarUrl)} name={person.displayName} size={56} className="-mt-7 ring-4 ring-surface" />
+              <Avatar src={mediaUrl(person.avatarUrl)} name={person.displayName} size={56} className="relative -mt-7 ring-4 ring-surface" />
               <p className="mt-2 truncate font-display text-lg font-bold">{person.displayName}</p>
               <p className="truncate text-sm text-ink-3">@{person.handle}</p>
               <p className="mt-3 text-sm font-semibold text-ink-2">

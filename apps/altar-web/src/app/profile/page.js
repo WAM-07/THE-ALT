@@ -32,7 +32,7 @@ export default function ProfilePage() {
 
 // The signed-in person's ALT account: the AIs they own and the ones they saved.
 function Profile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { showAlert } = useModal();
   const { aiModels } = useAI();
   const { wishlist, removeFromWishlist } = useWishlist();
@@ -116,6 +116,12 @@ function Profile() {
               </svg>
               Settings
             </Link>
+            <Link href="/wallet" className={btnClass("outline", "sm")}>
+              Wallet
+            </Link>
+            <Button kind="ghost" size="sm" onClick={logout}>
+              Sign out
+            </Button>
           </div>
         </div>
 

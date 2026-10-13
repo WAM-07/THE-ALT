@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
@@ -59,67 +59,8 @@ function Search({ autoFocus = false, onDone }) {
   );
 }
 
-function AccountMenu({ user, onLogout }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef(null);
-  // Close the menu after moving to another page.
-  const pathname = usePathname();
-  const [menuPath, setMenuPath] = useState(pathname);
-  if (pathname !== menuPath) {
-    setMenuPath(pathname);
-    setOpen(false);
-  }
-  useEffect(() => {
-    if (!open) return;
-    const close = (e) => !box.current?.contains(e.target) && setOpen(false);
-    const esc = (e) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-
-  const item = "flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[15px] font-medium hover:bg-sunken";
-  return (
-    <div className="relative" ref={box}>
-      {/* Opens the account menu; the profile itself is its first entry. */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="Account menu"
-        className={`flex items-center gap-1 rounded-full border p-1 pr-2 transition ${open ? "border-ink/30 bg-surface" : "border-line hover:border-ink/30"}`}
-      >
-        <Avatar src={mediaUrl(user.avatarUrl)} name={user.name} size={32} />
-        <svg viewBox="0 0 24 24" className={`h-4 w-4 text-ink-2 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <div role="menu" className="animate-pop-in absolute right-0 top-13 z-50 w-64 rounded-2xl border border-line bg-surface p-2 shadow-card">
-          <Link href="/profile" role="menuitem" className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-sunken">
-            <Avatar src={mediaUrl(user.avatarUrl)} name={user.name} size={40} />
-            <span className="min-w-0">
-              <span className="block truncate font-semibold">{user.name}</span>
-              <span className="block truncate text-sm text-ink-3">View profile</span>
-            </span>
-          </Link>
-          <div className="my-1 h-px bg-line" />
-          <Link href="/profile?tab=saved" className={item} role="menuitem">Saved</Link>
-          <Link href="/wallet" className={item} role="menuitem">Wallet</Link>
-          <Link href="/settings" className={item} role="menuitem">Settings</Link>
-          <div className="my-1 h-px bg-line" />
-          <button onClick={onLogout} className={`${item} text-ink-2`} role="menuitem">Sign out</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Header() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { wishlist } = useWishlist();
   const pathname = usePathname();
   const [searching, setSearching] = useState(false);
@@ -172,7 +113,13 @@ export default function Header() {
                 <Svg className="h-4.5 w-4.5">{Icon.wallet}</Svg>
                 Wallet
               </Link>
-              <AccountMenu user={user} onLogout={logout} />
+              <Link
+                href="/profile"
+                aria-label="Your profile"
+                className={`rounded-full ring-offset-2 ring-offset-canvas transition hover:ring-2 hover:ring-ink/20 ${pathname === "/profile" ? "ring-2 ring-accent" : ""}`}
+              >
+                <Avatar src={mediaUrl(user.avatarUrl)} name={user.name} size={40} />
+              </Link>
             </>
           ) : (
             <>
