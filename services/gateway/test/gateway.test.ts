@@ -40,6 +40,7 @@ beforeAll(async () => {
     NODE_ENV: 'test',
     CORE_URL: `http://127.0.0.1:${port}`,
     ALTERA_URL: 'http://127.0.0.1:9', // nothing listens here
+    ALTAR_WEB_URL: `http://127.0.0.1:${port}`, // the stand-in plays ALTAR web too
   });
   gateway = await buildGateway(config, { jwks: createLocalJWKSet({ keys: [jwk] }), logger: false });
   await gateway.ready();
@@ -59,6 +60,15 @@ describe('gateway', () => {
     expect(body.headers['x-alt-user-id']).toBe('user-1');
     expect(body.headers['x-alt-platform']).toBe('altera');
     expect(body.headers['x-request-id']).toBeTruthy();
+  });
+
+  it('serves ALTAR web for every path the services do not own', async () => {
+    const page = await gateway.inject({ method: 'GET', url: '/details/sara_ai?x=1' });
+    expect(page.statusCode).toBe(200);
+    expect(page.json().url).toBe('/details/sara_ai?x=1');
+    expect((await gateway.inject({ method: 'GET', url: '/' })).json().url).toBe('/');
+    // Service prefixes still win.
+    expect((await gateway.inject({ method: 'GET', url: '/core/me' })).json().url).toBe('/me');
   });
 
   it('drops identity headers a client tries to forge', async () => {

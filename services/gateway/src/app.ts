@@ -195,11 +195,20 @@ export async function buildGateway(config: GatewayConfig, opts: { jwks?: JWTVeri
 
   app.get('/docs', async (_req, reply) => reply.redirect('/core/docs'));
 
+  // A client that drops a WebSocket mid-handshake resets its socket; with no listener that
+  // error would crash the whole gateway. Log it and carry on.
+  app.server.on('upgrade', (_req, socket) => {
+    socket.on('error', (err) => app.log.debug({ err }, 'websocket client went away'));
+  });
+
   if (config.altarWebUrl) {
     // ALTAR web is the public face of the ecosystem; everything not matched above goes to it.
     await app.register(proxy, {
       upstream: config.altarWebUrl,
-      prefix: '/',
+      // OPTIONS "*" already belongs to CORS; ALTAR web is same-origin and needs no preflight.
+      httpMethods: ['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'],
+      // Next.js live reload (development) uses a WebSocket on this route too.
+      websocket: true,
       replyOptions: { onError: upstreamError('altar-web') },
     });
   } else {
