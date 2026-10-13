@@ -14,6 +14,8 @@ export const toModel = (ai) => ({
   creatorName: ai.creator?.displayName ?? "Unknown",
   ownerName: ai.owner?.displayName ?? "Unknown",
   version: ai.currentVersion?.version ?? null,
+  // The token's artwork is drawn from its id on its contract (see AitArt).
+  artSeed: ai.token ? `${ai.token.contract}:${ai.token.tokenId}` : ai.handle,
 });
 
 export const AIProvider = ({ children }) => {

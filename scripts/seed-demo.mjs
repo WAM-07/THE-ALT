@@ -23,19 +23,17 @@ const CONSENTS = { persona_training: true, third_party_processing: true, public_
 
 // ---------------------------------------------------------------- pictures
 
-/** A simple PNG avatar: a coloured disc on a tinted background (no image library needed). */
-function avatarPng([r, g, b], [br, bg, bb]) {
-  const W = 256;
+/** A PNG (RGB, no image library needed); `pixel(x, y)` returns [r, g, b]. */
+function encodePng(W, pixel) {
   const raw = Buffer.alloc((W * 3 + 1) * W);
   for (let y = 0; y < W; y++) {
     raw[y * (W * 3 + 1)] = 0;
     for (let x = 0; x < W; x++) {
       const i = y * (W * 3 + 1) + 1 + x * 3;
-      const d = Math.hypot(x - 128, y - 118);
-      const inner = d < 70 || (Math.hypot(x - 128, y - 260) < 120 && y > 170);
-      raw[i] = inner ? r : br;
-      raw[i + 1] = inner ? g : bg;
-      raw[i + 2] = inner ? b : bb;
+      const [r, g, b] = pixel(x, y);
+      raw[i] = r;
+      raw[i + 1] = g;
+      raw[i + 2] = b;
     }
   }
   const table = Array.from({ length: 256 }, (_, n) => {
@@ -64,9 +62,34 @@ function avatarPng([r, g, b], [br, bg, bb]) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
+/** A simple person avatar: a coloured head and shoulders on a tinted background. */
+function avatarPng([r, g, b], [br, bg, bb]) {
+  return encodePng(256, (x, y) => {
+    const inner = Math.hypot(x - 128, y - 118) < 70 || (Math.hypot(x - 128, y - 260) < 120 && y > 170);
+    return inner ? [r, g, b] : [br, bg, bb];
+  });
+}
+
+/** An AI's picture: a glossy orb, lit from the top left, glowing on a solid background. */
+function orbPng(light, deep, back) {
+  const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  return encodePng(256, (x, y) => {
+    const d = Math.hypot(x - 128, y - 128);
+    const glow = d > 90 ? clamp(1 - (d - 90) / 50) * 0.35 : 0;
+    const bgCol = mix(back, deep, glow);
+    const t = clamp(Math.hypot(x - 96, y - 92) / 150) ** 0.85;
+    let col = mix(light, deep, t);
+    const spec = clamp(1 - Math.hypot(x - 98, y - 90) / 34) ** 2 * 0.65;
+    col = mix(col, [255, 255, 255], spec);
+    return mix(bgCol, col, clamp(92.5 - d)).map(Math.round);
+  });
+}
+
 // ---------------------------------------------------------------- the seed
 
-export async function seedDemo({ gateway, log = console.log }) {
+/** The public-API helpers the seed uses, bound to one gateway. */
+function demoClient(gateway) {
   const call = async (method, path, token, body, { allow = [] } = {}) => {
     const res = await fetch(gateway + path, {
       method,
@@ -101,7 +124,7 @@ export async function seedDemo({ gateway, log = console.log }) {
 
   /** Creates an AI in ALTER and, unless `draft`, takes it all the way to a minted identity token. */
   async function makeAi(token, spec) {
-    const ai = (await call('POST', '/core/ais', token, { name: spec.name, handle: spec.handle, description: spec.bio, onboarding: spec.onboarding, consents: CONSENTS })).data;
+    const ai = (await call('POST', '/core/ais', token, { name: spec.name, handle: spec.handle, description: spec.bio, category: spec.category, royaltyBps: spec.royaltyBps, onboarding: spec.onboarding, consents: CONSENTS })).data;
     for (const d of spec.data) await call('POST', `/core/ais/${ai.id}/datasets`, token, d);
     for (const m of spec.memories ?? []) await call('POST', `/core/ais/${ai.id}/memories`, token, { content: m });
     if (spec.draft) return ai;
@@ -119,6 +142,11 @@ export async function seedDemo({ gateway, log = console.log }) {
     throw new Error(`${spec.name} took too long to mint`);
   }
 
+  return { call, upload, sleep, signUp, intoAltera, makeAi };
+}
+
+export async function seedDemo({ gateway, log = console.log }) {
+  const { call, upload, sleep, signUp, intoAltera, makeAi } = demoClient(gateway);
   const started = Date.now();
   const t = {};
   log('creating ALT accounts (sign-up, e-mail code)…');
@@ -146,6 +174,7 @@ export async function seedDemo({ gateway, log = console.log }) {
   const museAi = await makeAi(t.ayesha, {
     name: 'Muse',
     handle: 'ayesha.muse',
+    category: 'creative',
     bio: 'Ayesha’s creative twin: digital art, colour theory and gentle critique.',
     onboarding: { about: 'Digital artist and illustrator from Lahore.', pronouns: 'She/Her', roles: ['Artist', 'Illustrator'], primaryTrait: 'Creative' },
     data: [
@@ -163,8 +192,8 @@ export async function seedDemo({ gateway, log = console.log }) {
     draft: true,
   });
 
-  await upload(`/core/ais/${wamiqAi.id}/avatar`, t.wamiq, avatarPng([16, 185, 129], [46, 16, 101]));
-  await upload(`/core/ais/${museAi.id}/avatar`, t.ayesha, avatarPng([245, 158, 11], [19, 78, 74]));
+  await upload(`/core/ais/${wamiqAi.id}/avatar`, t.wamiq, orbPng([110, 240, 170], [18, 110, 70], [12, 40, 30]));
+  await upload(`/core/ais/${museAi.id}/avatar`, t.ayesha, orbPng([255, 200, 120], [214, 80, 140], [40, 20, 45]));
 
   log('version 2 of Wamiq’s ALT: new data, built, published on-chain…');
   await call('POST', `/core/ais/${wamiqAi.id}/datasets`, t.wamiq, { title: 'Project update', category: 'knowledge', text: 'THE ALT now has one notification inbox shared by ALTER and ALTERA, and AIs keep their identity tokens across restarts of the development chain.' });
@@ -245,9 +274,97 @@ export async function seedDemo({ gateway, log = console.log }) {
     log(`  (skipped the DM: ${err.message})`);
   }
 
+  log('filling ALTAR: more creators and verified AIs, each minted on-chain…');
+  await seedMarket({ gateway, log, tokens: { wamiq: t.wamiq, ayesha: t.ayesha } });
+
   log('an announcement from the ALT team to everyone…');
   await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
 
   log(`demo data ready in ${Math.round((Date.now() - started) / 1000)} s`);
   return { wamiqAi, museAi };
+}
+
+// ---------------------------------------------------------------- ALTAR's catalogue
+
+/** More creators with verified AIs, so ALTAR has a real catalogue to browse (each one is minted on-chain). */
+export const MARKET_PEOPLE = [
+  { key: 'bilal', email: 'bilal@demo.alt', handle: 'bilal', name: 'Bilal Ahmed', colour: [16, 120, 90] },
+  { key: 'zainab', email: 'zainab@demo.alt', handle: 'zainab', name: 'Zainab Khan', colour: [190, 70, 120] },
+  { key: 'omar', email: 'omar@demo.alt', handle: 'omar', name: 'Omar Farooq', colour: [40, 90, 200] },
+];
+
+const MARKET_AIS = [
+  {
+    owner: 'bilal', name: 'Code Sensei', handle: 'bilal.sensei', category: 'coding', royaltyBps: 750,
+    bio: 'A patient pair-programmer for JavaScript, Python and SQL. Explains the why, not just the fix.',
+    onboarding: { about: 'Senior backend engineer in Islamabad who mentors juniors.', roles: ['Engineer', 'Mentor'], primaryTrait: 'Patient' },
+    text: 'I have been a backend engineer for eight years, mostly Node.js, Python and PostgreSQL. I mentor junior developers. I explain bugs step by step, suggest small tests first and avoid jargon.',
+    orb: [[120, 230, 200], [10, 110, 90], [10, 32, 30]],
+  },
+  {
+    owner: 'bilal', name: 'Pitch Partner', handle: 'bilal.pitch', category: 'business', royaltyBps: 500,
+    bio: 'Sharpens startup pitches and one-pagers. Direct, numbers-first feedback.',
+    onboarding: { about: 'Founder who has pitched to investors in Karachi and Dubai.', roles: ['Founder'], primaryTrait: 'Direct' },
+    text: 'I have built two small startups and pitched to many investors. I care about a clear problem, real numbers and a short story. I give direct feedback and always suggest one concrete next step.',
+    orb: [[255, 214, 120], [200, 120, 20], [40, 28, 10]],
+  },
+  {
+    owner: 'zainab', name: 'Urdu Ustad', handle: 'zainab.ustad', category: 'language', royaltyBps: 600,
+    bio: 'Learn conversational Urdu and read Ghalib, one couplet at a time.',
+    onboarding: { about: 'Urdu literature teacher from Lahore.', roles: ['Teacher', 'Poet'], primaryTrait: 'Warm' },
+    text: 'I teach Urdu literature and love Ghalib, Faiz and Parveen Shakir. I teach with everyday phrases first, then poetry. I correct mistakes gently and give the Roman Urdu spelling alongside the script.',
+    orb: [[255, 170, 210], [180, 40, 110], [40, 12, 30]],
+  },
+  {
+    owner: 'zainab', name: 'Calm Coach', handle: 'zainab.calm', category: 'wellness', royaltyBps: 400,
+    bio: 'Breathing exercises, study-stress check-ins and a kind voice before exams.',
+    onboarding: { about: 'Yoga teacher who helps students handle exam stress.', roles: ['Coach'], primaryTrait: 'Calm' },
+    text: 'I teach yoga and simple breathing exercises to university students. I speak slowly and kindly, suggest one small step at a time, and remind people to rest. I am not a doctor and say so when it matters.',
+    orb: [[190, 220, 255], [60, 110, 200], [14, 22, 44]],
+  },
+  {
+    owner: 'omar', name: 'Chess Buddy', handle: 'omar.chess', category: 'gaming', royaltyBps: 1000,
+    bio: 'Opening ideas, tactics drills and friendly post-game reviews.',
+    onboarding: { about: 'Club chess player and coach, rated 2100.', roles: ['Coach', 'Player'], primaryTrait: 'Competitive' },
+    text: 'I play club chess and coach beginners. I love the Sicilian and endgame puzzles. I review games by asking what the player was thinking before showing the better move.',
+    orb: [[230, 230, 230], [70, 70, 80], [18, 18, 22]],
+  },
+  {
+    owner: 'ayesha', name: 'Palette', handle: 'ayesha.palette', category: 'creative', royaltyBps: 800,
+    bio: 'Colour palettes from a mood, a photo or a city. Truck-art energy included.',
+    onboarding: { about: 'Digital artist and illustrator from Lahore.', roles: ['Artist'], primaryTrait: 'Creative' },
+    text: 'I build colour palettes for illustrators. I name colours after things in Lahore, like saffron, rickshaw green and old-city brick, and I always explain why the colours work together.',
+    orb: [[255, 190, 110], [230, 80, 60], [44, 18, 12]],
+  },
+  {
+    owner: 'wamiq', name: 'Study Buddy', handle: 'wamiq.study', category: 'education', royaltyBps: 300,
+    bio: 'Turns lecture notes into flashcards and quizzes for CS courses.',
+    onboarding: { about: 'Final-year CS student who likes making revision notes.', roles: ['Student'], primaryTrait: 'Organised' },
+    text: 'I make short revision notes and flashcards for computer science courses: data structures, databases and operating systems. I quiz one question at a time and explain the answer in two lines.',
+    orb: [[170, 240, 120], [60, 140, 40], [16, 34, 12]],
+  },
+];
+
+/**
+ * Fills ALTAR's catalogue: more creators and verified AIs across categories, each built and minted
+ * through the real APIs. `tokens` can pass sessions for people the demo already signed up.
+ */
+export async function seedMarket({ gateway, log = console.log, tokens = {} }) {
+  const { upload, signUp, makeAi } = demoClient(gateway);
+  const t = { ...tokens };
+  for (const p of MARKET_PEOPLE) {
+    if (t[p.key]) continue;
+    t[p.key] = await signUp(p);
+    await upload('/core/me/avatar', t[p.key], avatarPng([255, 255, 255], p.colour));
+  }
+  for (const spec of MARKET_AIS) {
+    if (!t[spec.owner]) continue;
+    log(`  ${spec.name} (${spec.category})…`);
+    const ai = await makeAi(t[spec.owner], {
+      ...spec,
+      data: [{ title: 'About me', category: 'personality', text: spec.text }],
+      chat: ['Hi! What can you help me with?', 'What makes you different?', 'Give me one quick tip.'],
+    });
+    await upload(`/core/ais/${ai.id}/avatar`, t[spec.owner], orbPng(...spec.orb));
+  }
 }

@@ -1,240 +1,180 @@
 @import "tailwindcss";
 
 /*
- * ALTAR themes. Soban's screens use Tailwind's own colour names (black, white, green); each theme
- * redefines what those names mean, so the same markup renders in every theme.
- *   black  = card surface      white = text and lines      green = ALTAR's brand scale
- *   canvas = page background   raised = inset panels        popup = dialogs
- * Pick a theme in My AIs → Appearance (or the region button). html[data-theme] holds the choice;
- * any element can carry data-theme to keep its own look (the light theme's dark hero does).
+ * ALTAR's design tokens. Screens use these names only (bg-canvas, text-ink, border-line, bg-accent…);
+ * each theme gives them its own values, so every screen renders in every theme.
+ *   canvas  page background        surface  cards              sunken  wells, inputs, table heads
+ *   ink     text (ink-2 muted, ink-3 faint)                     line    borders and dividers
+ *   accent  ALTAR green (accent-ink: text on it; accent-text: green that reads on the canvas)
+ *   pop     the main button (pop-ink: its text)
+ *   b1–b4   the playful shapes behind headings (mint, pink, blue, yellow in Studio)
+ * html[data-theme] holds the choice (Settings → Advanced → Appearance lab). Any element can carry
+ * its own data-theme (the light theme's dark "Ways to hold an AI" band does).
  */
-@theme {
-  --color-canvas: #000000;
-  --color-raised: #0a0a0a;
-  --color-popup: #050505;
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
+  --color-pop: var(--pop);
+  --color-pop-ink: var(--pop-ink);
+  --color-b1: var(--b1);
+  --color-b2: var(--b2);
+  --color-b3: var(--b3);
+  --color-b4: var(--b4);
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
 }
 
-:root {
-  --background: #000000;
-  --foreground: #ffffff;
+/* Studio (default): a warm paper canvas, ink type and bright, friendly shapes. */
+:root,
+[data-theme="studio"] {
+  color-scheme: light;
+  --canvas: #f3f1ec;
+  --surface: #ffffff;
+  --sunken: #ebe8e0;
+  --ink: #131613;
+  --ink-2: #555a54;
+  --ink-3: #8a8e86;
+  --line: #e0dcd2;
+  --accent: #3ddc84;
+  --accent-ink: #06210f;
+  --accent-text: #138a45;
+  --pop: #131613;
+  --pop-ink: #ffffff;
+  --b1: #4ae68e;
+  --b2: #ffb5ea;
+  --b3: #7aa9ff;
+  --b4: #ffd04a;
+  --shadow: 0 1px 2px rgb(19 22 19 / 0.04), 0 12px 32px rgb(19 22 19 / 0.07);
 }
 
-/* Forest: dark with depth. Green-tinted off-blacks in layers, warm off-white text, a deeper green scale. */
+/* Night: a dark market floor; the art and the green do the talking. */
+[data-theme="night"] {
+  color-scheme: dark;
+  --canvas: #0c0d10;
+  --surface: #15171b;
+  --sunken: #1c1f24;
+  --ink: #f2f3ef;
+  --ink-2: #a6aaa4;
+  --ink-3: #6f746e;
+  --line: #262a30;
+  --accent: #3ddc84;
+  --accent-ink: #04140a;
+  --accent-text: #52e394;
+  --pop: #f2f3ef;
+  --pop-ink: #0c0d10;
+  --b1: #1f9a5c;
+  --b2: #a8327f;
+  --b3: #3554c9;
+  --b4: #b88d16;
+  --shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+/* Forest: dark with depth, layered green-blacks. */
 [data-theme="forest"] {
   color-scheme: dark;
-  --background: #08100c;
-  --foreground: #edf3ee;
-  --color-canvas: #08100c;
-  --color-black: #0f1813;
-  --color-raised: #15211a;
-  --color-popup: #111c16;
-  --color-white: #edf3ee;
-  --color-gray-700: #4d5d53;
-  --color-green-50: #effbf3;
-  --color-green-100: #d6f5e0;
-  --color-green-200: #ade9c3;
-  --color-green-300: #7fd9a2;
-  --color-green-400: #4fc583;
-  --color-green-500: #2aa866;
-  --color-green-600: #1f8a53;
-  --color-green-700: #1b6e45;
-  --color-green-800: #185839;
-  --color-green-900: #14482f;
-  --color-green-950: #0a2a1b;
-  --color-emerald-400: #6fd6b0;
-  --color-emerald-500: #3fb88f;
+  --canvas: #08100c;
+  --surface: #0f1913;
+  --sunken: #15211a;
+  --ink: #edf3ee;
+  --ink-2: #a3b5a9;
+  --ink-3: #6b7f72;
+  --line: #1f2e25;
+  --accent: #2fbf71;
+  --accent-ink: #03110a;
+  --accent-text: #5fd394;
+  --pop: #edf3ee;
+  --pop-ink: #08100c;
+  --b1: #1f8a53;
+  --b2: #2f6f5a;
+  --b3: #3f7f6e;
+  --b4: #8fae3a;
+  --shadow: 0 12px 32px rgb(0 0 0 / 0.4);
 }
 
-/* Daylight: a light marketplace. Soft grey-green page, white cards, ink text, greens dark enough to read on white. */
-[data-theme="daylight"] {
-  color-scheme: light;
-  --background: #f3f6f4;
-  --foreground: #12201a;
-  --color-canvas: #f3f6f4;
-  --color-black: #ffffff;
-  --color-raised: #eef3f0;
-  --color-popup: #ffffff;
-  --color-white: #12201a;
-  --color-gray-700: #9aa8a0;
-  --color-green-50: #effbf3;
-  --color-green-100: #d6f5e0;
-  --color-green-200: #a7e3bd;
-  --color-green-300: #1f8a53;
-  --color-green-400: #1b7a49;
-  --color-green-500: #1f9a5c;
-  --color-green-600: #17804b;
-  --color-green-700: #136a3e;
-  --color-green-800: #105633;
-  --color-green-900: #0d4529;
-  --color-green-950: #072a19;
-  --color-emerald-400: #23986d;
-  --color-emerald-500: #1c8460;
-}
-/* Glows and heavy black shadows read as smudges on white: soften every shadow in the light theme. */
-[data-theme="daylight"] * {
-  --tw-shadow-color: rgb(18 32 26 / 0.07);
-}
-/* Elements that keep their own theme inside Daylight (the hero) get their shadows back. */
-[data-theme="daylight"] [data-theme="forest"] * {
-  --tw-shadow-color: initial;
+/* Original: Soban's colours. Pure black, white type, one bright green. */
+[data-theme="original"] {
+  color-scheme: dark;
+  --canvas: #000000;
+  --surface: #0a0a0a;
+  --sunken: #121212;
+  --ink: #ffffff;
+  --ink-2: #a3a3a3;
+  --ink-3: #6b6b6b;
+  --line: #1f1f1f;
+  --accent: #22c55e;
+  --accent-ink: #000000;
+  --accent-text: #4ade80;
+  --pop: #ffffff;
+  --pop-ink: #000000;
+  --b1: #22c55e;
+  --b2: #15803d;
+  --b3: #166534;
+  --b4: #4ade80;
+  --shadow: 0 12px 32px rgb(0 0 0 / 0.5);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Inter', sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--color-white) 15%, transparent);
+  background: color-mix(in oklab, var(--ink) 18%, transparent);
   border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(52, 211, 153, 0.3);
+@utility shadow-card {
+  box-shadow: var(--shadow);
 }
 
-/* Glassmorphism */
-.glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-emerald {
-  background: rgba(16, 185, 129, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(16, 185, 129, 0.1);
-}
-
-/* Animations */
-@keyframes marquee {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-50%); }
-}
-
-.animate-marquee {
-  animation: marquee 40s linear infinite;
-  display: flex;
-  width: max-content;
-}
-
-.animate-marquee:hover {
-  animation-play-state: paused;
-}
-
-@keyframes fade-in-up {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
+/* Rows that scroll sideways on phones without a visible bar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
+}
+
+@keyframes float {
+  0%,
   100% {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-10px) rotate(var(--r, 0deg));
   }
 }
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.6s ease-out forwards;
+@utility animate-float {
+  animation: float 7s ease-in-out infinite;
 }
 
-/* Selection */
-::selection {
-  background: rgba(16, 185, 129, 0.3);
-  color: white;
-}
-
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(1000%); }
-}
-
-.animate-scanline {
-  animation: scanline 4s linear infinite;
-}
-
-@keyframes flicker {
-  0% { opacity: 1; }
-  50% { opacity: 0.8; }
-  100% { opacity: 1; }
-}
-
-.animate-flicker {
-  animation: flicker 2s infinite;
-}
-
-@keyframes receipt-unfold {
-  0% { transform: scaleY(0); transform-origin: top; opacity: 0; }
-  100% { transform: scaleY(1); transform-origin: top; opacity: 1; }
-}
-
-.animate-receipt-unfold {
-  animation: receipt-unfold 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes text-shimmer {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-
-.animate-text-shimmer {
-  animation: text-shimmer 4s linear infinite;
-}
-
-@keyframes typing {
-  from { width: 0 }
-  to { width: 100% }
-}
-
-@keyframes blink {
-  from, to { border-color: transparent }
-  50% { border-color: #10b981 }
-}
-
-.animate-typing-reveal {
-  animation: 
-    typing 3.5s steps(40, end) forwards,
-    blink .75s step-end infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes spin-reverse {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-360deg); }
-}
-
-/* Hide Number Input Spinners */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type=number] {
-  -moz-appearance: textfield;
-}
-
-/* Aggressive Autofill Style Override */
-input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
-input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 100px var(--color-black) inset !important;
-  -webkit-text-fill-color: var(--color-white) !important;
-  transition: background-color 5000s ease-in-out 0s;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

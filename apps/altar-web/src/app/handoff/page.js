@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth, takeNextPath } from "../../lib/alt";
 import { AuthCard } from "../../components/AuthCard";
+import { Spinner } from "../../components/ui";
 
 // "Open ALTAR" in ALTER or ALTERA, and the ALT Account window when popups are blocked, land here
 // with a one-time code: no password needed.
@@ -26,17 +27,17 @@ export default function Handoff() {
   }, [router]);
 
   return (
-    <AuthCard badge="ALT Handoff" subtitle="Signing you in">
+    <AuthCard title={error ? "That didn't work" : "Signing you in"}>
       {error ? (
         <>
-          <p role="alert" className="text-sm text-center text-white/70 leading-relaxed">{error}</p>
-          <Link href="/signin" className="text-center text-[10px] font-black uppercase tracking-widest text-green-400 hover:text-white">
-            Sign in with your password instead
+          <p role="alert" className="text-ink-2">{error}</p>
+          <Link href="/signin" className="font-semibold text-ink underline underline-offset-4">
+            Sign in with ALT instead
           </Link>
         </>
       ) : (
         <div className="flex justify-center py-6">
-          <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+          <Spinner />
         </div>
       )}
     </AuthCard>

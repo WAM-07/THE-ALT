@@ -36,9 +36,9 @@ export const WishlistProvider = ({ children }) => {
 
   const addToWishlist = (agent) => {
     if (!user) return showAlert("Sign in first", "Sign in with your ALT account to keep a wishlist.");
-    if (wishlist.some((item) => item.agentId === agent.id)) return showAlert("Already saved", `${agent.name} is already on your wishlist.`);
-    save([...wishlist, { id: `WL-${agent.id}`, agentId: agent.id, agentName: agent.name, addedAt: new Date().toISOString() }]);
-    showAlert("Saved", `${agent.name} is on your wishlist.`);
+    if (wishlist.some((item) => item.agentId === agent.id)) return;
+    // The heart fills in; no dialog needed.
+    save([...wishlist, { id: `WL-${agent.id}`, agentId: agent.id, agentName: agent.name, handle: agent.handle, addedAt: new Date().toISOString() }]);
   };
 
   const removeFromWishlist = (agentId) => save(wishlist.filter((item) => item.agentId !== agentId));

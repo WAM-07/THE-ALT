@@ -266,7 +266,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
     A gateway test covers the routing.
   - **Phones:** Soban's header had no menu below 1024px. It now has a compact row, and the search bar and toggle fit at 320px.
 
-- ✅ **ALTAR themes to compare** (2026-10-13, owner's request). My AIs → Appearance, or the region button in the header, switches between:
+- ✅ **ALTAR themes to compare** (2026-10-13, owner's request; replaced by the redesign below). My AIs → Appearance, or the region button in the header, switched between:
   - **Original:** Soban's pure black with one green;
   - **Forest:** layered green-blacks, softer text, a deeper green scale;
   - **Daylight:** a light marketplace with a dark hero.
@@ -289,8 +289,18 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - Android emulator: ALTER (data wiped first) came back signed in as Wamiq; ALTERA came back signed in as Hamza on the feed.
   - **Not yet:** Google sign-in inside the window; the app's handoff link doesn't yet check a `state` value (a crafted link could sign the app into another account; this predates the window).
 
+- ✅ **ALTAR redesign** (2026-10-13, owner's request: "it's not attracting just yet"; references: labs.google and magiceden.io).
+  - **Look:** "Studio", a warm paper canvas with ink type (Bricolage Grotesque headings, Figtree text), bright friendly shapes and green as the accent. Colours are design tokens in `globals.css` (`canvas`, `surface`, `ink`, `accent`, `b1`–`b4`…); building blocks are in `src/components/ui.js` (`Button`, `Chip`, `Avatar`, `VerifiedTick`, `Shape`…).
+  - **AIT art:** every token gets its own generated artwork from its contract and token id (`AitArt.js`), like the art on an NFT. The AI's own picture sits on top.
+  - **Home:** a hero with the newest tokens fanned like cards, real counts, a "Newly minted" table, "Three ways to hold an AI" (own, rent, subscribe, royalties), the explore grid (categories, filter, sort), creators, and a "List your AI" band.
+  - **AI page:** large token art that stays in view, an Own / Rent / Subscribe panel (prices say "Not listed"; buttons are disabled until step 3), about, traits, on-chain proof checked live, and activity (the mint).
+  - **Profile:** a generated banner, wallet chip, "My AIs" and "Saved" tabs (the wishlist modal is gone), and a Settings button. **Settings** has account, region and currency, sign out, and a closed **Advanced** section.
+  - **Themes are hidden** as the owner asked: Profile → Settings → Advanced → Appearance lab (`/settings/appearance`). Studio is the default; Night, Forest and Original (Soban's colours) remain to compare. Older saved choices ("daylight") fall back to Studio.
+  - **Demo catalogue:** `npm run demo` now also creates three creators (Bilal, Zainab, Omar) and seven more verified AIs across categories (`seedMarket` in `scripts/seed-demo.mjs`), each built, tested and minted through the real APIs, with generated "orb" pictures. Nine verified AIs in total.
+  - **Checked:** in headless Chrome at 1440px and 375px, signed out and signed in (Wamiq), in all four themes; `eslint` (no errors) and `next build` pass. The catalogue seed ran against a live demo stack (33 s); a full fresh `npm run demo` with it was not rerun.
+
 ## Known mocks / not real yet
-- **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; the licence options on a detail page say "Soon"; the wishlist is saved in the browser per account.
+- **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; prices say "Not listed" and the Buy / Rent / Subscribe buttons are disabled with "Opens soon"; activity shows only the mint; the saved list (wishlist) is kept in the browser per account.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **No push notifications when the app is closed.** The ALT inbox is live while an app is open; Firebase push comes after 60%.

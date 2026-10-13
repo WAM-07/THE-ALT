@@ -1,28 +1,46 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useModal } from "../../contexts/ModalContext";
-import { toModel } from "../../contexts/AIContext";
-import AiImage from "../../components/AiImage";
-import ThemePicker from "../../components/ThemePicker";
-import { api, auth, mediaUrl } from "../../lib/alt";
+import { useAI, toModel } from "../../contexts/AIContext";
+import { useWishlist } from "../../contexts/WishlistContext";
+import AICard from "../../components/AICard";
+import AitArt from "../../components/AitArt";
+import { Avatar, Button, Chip, Empty, Spinner, btnClass } from "../../components/ui";
+import { api, auth, continueWithAlt, mediaUrl } from "../../lib/alt";
+import { shortAddress } from "../../lib/format";
 
 const STATUS = {
-  verified: ["Verified", "text-green-400 bg-green-500/10 border-green-500/20"],
-  draft: ["Draft in ALTER", "text-white/60 bg-white/5 border-white/10"],
-  training: ["Building", "text-white/60 bg-white/5 border-white/10"],
-  ready: ["Ready to mint", "text-orange-400 bg-orange-500/10 border-orange-500/20"],
-  minting: ["Minting", "text-orange-400 bg-orange-500/10 border-orange-500/20"],
-  retired: ["Retired", "text-white/40 bg-white/5 border-white/10"],
-  suspended: ["Suspended", "text-red-400 bg-red-500/10 border-red-500/20"],
+  verified: ["Verified", "accent"],
+  draft: ["Draft in ALTER", "plain"],
+  training: ["Building", "plain"],
+  ready: ["Ready to mint", "warn"],
+  minting: ["Minting", "warn"],
+  retired: ["Retired", "plain"],
+  suspended: ["Suspended", "warn"],
 };
 
-// The signed-in person's ALT account and the AIs they own.
-export default function Profile() {
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={null}>
+      <Profile />
+    </Suspense>
+  );
+}
+
+// The signed-in person's ALT account: the AIs they own and the ones they saved.
+function Profile() {
   const { user } = useAuth();
   const { showAlert } = useModal();
+  const { aiModels } = useAI();
+  const { wishlist, removeFromWishlist } = useWishlist();
+  const params = useSearchParams();
+  const router = useRouter();
+  const tab = params.get("tab") === "saved" ? "saved" : "owned";
   const [ais, setAis] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -33,13 +51,12 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas p-6 font-sans">
-        <div className="bg-black p-10 rounded-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 text-center max-w-sm">
-          <h2 className="text-2xl font-black text-white">Sign in to see your AIs</h2>
-          <Link href="/signin?next=/profile" className="block w-full mt-8 bg-gradient-to-r from-green-600 to-green-400 text-white py-4 rounded-2xl font-black uppercase hover:shadow-lg hover:shadow-green-500/25 transition-all">
-            Sign in
-          </Link>
-        </div>
+      <div className="mx-auto flex min-h-[60vh] max-w-sm flex-col items-center justify-center px-4 text-center">
+        <p className="font-display text-2xl font-bold">Sign in to see your AIs</p>
+        <p className="mt-2 text-ink-2">Use your ALT account, the same one as ALTER and ALTERA.</p>
+        <Button className="mt-6" onClick={() => continueWithAlt("signin", "/profile").catch(() => {})}>
+          Continue with ALT
+        </Button>
       </div>
     );
   }
@@ -49,91 +66,123 @@ export default function Profile() {
       const { url } = await auth.handoffTo(target);
       window.location.href = url;
     } catch {
-      showAlert(name, `Open the ${name} app on your phone.`);
+      showAlert(`Open ${name}`, `Open the ${name} app on your phone.`);
+    }
+  };
+  const copyWallet = async () => {
+    try {
+      await navigator.clipboard.writeText(user.wallet.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard can be blocked; the address is still on screen.
     }
   };
 
-  const avatar = mediaUrl(user.avatarUrl);
+  const verifiedCount = ais?.filter((a) => a.verified).length ?? 0;
+  const savedModels = wishlist.map((w) => ({ item: w, model: aiModels?.find((m) => m.id === w.agentId) }));
+  const setTab = (t) => router.replace(t === "saved" ? "/profile?tab=saved" : "/profile", { scroll: false });
 
   return (
-    <div className="min-h-screen bg-canvas px-6 pt-36 pb-24 font-sans text-white">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Account */}
-        <div className="lg:col-span-1">
-          <div className="bg-black shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-3xl border border-white/10 p-8">
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-28 h-28 bg-black rounded-[36px] border border-white/10 flex items-center justify-center overflow-hidden mb-5">
-                {avatar ? <img src={avatar} alt={user.name} className="w-full h-full object-cover" /> : <span className="text-4xl text-white/60 font-black">{user.name?.charAt(0).toUpperCase()}</span>}
-              </div>
-              <h1 className="text-2xl font-black tracking-tight">{user.name}</h1>
-              <p className="text-sm text-white/40 font-bold">@{user.handle}</p>
+    <div className="pb-24">
+      <div className="relative h-40 overflow-hidden sm:h-56">
+        <AitArt seed={`person:${user.id}`} />
+      </div>
+      <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Avatar src={mediaUrl(user.avatarUrl)} name={user.name} size={112} className="relative -mt-14 ring-[6px] ring-canvas" />
+            <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">{user.name}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-ink-3">
+              <span>@{user.handle}</span>
+              {user.wallet?.address && (
+                <button onClick={copyWallet} className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-3 py-1 font-mono text-xs text-ink-2 hover:text-ink" title={user.wallet.address}>
+                  {copied ? "Copied" : shortAddress(user.wallet.address)}
+                </button>
+              )}
             </div>
-
-            <div className="space-y-3">
-              <Info label="Email" value={user.email ?? "—"} />
-              <Info label="ALT wallet" value={user.wallet?.address ?? "—"} mono />
-              <Info label="Two-step verification" value={user.twoFactorEnabled ? "On" : "Off"} />
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-white/10 grid grid-cols-2 gap-3">
-              <button onClick={() => open("alter", "ALTER")} className="p-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:border-green-500/40 transition-all">
-                Open ALTER
-              </button>
-              <button onClick={() => open("altera", "ALTERA")} className="p-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest hover:border-orange-500/40 transition-all">
-                Open ALTERA
-              </button>
-            </div>
-            <p className="mt-4 text-[10px] text-white/30 text-center leading-relaxed">Password, 2FA and devices are managed in the ALT Account Center inside ALTER or ALTERA.</p>
           </div>
-
-          <div className="mt-6 bg-black shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-3xl border border-white/10 p-6">
-            <h2 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">Appearance</h2>
-            <ThemePicker />
-            <p className="mt-4 text-[10px] text-white/30 leading-relaxed">Saved in this browser. Switch and browse to compare.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button kind="outline" size="sm" onClick={() => open("alter", "ALTER")}>
+              Open ALTER
+            </Button>
+            <Button kind="outline" size="sm" onClick={() => open("altera", "ALTERA")}>
+              Open ALTERA
+            </Button>
+            <Link href="/settings" className={btnClass("outline", "sm")} aria-label="Settings">
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+              </svg>
+              Settings
+            </Link>
           </div>
         </div>
 
-        {/* My AIs */}
-        <div className="lg:col-span-2">
-          <h2 className="text-2xl font-black mb-2 uppercase tracking-tight">
-            My <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-green-400">AIs</span>
-          </h2>
-          <p className="text-sm text-white/50 mb-8">AIs are created and trained in ALTER. Once verified with an AI Identity Token, they can be listed here.</p>
+        <div className="mt-8 flex gap-6 border-b border-line" role="tablist">
+          {[
+            ["owned", "My AIs", ais?.length],
+            ["saved", "Saved", wishlist.length],
+          ].map(([id, label, count]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`-mb-px border-b-2 pb-3 text-[15px] font-semibold transition ${tab === id ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink-2"}`}
+            >
+              {label}
+              {count > 0 && <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs text-ink-2">{count}</span>}
+            </button>
+          ))}
+        </div>
 
-          {ais === null ? (
-            <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-          ) : ais.length === 0 ? (
-            <div className="text-center py-20 rounded-[32px] border border-dashed border-white/10">
-              <p className="text-white/60 font-bold uppercase tracking-widest text-sm">You don&apos;t have an AI yet</p>
-              <button onClick={() => open("alter", "ALTER")} className="mt-4 text-green-400 font-black underline hover:text-white">
-                Create one in ALTER
-              </button>
-            </div>
+        <div className="pt-8">
+          {tab === "owned" ? (
+            ais === null ? (
+              <Spinner />
+            ) : ais.length === 0 ? (
+              <Empty title="You don't have an AI yet" action={<Button onClick={() => open("alter", "ALTER")}>Create one in ALTER</Button>}>
+                AIs are created and trained in ALTER. Once verified with an AI Identity Token, they appear here and can be listed.
+              </Empty>
+            ) : (
+              <>
+                <p className="mb-6 text-ink-2">
+                  {verifiedCount} of {ais.length} verified. Drafts stay in ALTER until they&apos;re minted.
+                </p>
+                <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+                  {ais.map((ai) =>
+                    ai.verified ? (
+                      // The public listing knows the creator's name; fall back to the account's own copy.
+                      <AICard key={ai.id} model={aiModels?.find((m) => m.id === ai.id) ?? { ...ai, owner: { id: user.id }, creatorName: "you" }} />
+                    ) : (
+                      <DraftCard key={ai.id} ai={ai} />
+                    ),
+                  )}
+                </div>
+              </>
+            )
+          ) : savedModels.length === 0 ? (
+            <Empty title="Nothing saved yet" action={<Button href="/#explore">Explore AIs</Button>}>
+              Tap the heart on an AI to keep an eye on it. Saved AIs are kept in this browser for your ALT account.
+            </Empty>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {ais.map((ai) => {
-                const [label, tone] = STATUS[ai.status] ?? [ai.status, STATUS.draft[1]];
-                const card = (
-                  <div className="bg-black rounded-[28px] border border-white/10 p-4 flex gap-4 items-center hover:border-green-500/30 transition-all h-full">
-                    <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0">
-                      <AiImage model={ai} textClassName="text-xl" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-black text-lg truncate">{ai.name}</p>
-                      <p className="text-xs text-white/40 font-bold truncate">@{ai.handle}{ai.version ? ` · v${ai.version}` : ""}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${tone}`}>{label}</span>
-                        {ai.token && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-white/10 text-white/60">AIT #{ai.token.tokenId}</span>}
-                      </div>
-                    </div>
-                  </div>
-                );
-                return ai.verified ? (
-                  <Link key={ai.id} href={`/details/${ai.handle}`}>{card}</Link>
+            <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+              {savedModels.map(({ item, model }) =>
+                model ? (
+                  <AICard key={item.id} model={model} />
                 ) : (
-                  <div key={ai.id}>{card}</div>
-                );
-              })}
+                  <div key={item.id} className="flex flex-col justify-between rounded-3xl border border-dashed border-line p-5">
+                    <div>
+                      <p className="font-display text-lg font-bold">{item.agentName}</p>
+                      <p className="mt-1 text-sm text-ink-3">No longer on ALTAR.</p>
+                    </div>
+                    <button onClick={() => removeFromWishlist(item.agentId)} className="mt-4 self-start text-sm font-semibold text-ink-2 hover:text-ink">
+                      Remove
+                    </button>
+                  </div>
+                ),
+              )}
             </div>
           )}
         </div>
@@ -142,9 +191,18 @@ export default function Profile() {
   );
 }
 
-const Info = ({ label, value, mono }) => (
-  <div className="bg-black border border-white/5 p-4 rounded-2xl">
-    <span className="text-[9px] font-black text-white/50 uppercase tracking-widest block mb-1">{label}</span>
-    <p className={`font-bold text-white ${mono ? "font-mono text-[11px] text-green-400 break-all" : "text-sm break-words"}`}>{value}</p>
-  </div>
-);
+function DraftCard({ ai }) {
+  const [label, tone] = STATUS[ai.status] ?? [ai.status, "plain"];
+  return (
+    <div className="rounded-3xl border border-dashed border-line p-2">
+      <div className="flex aspect-square flex-col items-center justify-center gap-3 rounded-[20px] bg-sunken/70 text-center">
+        <Avatar src={ai.image} name={ai.name} size={64} />
+        <Chip tone={tone}>{label}</Chip>
+      </div>
+      <div className="px-2 pb-2 pt-3">
+        <p className="truncate font-display text-[17px] font-bold">{ai.name}</p>
+        <p className="truncate text-sm text-ink-3">@{ai.handle} · not on ALTAR yet</p>
+      </div>
+    </div>
+  );
+}
