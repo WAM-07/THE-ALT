@@ -59,3 +59,6 @@ apps/*/env/dev.json
 packages/contracts/coverage/
 packages/contracts/deployments/localhost.json
 packages/contracts/deployments/testchain.json
+
+# Soban's original ALTAR repo, kept locally for reference (holds his live Supabase settings)
+/altar-marketplace/

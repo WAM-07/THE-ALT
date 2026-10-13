@@ -209,6 +209,8 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
     // Public profile for ALTERA and ALTAR.
     const pub = (await t.app.inject({ method: 'GET', url: `/public/ais/${verified.handle}` })).json();
     expect(pub).toMatchObject({ handle: verified.handle, verified: true, traits: ['Logical'], owner: { handle: u.handle } });
+    const listed = (await t.app.inject({ method: 'GET', url: '/public/ais' })).json();
+    expect(listed.find((x: { id: string }) => x.id === ai.id)).toMatchObject({ owner: { handle: u.handle }, creator: { handle: u.handle }, token: { owner: wallet }, royaltyBps: 500 });
 
     // Behaviour changes go in by version: edit draft, build v2, publish it on-chain.
     await call('PATCH', `/ais/${ai.id}`, u.accessToken, { persona: { ...verified.persona, traits: ['Logical', 'Curious'] } });

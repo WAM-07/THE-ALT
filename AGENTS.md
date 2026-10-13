@@ -63,6 +63,7 @@ npx tsc --noEmit    # inside services/core or services/gateway
 - **API paths behind the gateway:** `/core/...`, `/altera/...`, `/altar/...`. Inside a service, routes have no prefix.
 - **Flutter:** Riverpod and go_router (ALTER). No hard-coded URLs; use the dart-define config.
 - **ALTER's look ("Obsidian"):** take every colour, font and spacing from `Ds` (`apps/alter/lib/core/theme/ds.dart`) and build screens from `apps/alter/lib/shared/ui/ui.dart` (`AltPage`, `Glass`, `Btn`, `ListRow`, `Group`, `Pill`, `AiIdentityCard`…). ALTER is dark-only by design. Don't style Material widgets one by one, and check new screens at 320px width (narrow phones).
+- **ALTAR web (`apps/altar-web`, Next.js):** Soban's green design; keep it. It talks to ALT only through `src/lib/alt.js`, on the same origin as the gateway (`/core/...`, `/altar/...`). It has no accounts, database or API routes of its own; never keep tokens in `localStorage`. Identify people by their ALT id, never by display name. `altar-marketplace/` is Soban's original, kept locally for reference only.
 - **Commits:** imperative summary line, then what and why. One logical change per commit.
 
 ## When you finish a task

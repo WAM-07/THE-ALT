@@ -98,3 +98,27 @@ Build: ✅ compiles (15 routes).
 2. Keep Soban's black-and-green look, or move ALTAR to ALTER's Obsidian style?
 3. Which extras count toward the 60% (subscriptions, discount codes, reviews, wishlist, DMs)? ROADMAP defers subscriptions and auctions.
 4. Selling an AI means transferring its AIT (and its use through ALT), not downloading a file. Confirm this, so the upload step goes away.
+
+## 7. Decisions and plan (owner, 2026-10-13)
+
+**Decided:**
+- Keep Soban's **frontend design only**. The backend and functionality are rebuilt on ALT's central system; Supabase goes.
+- ALTAR's colour is **green** (ALTERA orange; ALTER to be redesigned later).
+- **Sale** = the AIT moves to the buyer; the seller loses all access and rights. **Rent** = one person, sole use, for set days; the owner keeps ownership. **Subscription** = many people, monthly use. **Royalties** go to the original creator.
+- Where something can't be real yet, use a clearly labelled placeholder that the real system can replace.
+
+**How an AI changes hands (the "model file" question).** An ALT AI is not a file. It is:
+1. its **AIT** (the on-chain right: who owns it, who is renting it until when);
+2. its **published version**: persona, consented data and approved memories, frozen and hashed (only hashes are public on IPFS);
+3. **Core's persona engine**, which is the only thing that ever runs it.
+
+Nobody downloads an AI, so there is nothing a seller can keep. Core decides who may talk to or edit an AI by reading the token: the owner (`ownerOf`) edits and uses it, the renter (`userOf`, until expiry) uses it, subscribers use it until their period ends. When the token moves, Core moves the AI to the new owner in ALTER on the next chain event.
+- **What the seller keeps:** their own raw notes and files (they're the seller's, and could be used to build a *new* AI, which would be a different token with its own provenance) and their old chat history as read-only.
+- **What the buyer gets:** the published versions and the right to build new ones. The seller's raw datasets stay sealed: the buyer can use the AI but can't read the seller's private documents.
+- **Fine-tuned adapters later** (after the 60%) follow the same rule: stored encrypted by Core, attached to a version, never downloadable.
+
+**Steps (each stops for the owner's review):**
+1. ✅ **Foundation** (2026-10-13): `apps/altar-web` with Soban's design on Next.js 16.4 (patched), served by the gateway at `/`; ALT accounts (sign-in with 2FA and email codes, sign-up, handoff from ALTER/ALTERA); browse and detail pages from Core's verified AIs with a live on-chain token check; My AIs; Soban's fake backend removed.
+2. **Listings and wallet:** `altar-api` service and `altar` schema (listings, terms, reviews, wishlist); list a verified AI for sale, rent and subscription; the wallet shows the custodial balance, test funds on the local chain, earnings and withdraw. Core signs marketplace transactions with the custodial key after the person confirms.
+3. **Buying and renting:** buy and rent through `ALTMarketplace`; an indexer turns contract events into `altar.transactions` and `altar.rentals`; Core moves ownership and rental rights; renters chat with the AI on ALTAR (`altar_rental`); ALTER and ALTERA follow the new owner; inbox notifications.
+4. **Subscriptions and royalties:** add `subscribe` to `ALTMarketplace` (owner's decision needed: it changes `packages/contracts`), creator royalty view, reviews from real buyers, demo seed and docs.

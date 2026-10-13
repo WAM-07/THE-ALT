@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🔍 Soban's code received (`altar-marketplace/`, not tracked here) and evaluated: UI reusable, logic all simulated and insecure. See `Documentations/ALTAR_EVALUATION.md`. Plan pending the owner's decisions. |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🟡 Step 1 of 4 done 2026-10-13: `apps/altar-web` (Soban's design) on ALT accounts and verified AIs. Plan and decisions: `Documentations/ALTAR_EVALUATION.md` §7. |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
@@ -22,7 +22,8 @@ npm test                        # contracts 31 · core 65 · gateway 8 · altera
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
-npm run dev                     # everything at http://localhost:8080
+cd apps/altar-web && npx eslint . && npx next build   # ALTAR web
+npm run dev                     # everything at http://localhost:8080 (ALTAR is the front page)
 ```
 
 ## Done
@@ -169,7 +170,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 1. **ALT Core and the central system**: keep hardening it.
 2. **ALTERA fully on the central system**: fix issues along the way.
 3. **ALTER personal-AI module**, without the training part.
-4. **Later:** the ALTAR marketplace. Soban's code was evaluated on 2026-10-13 (`Documentations/ALTAR_EVALUATION.md`). Do **not** start building it until the owner agrees a plan.
+4. **Now:** the ALTAR marketplace, in the four steps of `Documentations/ALTAR_EVALUATION.md` §7 (owner's go-ahead 2026-10-13).
 
 ### Step status
 - ✅ **Persona engine providers.** Groq (`openai/gpt-oss-120b`) is the primary, Gemini (`gemini-flash-latest`) the fallback, and DeepSeek last; its account currently has no balance (HTTP 402). Keys live in the root `.env`, copied from the old ALTERA config.
@@ -252,7 +253,21 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - the Account Center loaded your photo from a localhost link, which fails on phones;
     - onboarding showed a misleading "I already have an account" link.
 
+- ✅ **ALTAR step 1: foundation** (2026-10-13). Checked live through the gateway with `npm run demo`, at 1440px, 390px and 320px.
+  - **`apps/altar-web`**: Soban's design, moved onto Next.js 16.4.0 (15.1.0 had remote-code-execution advisories), as an npm workspace. `npm run dev` starts it, and the gateway serves it at `/`.
+  - **Removed:** the public key-value database API, plaintext passwords, the shared global session, the free wallet, fake card checkout, escrow, the "smart contract" animation, model-file uploads, canned AI chat, messages (DMs live on ALTERA), and Google sign-in (until configured in Core).
+  - **ALT accounts** (`src/lib/alt.js`): sign-in with 2FA and email codes, sign-up, and `/handoff` from ALTER and ALTERA. The access token stays in memory; the refresh token is Core's httpOnly cookie.
+  - **Browse and details** use Core's verified AIs. Each detail page re-reads the AIT from the chain (owner, creator, version, manifest hash) and links to independent verification. **My AIs** lists the person's AIs with their status.
+  - **Core:** `/public/ais` now includes owner and creator, and AI summaries include `royaltyBps`; tests extended.
+  - **Gateway fixes found live:**
+    - the front-page route never started: it clashed with CORS's `OPTIONS *`;
+    - a browser dropping a WebSocket (Next's live reload) crashed the whole gateway. Upgrades now get an error handler, and ALTAR's route proxies WebSockets.
+
+    A gateway test covers the routing.
+  - **Phones:** Soban's header had no menu below 1024px. It now has a compact row, and the search bar and toggle fit at 320px.
+
 ## Known mocks / not real yet
+- **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; the licence options on a detail page say "Soon"; the wishlist is saved in the browser per account.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **No push notifications when the app is closed.** The ALT inbox is live while an app is open; Firebase push comes after 60%.
@@ -262,6 +277,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Biometric unlock** (planned under M1 FE-4) is not built yet.
 
 ## Environment notes
+- **ALTAR web** runs on port 4300 (`ALTAR_WEB_PORT`) behind the gateway. Soban's original repo stays in `altar-marketplace/` (git-ignored; it holds his live Supabase settings, never copy them).
 - **Development needs no keys.** Optional settings go in `.env`: `GOOGLE_CLIENT_IDS`, `SMTP_URL` with `MAIL_MODE=smtp`, and `ADMIN_EMAILS`.
 - **Flutter SDK is at `C:\flutter`.** It was moved out of `ALTER/flutter` because Flutter's native-asset build fails when the SDK path contains a space ("C:\THE ALT"). Add `C:\flutter\bin` to PATH.
 - **Android Studio is installed** (SDK 36, Android 16 emulator, licences accepted). Both apps build and run on the emulator. Checked 2026-10-12: sign-in, the ALTER → ALTERA handoff, the verified AI and the shared inbox.

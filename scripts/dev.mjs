@@ -21,7 +21,7 @@ const dataDir = path.join(root, '.data');
 const args = new Set(process.argv.slice(2));
 const require = createRequire(import.meta.url);
 
-const colors = { core: 36, gateway: 35, altera: 33, altar: 32, postgres: 34, chain: 94, dev: 37 };
+const colors = { core: 36, gateway: 35, altera: 33, altar: 32, 'altar-web': 92, postgres: 34, chain: 94, dev: 37 };
 const tag = (name) => `\x1b[${colors[name] ?? 37}m${name.padEnd(8)}\x1b[0m`;
 const say = (msg) => console.log(`${tag('dev')} ${msg}`);
 const fail = (msg) => {
@@ -57,6 +57,7 @@ const ports = {
   core: Number(process.env.CORE_PORT || 4000),
   altera: Number(process.env.ALTERA_PORT || 4100),
   altar: Number(process.env.ALTAR_PORT || 4200),
+  altarWeb: Number(process.env.ALTAR_WEB_PORT || 4300),
 };
 process.env.ALT_PUBLIC_URL ||= `http://localhost:${ports.gateway}`;
 
@@ -67,7 +68,7 @@ const portInUse = (port) =>
     probe.listen(port, '0.0.0.0');
   });
 const busy = [];
-for (const [name, port] of [['gateway', ports.gateway], ['ALT Core', ports.core], ['ALTERA API', ports.altera], ['database', Number(process.env.DEV_POSTGRES_PORT || 54320)]]) {
+for (const [name, port] of [['gateway', ports.gateway], ['ALT Core', ports.core], ['ALTERA API', ports.altera], ['ALTAR web', ports.altarWeb], ['database', Number(process.env.DEV_POSTGRES_PORT || 54320)]]) {
   if (await portInUse(port)) busy.push(`${name} (port ${port})`);
 }
 if (busy.length) {
@@ -215,6 +216,7 @@ const services = [
       GATEWAY_PORT: String(ports.gateway),
       CORE_URL: `http://127.0.0.1:${ports.core}`,
       ...(existsSync(path.join(root, 'services', 'altera-api', 'migrations')) ? { ALTERA_URL: `http://127.0.0.1:${ports.altera}` } : {}),
+      ALTAR_WEB_URL: `http://127.0.0.1:${ports.altarWeb}`,
     },
     health: `http://127.0.0.1:${ports.gateway}/health`,
   },
@@ -228,6 +230,15 @@ if (existsSync(path.join(root, 'services', 'altera-api', 'migrations'))) {
     health: `http://127.0.0.1:${ports.altera}/health`,
   });
 }
+
+// ALTAR web (Next.js) is the gateway's front page: http://localhost:8080/
+services.push({
+  name: 'altar-web',
+  cwd: path.join(root, 'apps', 'altar-web'),
+  cmd: [process.execPath, require.resolve('next/dist/bin/next'), 'dev', '-p', String(ports.altarWeb), '-H', '127.0.0.1'],
+  env: { NEXT_TELEMETRY_DISABLED: '1', ALTAR_DEV_ORIGINS: ['localhost', '127.0.0.1', lanIp].filter(Boolean).join(',') },
+  health: `http://127.0.0.1:${ports.altarWeb}/`,
+});
 
 /** Turns pino JSON lines into short readable ones. */
 function pretty(line) {
@@ -297,6 +308,7 @@ const url = process.env.ALT_PUBLIC_URL;
 console.log(`
 \x1b[1m  THE ALT ECOSYSTEM is running\x1b[0m
     Gateway (single entry point)  ${url}
+    ALTAR marketplace (web)       ${url}/
     Health of every service       ${url}/health
     API docs (ALT Core)           ${url}/core/docs
     Emails / OTP codes (dev)      ${url}/core/dev/mail

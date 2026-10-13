@@ -62,6 +62,15 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     };
   }
 
+  /** Public names for a set of people (owners and creators shown next to an AI). */
+  async function peopleById(ids: string[]) {
+    const { rows } = await ctx.db.query('SELECT id, handle, display_name, avatar_url FROM core.users WHERE id = ANY($1::uuid[])', [[...new Set(ids)]]);
+    return (id: string) => {
+      const p = rows.find((x) => x.id === id);
+      return p ? { id: p.id as string, handle: p.handle as string, displayName: p.display_name as string, avatarUrl: (p.avatar_url as string | null) ?? null } : null;
+    };
+  }
+
   async function summary(ai: AiRow) {
     const [token, current] = await Promise.all([
       tokenOf(ai.id),
@@ -77,6 +86,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       status: ai.status,
       verified: ai.status === 'verified',
       healthScore: Number(ai.health_score),
+      royaltyBps: ai.royalty_bps,
       currentVersion: current?.rows[0] ? { version: current.rows[0].version_no as number, manifestCid: current.rows[0].manifest_cid as string } : null,
       token,
       createdAt: ai.created_at.toISOString(),
@@ -741,11 +751,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       const { rows } = await ctx.db.query<AiRow>(`SELECT * FROM core.personal_ais WHERE handle = $1 AND deleted_at IS NULL AND status = 'verified'`, [req.params.handle]);
       const ai = rows[0];
       if (!ai) throw notFound('AI');
-      const { rows: people } = await ctx.db.query('SELECT id, handle, display_name FROM core.users WHERE id = ANY($1::uuid[])', [[ai.owner_id, ai.creator_id]]);
-      const person = (id: string) => {
-        const p = people.find((x) => x.id === id);
-        return p ? { id: p.id, handle: p.handle, displayName: p.display_name } : null;
-      };
+      const person = await peopleById([ai.owner_id, ai.creator_id]);
       const persona = parsePersona(ai.draft_config);
       const version = ai.current_version_id ? await ctx.db.query('SELECT persona_config FROM core.ai_versions WHERE id = $1', [ai.current_version_id]) : null;
       const published = parsePersona(version?.rows[0]?.persona_config ?? persona);
@@ -764,7 +770,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
          ORDER BY created_at DESC LIMIT $2`,
         [q, req.query.limit],
       );
-      return Promise.all(rows.map(summary));
+      const person = await peopleById(rows.flatMap((ai) => [ai.owner_id, ai.creator_id]));
+      return Promise.all(rows.map(async (ai) => ({ ...(await summary(ai)), owner: person(ai.owner_id), creator: person(ai.creator_id) })));
     },
   );
 
