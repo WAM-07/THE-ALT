@@ -86,7 +86,7 @@ function Profile() {
   return (
     <div className="pb-24">
       <div className="relative h-40 overflow-hidden sm:h-56">
-        <AitArt seed={`person:${user.id}`} />
+        <AitArt seed={`person:${user.id}`} motion="always" className="h-full w-full" />
       </div>
       <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">

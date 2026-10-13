@@ -4,6 +4,7 @@ import AitArt from "./AitArt";
 import { Avatar, Chip, VerifiedTick } from "./ui";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
+import { useTilt } from "./motion";
 
 // One verified AI in a grid: its token's artwork with the AI's own picture on top, like a
 // collectible. Prices appear when listings open (ALTAR step 2); until then it says so.
@@ -12,15 +13,17 @@ export default function AICard({ model }) {
   const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const mine = Boolean(user && model.owner?.id === user.id);
   const saved = wishlist?.some((w) => w.agentId === model.id);
+  const tilt = useTilt(6);
 
   return (
-    <div className="group relative rounded-3xl border border-line bg-surface p-2 transition duration-300 hover:-translate-y-1 hover:shadow-card">
+    <div {...tilt} className="tilt group relative rounded-3xl border border-line bg-surface p-2 hover:shadow-card">
       <Link href={`/details/${model.handle}`} className="block rounded-[20px] outline-offset-4">
         <div className="relative aspect-square overflow-hidden rounded-[20px]">
           <AitArt seed={model.artSeed} className="h-full w-full transition duration-700 group-hover:scale-[1.06]" />
           {model.token && <Chip tone="glass" className="absolute left-3 top-3">AIT #{model.token.tokenId}</Chip>}
           <Avatar src={model.image} name={model.name} size={48} className="absolute bottom-3 left-3 ring-[3px] ring-white/80" />
           {mine && <Chip tone="glass" className="absolute bottom-4 right-3">Yours</Chip>}
+          <span className="tilt-shine absolute inset-0" />
         </div>
         <div className="px-2 pb-2 pt-3">
           <div className="flex items-center gap-1.5">

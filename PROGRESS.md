@@ -298,6 +298,14 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Themes are hidden** as the owner asked: Profile → Settings → Advanced → Appearance lab (`/settings/appearance`). Studio is the default; Night, Forest and Original (Soban's colours) remain to compare. Older saved choices ("daylight") fall back to Studio.
   - **Demo catalogue:** `npm run demo` now also creates three creators (Bilal, Zainab, Omar) and seven more verified AIs across categories (`seedMarket` in `scripts/seed-demo.mjs`), each built, tested and minted through the real APIs, with generated "orb" pictures. Nine verified AIs in total.
   - **Checked:** in headless Chrome at 1440px and 375px, signed out and signed in (Wamiq), in all four themes; `eslint` (no errors) and `next build` pass. The catalogue seed ran against a live demo stack (33 s); a full fresh `npm run demo` with it was not rerun.
+- ✅ **ALTAR motion** (2026-10-13, owner's request: "moving objects or animations").
+  - **Hero:** the headline rises in line by line, the "owned" highlight swipes across, the shapes morph, spin and float, and the newest token cards are dealt onto the table, then float and follow the mouse (parallax). The counts tick up from zero.
+  - **Ticker:** a tilted ribbon of the latest mints slides past under the hero (real tokens; pauses under the mouse).
+  - **Token art moves:** always in the hero, on the AI page and on the profile banner; in grids only while a card is hovered. Grain is a static overlay, so the motion stays smooth.
+  - **Cards** tilt towards the cursor with a soft light (`useTilt`); sections and grid cards fade up as they scroll in (`Reveal`); pages fade in (`app/template.js`); the Own / Rent / Subscribe tab slides.
+  - **Account button:** avatar with a ▾ that opens the menu (profile is its first entry), with a small pop-in; the header gains a shadow once the page scrolls.
+  - Helpers in `src/components/motion.js`, keyframes in `globals.css`. Everything stops for people whose system asks for reduced motion.
+  - Checked in headless Chrome mid-animation (1440px and 375px), hover tilt, the menu and the tabs; `eslint` (no errors) and `next build` pass.
 
 ## Known mocks / not real yet
 - **ALTAR, until steps 2–4:** List AI and Wallet are honest "next step" pages; prices say "Not listed" and the Buy / Rent / Subscribe buttons are disabled with "Opens soon"; activity shows only the mint; the saved list (wishlist) is kept in the browser per account.

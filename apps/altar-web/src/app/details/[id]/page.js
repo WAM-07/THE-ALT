@@ -8,6 +8,7 @@ import { useWishlist } from "../../../contexts/WishlistContext";
 import { useModal } from "../../../contexts/ModalContext";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../components/ui";
+import { useTilt } from "../../../components/motion";
 import { auth, mediaUrl, publicApi } from "../../../lib/alt";
 import { networkName, percent, shortAddress, timeAgo } from "../../../lib/format";
 
@@ -26,6 +27,7 @@ export default function AgentDetails() {
   const [missing, setMissing] = useState(false);
   const [chain, setChain] = useState(null);
   const [offer, setOffer] = useState("own");
+  const tilt = useTilt(5);
 
   useEffect(() => {
     let live = true;
@@ -102,9 +104,10 @@ export default function AgentDetails() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-12">
         {/* The token: its artwork with the AI's picture on top */}
         <div className="lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-[32px] border border-line bg-surface p-3 shadow-card">
+          <div {...tilt} className="tilt animate-rise rounded-[32px] border border-line bg-surface p-3 shadow-card">
             <div className="relative aspect-square overflow-hidden rounded-[24px]">
-              <AitArt seed={model.artSeed} />
+              <span className="tilt-shine absolute inset-0 z-10" />
+              <AitArt seed={model.artSeed} motion="always" />
               {token && <Chip tone="glass" className="absolute left-4 top-4 py-1">AIT #{token.tokenId}</Chip>}
               <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-2xl bg-black/45 p-3 text-white backdrop-blur-md">
                 <Avatar src={model.image} name={model.name} size={52} className="ring-2 ring-white/70" />
@@ -138,7 +141,7 @@ export default function AgentDetails() {
           </div>
 
           {isOwner ? (
-            <Card className="p-6">
+            <Card style={{ animationDelay: "120ms" }} className="animate-rise p-6">
               <p className="font-display text-xl font-bold">You own this AI</p>
               <p className="mt-2 text-ink-2">You hold its AI Identity Token. Its personality, knowledge and versions are managed in ALTER. Setting a price, a rent and a subscription opens here soon.</p>
               <div className="mt-5 flex flex-wrap gap-3">
@@ -149,22 +152,29 @@ export default function AgentDetails() {
               </div>
             </Card>
           ) : (
-            <Card className="p-2">
-              <div className="grid grid-cols-3 gap-1 rounded-[20px] bg-sunken p-1" role="tablist" aria-label="Ways to hold this AI">
+            <Card style={{ animationDelay: "210ms" }} className="animate-rise p-2">
+              <div className="relative grid grid-cols-3 gap-1 rounded-[20px] bg-sunken p-1" role="tablist" aria-label="Ways to hold this AI">
+                <span
+                  className="absolute inset-y-1 left-1 w-[calc((100%-1rem)/3)] rounded-2xl bg-surface shadow-sm transition-transform duration-300 ease-out"
+                  style={{ transform: `translateX(calc(${OFFERS.findIndex(([id]) => id === offer)} * (100% + 0.25rem)))` }}
+                  aria-hidden="true"
+                />
                 {OFFERS.map(([id, label]) => (
                   <button
                     key={id}
                     role="tab"
                     aria-selected={offer === id}
                     onClick={() => setOffer(id)}
-                    className={`h-10 rounded-2xl text-sm font-semibold transition ${offer === id ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+                    className={`relative h-10 rounded-2xl text-sm font-semibold transition-colors ${offer === id ? "text-ink" : "text-ink-2 hover:text-ink"}`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
               <div className="p-4 sm:p-5">
-                <p className="text-sm text-ink-2">{OFFERS.find(([id]) => id === offer)[2]}</p>
+                <p key={offer} className="animate-rise text-sm text-ink-2">
+                  {OFFERS.find(([id]) => id === offer)[2]}
+                </p>
                 <div className="mt-4 flex items-end justify-between gap-4">
                   <div>
                     <p className="text-xs font-medium text-ink-3">{offer === "own" ? "Price" : offer === "rent" ? "Per day" : "Per month"}</p>
@@ -196,13 +206,13 @@ export default function AgentDetails() {
             </Card>
           )}
 
-          <Card className="p-6">
+          <Card style={{ animationDelay: "300ms" }} className="animate-rise p-6">
             <h2 className="font-display text-lg font-bold">About</h2>
             <p className="mt-2 whitespace-pre-line leading-relaxed text-ink-2">{model.description || model.about || "No description yet."}</p>
             {model.description && model.about && model.about !== model.description && <p className="mt-3 text-sm leading-relaxed text-ink-3">Its creator: {model.about}</p>}
           </Card>
 
-          <Card className="p-6">
+          <Card style={{ animationDelay: "390ms" }} className="animate-rise p-6">
             <h2 className="font-display text-lg font-bold">Traits</h2>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {traits.map(([k, v], i) => (
@@ -215,7 +225,7 @@ export default function AgentDetails() {
           </Card>
 
           {token && (
-            <Card className="p-6">
+            <Card style={{ animationDelay: "480ms" }} className="animate-rise p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-display text-lg font-bold">AI Identity Token #{token.tokenId}</h2>
                 <Chip tone={!chain ? "plain" : onchainOk ? "accent" : "warn"}>{!chain ? "Checking the chain…" : onchainOk ? "✓ Checked on-chain just now" : "Couldn't confirm on-chain"}</Chip>
@@ -244,7 +254,7 @@ export default function AgentDetails() {
           )}
 
           {token && (
-            <Card className="p-6">
+            <Card style={{ animationDelay: "570ms" }} className="animate-rise p-6">
               <h2 className="font-display text-lg font-bold">Activity</h2>
               <div className="mt-4 flex items-center gap-4 rounded-2xl bg-sunken/60 p-4 text-sm">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-bold text-accent-ink">✦</span>

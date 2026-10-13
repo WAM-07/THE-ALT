@@ -107,7 +107,11 @@ function motif(rand, kind, color) {
   }
 }
 
-export default function AitArt({ seed, className = "w-full h-full", grain = true }) {
+/**
+ * `motion`: "always" (the shapes drift slowly), "hover" (they drift while the card around it, a
+ * `group`, is hovered) or "none".
+ */
+export default function AitArt({ seed, className = "w-full h-full", grain = true, motion = "hover" }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const art = useMemo(() => {
     const h = hash(String(seed ?? "alt"));
@@ -119,28 +123,32 @@ export default function AitArt({ seed, className = "w-full h-full", grain = true
       main: { d: blob(rand, 20 + rand() * 60, 50 + rand() * 35, 22 + rand() * 12, 7), color: a },
       second: { d: blob(rand, 20 + rand() * 60, 20 + rand() * 60, 12 + rand() * 10, 6), color: b },
       motif: motif(rand, Math.floor(rand() * 5), rand() > 0.5 ? c : deep),
+      // Each token moves at its own pace, so a grid never moves in step.
+      delay: `-${(h % 9000) / 1000}s`,
     };
   }, [seed]);
 
+  const moving = motion !== "none";
+  const shape = (cls) => (moving ? `ait-shape ${cls}` : undefined);
+  const delay = moving ? { animationDelay: art.delay } : undefined;
+
   return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden="true">
-      <defs>
-        <filter id={`g${uid}`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="7" />
-        </filter>
-        {grain && (
-          <filter id={`n${uid}`}>
-            <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" stitchTiles="stitch" />
-            <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.09 0" />
+    <div className={`relative overflow-hidden ${motion === "hover" ? "ait-hover" : ""} ${className}`} aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+        <defs>
+          <filter id={`g${uid}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="7" />
           </filter>
-        )}
-      </defs>
-      <rect width="100" height="100" fill={art.bg} />
-      <path d={art.glow.d} fill={art.glow.color} filter={`url(#g${uid})`} opacity="0.75" />
-      <path d={art.main.d} fill={art.main.color} />
-      <path d={art.second.d} fill={art.second.color} />
-      {art.motif}
-      {grain && <rect width="100" height="100" filter={`url(#n${uid})`} />}
-    </svg>
+        </defs>
+        <rect width="100" height="100" fill={art.bg} />
+        <path d={art.glow.d} fill={art.glow.color} filter={`url(#g${uid})`} opacity="0.75" className={shape("ait-g")} style={delay} />
+        <path d={art.main.d} fill={art.main.color} className={shape("ait-a")} style={delay} />
+        <path d={art.second.d} fill={art.second.color} className={shape("ait-b")} style={delay} />
+        <g className={shape("ait-m")} style={delay}>
+          {art.motif}
+        </g>
+      </svg>
+      {grain && <div className="ait-grain absolute inset-0" />}
+    </div>
   );
 }
