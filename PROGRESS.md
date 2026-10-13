@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ⏸ Paused: waiting for Soban's 30% ALTAR code to decide whether to merge it or build new |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🔍 Soban's code received (`altar-marketplace/`, not tracked here) and evaluated: UI reusable, logic all simulated and insecure. See `Documentations/ALTAR_EVALUATION.md`. Plan pending the owner's decisions. |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
@@ -169,7 +169,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 1. **ALT Core and the central system**: keep hardening it.
 2. **ALTERA fully on the central system**: fix issues along the way.
 3. **ALTER personal-AI module**, without the training part.
-4. **Later:** the ALTAR marketplace, after Soban's code is evaluated. Do **not** work on it until then.
+4. **Later:** the ALTAR marketplace. Soban's code was evaluated on 2026-10-13 (`Documentations/ALTAR_EVALUATION.md`). Do **not** start building it until the owner agrees a plan.
 
 ### Step status
 - ✅ **Persona engine providers.** Groq (`openai/gpt-oss-120b`) is the primary, Gemini (`gemini-flash-latest`) the fallback, and DeepSeek last; its account currently has no balance (HTTP 402). Keys live in the root `.env`, copied from the old ALTERA config.
