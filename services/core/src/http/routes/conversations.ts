@@ -6,7 +6,7 @@ import { AppError, notFound } from '../../lib/errors.js';
 import { respond } from '../../modules/ai/engine.js';
 import { moderate } from '../../modules/ai/moderation.js';
 import { loadAi } from '../../modules/ai/repo.js';
-import { requireUser } from '../auth-guard.js';
+import { requireService, requireUser } from '../auth-guard.js';
 
 const AiId = z.object({ id: z.uuid() });
 const SessionParams = z.object({ id: z.uuid(), sessionId: z.uuid() });
@@ -46,6 +46,16 @@ export async function conversationRoutes(app: FastifyInstance, ctx: Ctx) {
   const requireAccess = (access: Awaited<ReturnType<typeof accessOf>>) => {
     if (!access.role) throw new AppError(403, 'NO_ACCESS', 'Rent or subscribe to this AI to talk to it. If you did, that time has ended.');
   };
+
+  // For other ALT services (ALTERA drafting a post with a rented AI): may this person use the AI now?
+  r.get(
+    '/internal/ais/:id/access',
+    { preHandler: requireService(ctx), schema: { tags: ['internal'], summary: 'May this person use this AI right now? (owner, renter, subscriber or no)', params: AiId, querystring: z.object({ userId: z.uuid() }) } },
+    async (req) => {
+      const a = await accessOf(req.query.userId, req.params.id);
+      return { role: a.role, until: a.until?.toISOString() ?? null, ai: { id: a.ai.id, name: a.ai.name, handle: a.ai.handle } };
+    },
+  );
 
   r.get('/ais/:id/access', { preHandler: authed, schema: { tags: ['chat'], summary: 'May I talk to this AI? (owner, renter until when, or no)', params: AiId } }, async (req) => {
     const a = await accessOf(req.auth!.userId, req.params.id);

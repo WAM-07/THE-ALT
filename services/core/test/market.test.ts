@@ -113,6 +113,14 @@ describe('buying, reselling and renting an AI', () => {
     expect(await onAccount(a)).toBeUndefined();
     expect(await onAccount(stranger)).toBeUndefined();
 
+    // Other ALT services (ALTERA drafting a post with it) ask Core, with the service key only.
+    const internal = (u: User, key = t.config.internalServiceKey) =>
+      t.app.inject({ method: 'GET', url: `/internal/ais/${ai.id}/access?userId=${u.user.id}`, headers: { 'x-alt-service': 'altera', 'x-alt-service-key': key } });
+    expect((await internal(d)).json()).toMatchObject({ role: 'renter', ai: { id: ai.id, handle: ai.handle } });
+    expect((await internal(stranger)).json().role).toBeNull();
+    expect((await internal(d, 'wrong-key')).statusCode).toBe(401);
+    expect((await call('GET', `/internal/ais/${ai.id}/access?userId=${d.user.id}`, d.accessToken)).statusCode).toBe(401);
+
     // 4. The rental ends: the chain stops naming D, and D can read the old conversation but not talk.
     await rpc('evm_increaseTime', [2 * 86_400]);
     await rpc('evm_mine', []);
@@ -122,6 +130,7 @@ describe('buying, reselling and renting an AI', () => {
     expect((await call('GET', `/ais/${ai.id}/conversations/${convo.id}/messages`, d.accessToken)).json()).toHaveLength(2);
     // It stays on D's account, inactive, so the conversation can still be read.
     expect(await onAccount(d)).toMatchObject({ access: { role: 'renter', active: false } });
+    expect((await internal(d)).json().role).toBeNull();
   });
 
   it('lets many people subscribe by the month, renew, talk until it ends, and picks up subscriptions made elsewhere', async () => {
