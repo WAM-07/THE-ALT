@@ -28,6 +28,9 @@ final AltInbox altInbox = AltInbox(altAccount);
 /// Opens ALTERA / ALTAR already signed in, and receives `alter://handoff?code=...` links.
 final AltHandoff altHandoff = AltHandoff(altAccount);
 
+/// Push notifications for the ALT inbox while ALTER is closed (on once Firebase is set up).
+final AltPush altPush = AltPush(altAccount);
+
 /// Becomes true once the saved session has been restored (or found missing) at start-up.
 final ValueNotifier<bool> altSessionReady = ValueNotifier<bool>(false);
 

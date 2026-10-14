@@ -13,6 +13,7 @@ export 'src/handoff.dart';
 export 'src/inbox.dart';
 export 'src/known_accounts.dart';
 export 'src/media.dart';
+export 'src/push.dart';
 export 'src/models.dart';
 export 'src/token_store.dart';
 export 'src/ui/account_center.dart';

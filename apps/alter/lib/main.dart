@@ -64,6 +64,8 @@ class _AlterAppState extends State<AlterApp> {
     );
     // The sign-in card lists the accounts used here, however they signed in.
     AltKnownAccounts.instance.track(altAccount);
+    // Pushes while ALTER is closed (only when built with Firebase); tapping one opens the inbox.
+    altPush.start(onOpen: (_) => goRouter.push('/inbox'));
     // "Continue with ALTER" in ALTERA: ask the person here, then sign ALTERA in.
     answerAltSignInRequests(
       altHandoff,

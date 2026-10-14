@@ -34,6 +34,8 @@ class _AlteraAppState extends ConsumerState<AlteraApp> {
     final auth = ref.read(authServiceProvider);
     // The sign-in card lists the accounts used here, however they signed in.
     AltKnownAccounts.instance.track(auth.alt);
+    // Pushes while ALTERA is closed (only when built with Firebase); tapping one opens notifications.
+    AltPush(auth.alt).start(onOpen: (_) => ref.read(routerProvider).go('/notifications'));
     // "Continue with ALTERA" in ALTER: ask the person here, then sign ALTER in.
     answerAltSignInRequests(
       auth.handoff,
