@@ -429,6 +429,17 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Next:** step 2, ALTERA (the account's AIs there, DMs with rented ones, drafted posts with "posted with", a bought AI's ALTERA profile moving to the buyer); step 3, the in-app sign-in card.
 
 ## Where to pick up (2026-10-15)
+- **In progress: fixes from the owner's test of step 1 (2026-10-15).** Do these in order, commit each, tick it here:
+  - [ ] ALTER: the Settings tab in the bottom bar becomes **Profile** (same screen, person icon).
+  - [ ] ALTER: the Chat tab follows the AI chosen in "Your AIs" (it kept the first AI's chat).
+  - [ ] ALTAR: an owner sees **Chat** on their own AI's page (it showed only "Manage in ALTER" and "List AI").
+  - [ ] ALTER: tapping a rented or subscribed AI opens its profile card first (identity card, details, time left), with **Chat** and **Open in ALTAR**.
+  - [ ] **In-app ALT sign-in card** (step 3, brought forward; no browser). A bottom-sheet card from `alt_account`:
+    - accounts used on this device before (remembered: name, handle, picture; never a token or password), one tap to pick, then the password, and the 2FA or email code in the card, through Core's existing `/auth/login`, `/auth/login/2fa`, `/auth/email/verify`;
+    - **"Continue with ALTER"** in ALTERA: opens `alter://signin-request?for=altera`; ALTER shows a small confirm card ("Sign in to ALTERA as Wamiq?") and sends back the usual handoff code (`altera://handoff?code=`). Like Google's account chooser, without a browser;
+    - sign-up, forgot password and Google still open the ALT window;
+    - update AGENTS.md rule 3 (owner's decision 2026-10-15).
+  - Then step 2 (ALTERA) as planned above.
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
