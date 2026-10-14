@@ -436,9 +436,20 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
     const feed = await api('GET', '/feed?tab=all&limit=50', owner.token);
     expect(feed.body.posts.find((p) => p.id === post.body.post.id)).toMatchObject({ assisted_by_name: 'Nova' });
 
-    // Someone who doesn't own, rent or subscribe to it can't write or post with it.
+    // Comments and replies too: drafted for the person under someone's post, tagged "replied with".
+    const reply = await api('POST', '/ai/draft-with', owner.token, { core_ai_id: coreAi.id, kind: 'comment', post_id: post.body.post.id });
+    expect(reply.status).toBe(200);
+    expect(reply.body.content).toContain('Nova');
+    const comment = await api('POST', `/posts/${post.body.post.id}/comments`, owner.token, { content: 'Thanks, Nova helped me say it.', assisted_by_ai_id: coreAi.id });
+    expect(comment.status).toBe(201);
+    const thread = await api('GET', `/posts/${post.body.post.id}/comments`, owner.token);
+    expect(thread.body.comments.find((c) => c.id === comment.body.comment.id)).toMatchObject({ assisted_by_name: 'Nova', assisted_by_handle: coreAi.handle });
+
+    // Someone who doesn't own, rent or subscribe to it can't write, post or reply with it.
     expect((await api('POST', '/ai/draft-with', stranger.token, { core_ai_id: coreAi.id, brief: 'anything at all' })).body.code).toBe('NO_ACCESS');
     expect((await api('POST', '/posts', stranger.token, { content: 'Borrowed voice', assisted_by_ai_id: coreAi.id })).body.code).toBe('NO_ACCESS');
+    expect((await api('POST', '/ai/draft-with', stranger.token, { core_ai_id: coreAi.id, kind: 'comment', post_id: post.body.post.id })).body.code).toBe('NO_ACCESS');
+    expect((await api('POST', `/posts/${post.body.post.id}/comments`, stranger.token, { content: 'Borrowed', assisted_by_ai_id: coreAi.id })).body.code).toBe('NO_ACCESS');
   });
 
   it('refuses unverified AIs, other people’s AIs and unsafe drafts', async () => {

@@ -43,24 +43,33 @@ router.post('/generate', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /ai/draft-with ─────────────────────────────────────────────────────
-// An AI the person owns, rents or subscribes to (anywhere in ALT) drafts a post for their OWN
-// profile. They edit and publish it themselves, and it then shows "posted with <AI>".
+// An AI the person owns, rents or subscribes to (anywhere in ALT) drafts, for their OWN profile, a
+// post (kind "post", the default) or a comment or reply under a post (kind "comment", with post_id).
+// They edit and publish it themselves; it then shows "posted with" / "replied with" the AI.
 router.post('/draft-with', authMiddleware, async (req, res) => {
   try {
-    const { core_ai_id: aiId, brief } = req.body;
-    if (!aiId || !brief || `${brief}`.trim().length < 3) {
-      return res.status(400).json({ message: 'Choose an AI and say what the post should be about' });
+    const { core_ai_id: aiId, brief, kind = 'post', post_id: postId } = req.body;
+    const what = `${brief || ''}`.trim().slice(0, 1000);
+    if (!aiId || !['post', 'comment'].includes(kind)) return res.status(400).json({ message: 'Choose an AI to write with' });
+    if (kind === 'post' && what.length < 3) return res.status(400).json({ message: 'Say what the post should be about' });
+    let post = null;
+    if (kind === 'comment') {
+      post = postId ? await db.queryOne(`SELECT content FROM posts WHERE id = $1 AND status = 'published' AND deleted_at IS NULL`, [postId]) : null;
+      if (!post) return res.status(404).json({ message: 'Post not found' });
     }
     const access = await core.access(aiId, req.userId);
     if (!access.role) {
       return res.status(403).json({ message: 'Rent or subscribe to this AI to write with it. If you did, that time has ended.', code: 'NO_ACCESS' });
     }
     // Framed so the AI writes as the person posting, not as itself.
-    const ask = `Write a post for my own ALTERA profile, in my voice: I am the one posting it, not you. What I want to say: ${`${brief}`.trim().slice(0, 1000)}`;
-    const reply = await core.respond(aiId, 'altera_draft', [{ role: 'user', content: ask }], req.userId);
+    const ask =
+      kind === 'comment'
+        ? `Write a comment for me to post under this post, in my voice: I am the one replying, not you.\n\nThe post: «${post.content.slice(0, 1500)}»\n\n${what ? `What I want to say: ${what}` : 'Say something relevant and kind.'}`
+        : `Write a post for my own ALTERA profile, in my voice: I am the one posting it, not you. What I want to say: ${what}`;
+    const reply = await core.respond(aiId, kind === 'comment' ? 'altera_draft_comment' : 'altera_draft', [{ role: 'user', content: ask }], req.userId);
     res.json({ content: reply.text.trim().replace(/^"|"$/g, ''), ai: access.ai });
   } catch (err) {
-    fail(res, err, 'Failed to draft the post');
+    fail(res, err, 'Failed to draft that');
   }
 });
 

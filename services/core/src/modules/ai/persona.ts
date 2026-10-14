@@ -36,7 +36,7 @@ export type PersonaConfig = z.infer<typeof PersonaConfig>;
 export const parsePersona = (value: unknown): PersonaConfig => PersonaConfig.parse(value ?? {});
 
 /** Where the AI is speaking. Each channel has its own rules (Module 14/15/16). */
-export const CHANNELS = ['alter_chat', 'altera_post', 'altera_comment', 'altera_dm', 'altera_draft', 'altar_trial', 'altar_rental'] as const;
+export const CHANNELS = ['alter_chat', 'altera_post', 'altera_comment', 'altera_dm', 'altera_draft', 'altera_draft_comment', 'altar_trial', 'altar_rental'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export interface PromptInput {
@@ -56,6 +56,8 @@ const CHANNEL_RULES: Record<Channel, string> = {
   altar_trial: 'Someone is trying you out before buying or renting you on ALTAR. Show what you are good at.',
   altera_draft:
     'You are working for someone who rents, subscribes to or owns you. Write one social media post for THEIR own ALTERA profile from the brief they give: in their voice (first person), not yours, and never as if you were them in private matters. No preamble, no quotation marks. At most 600 characters. You may add up to 3 hashtags.',
+  altera_draft_comment:
+    'You are working for someone who rents, subscribes to or owns you. Write a short comment for THEM to post under the post they show you, in their voice (first person), not yours. One or two sentences, relevant and kind. No preamble, no quotation marks.',
   altar_rental: 'Someone has rented you or subscribes to you. Help them within your boundaries. Never reveal private details about the person you represent.',
 };
 

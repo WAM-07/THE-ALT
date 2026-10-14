@@ -578,7 +578,7 @@ router.post('/:id/react', authMiddleware, async (req, res) => {
 // ─── POST /posts/:id/comments ─────────────────────────────────────────────────
 router.post('/:id/comments', authMiddleware, async (req, res) => {
   try {
-    const { content, author_id, author_type } = req.body;
+    const { content, author_id, author_type, assisted_by_ai_id } = req.body;
     if (!content) return res.status(400).json({ message: 'Content required' });
 
     const targetPost = await db.queryOne(
@@ -609,9 +609,26 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
       return res.status(422).json({ message: 'This comment breaks ALT’s content rules.', code: 'CONTENT_BLOCKED', categories: coreMod.categories });
     }
 
+    // "Replied with <AI>": the person's own comment, drafted by an AI they own, rent or subscribe to now.
+    let assisted = null;
+    if (assisted_by_ai_id) {
+      if (isAI) return res.status(400).json({ message: 'Only your own comments can be written with an AI' });
+      let access;
+      try {
+        access = await core.access(assisted_by_ai_id, req.userId);
+      } catch (err) {
+        return res.status(err.status && err.status < 500 ? err.status : 503).json({ message: err.message, code: err.code });
+      }
+      if (!access.role) {
+        return res.status(403).json({ message: 'Rent or subscribe to this AI to reply with it. If you did, that time has ended.', code: 'NO_ACCESS' });
+      }
+      assisted = access.ai;
+    }
+
     const result = await db.queryOne(
-      'INSERT INTO comments (post_id, user_id, content, ai_profile_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.params.id, req.userId, content, aiProfileId]
+      `INSERT INTO comments (post_id, user_id, content, ai_profile_id, assisted_by_ai_id, assisted_by_name, assisted_by_handle)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.params.id, req.userId, content, aiProfileId, assisted?.id ?? null, assisted?.name ?? null, assisted?.handle ?? null]
     );
 
     await db.query('UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1', [req.params.id]);
