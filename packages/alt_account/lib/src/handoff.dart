@@ -17,6 +17,7 @@ class AltHandoff {
   final AltAccountClient client;
   final AppLinks _links;
   StreamSubscription<Uri>? _sub;
+  StreamSubscription<Uri>? _requests;
 
   /// Opens [target] signed in as the current person. Returns false if the app isn't installed
   /// (the caller can then point to where to get it).
@@ -46,7 +47,48 @@ class AltHandoff {
     }, onError: (Object e) => debugPrint('handoff links unavailable: $e'));
   }
 
-  void dispose() => _sub?.cancel();
+  /// Asks [from] (another ALT app on this phone) to sign this app in with its account, like "Continue
+  /// with Google": opens `<from>://signin-request?for=<this app>`. That app asks the person to confirm
+  /// and answers with the usual handoff link, which [listen] turns into a session. False if [from]
+  /// isn't installed.
+  Future<bool> requestFrom(AltPlatform from) async {
+    try {
+      return await launchUrl(Uri.parse('${from.name}://signin-request?for=${client.platform.name}'), mode: LaunchMode.externalNonBrowserApplication);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Answers [requestFrom]: [onRequest] runs with the app asking. It should ask the person (see
+  /// `showAltShareSignInSheet`) and then call [open] for that app; nothing is shared without that.
+  void listenForSignInRequests(void Function(AltPlatform target) onRequest) {
+    _requests ??= _links.uriLinkStream.listen((uri) {
+      final target = signInRequestTarget(uri);
+      if (target != null) onRequest(target);
+    }, onError: (Object e) => debugPrint('sign-in requests unavailable: $e'));
+  }
+
+  void dispose() {
+    _sub?.cancel();
+    _requests?.cancel();
+  }
+
+  /// The ALT phone app named by `<scheme>://signin-request?for=altera`, or null.
+  static AltPlatform? signInRequestTarget(Uri uri) {
+    if (uri.host != 'signin-request') return null;
+    return switch (uri.queryParameters['for']) {
+      'alter' => AltPlatform.alter,
+      'altera' => AltPlatform.altera,
+      _ => null,
+    };
+  }
+
+  /// The other ALT phone app this one can borrow a sign-in from, if any.
+  static AltPlatform? partnerOf(AltPlatform app) => switch (app) {
+        AltPlatform.alter => AltPlatform.altera,
+        AltPlatform.altera => AltPlatform.alter,
+        _ => null,
+      };
 
   /// Extracts the code from `altera://handoff?code=X`, `alter://handoff?code=X` or `https://…/handoff?code=X`.
   static String? handoffCode(Uri uri) {
