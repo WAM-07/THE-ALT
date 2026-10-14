@@ -19,8 +19,9 @@ THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutt
 3. **One account system.**
    - Users live only in `core.users`. Never create another users table or another login endpoint in a platform service.
    - Platform services identify the caller by verifying the ALT access token (RS256, public key at `/core/.well-known/jwks.json`) **and** checking the session is still active (see `services/altera-api/src/middleware/auth.js`). They may also read the `x-alt-user-id` header set by the gateway.
-   - Flutter apps sign people in **only** through `packages/alt_account` (`AltAccountClient`). Never add login, token or password code to an app.
-   - The front door is the **ALT Account window** (`/core/account/`, served by Core): "Continue with ALT" opens it as a popup (web) or in-app browser tab (phones), and it hands back a one-time handoff code. Improve sign-in there, not by adding forms to the apps.
+   - Flutter apps sign people in **only** through `packages/alt_account` (`AltAccountClient`). Never add login, token or password code to an app itself.
+   - **Phones:** "Continue with ALT" opens the **ALT sign-in card** (`showAltSignInSheet` in `alt_account`, owner's decision 2026-10-15): accounts used on the device, the password and any 2FA or email code, checked by Core's sign-in API, or "Continue with ALTER/ALTERA" (the other app confirms, then sends a handoff code). Improve sign-in in that card, never with forms of an app's own.
+   - **Web, and on phones for creating an account or resetting a password:** the **ALT Account window** (`/core/account/`, served by Core), which hands back a one-time handoff code.
 4. **Each service writes only to its own Postgres schema** (`core`, `altera`, `altar`).
    - Reading other schemas through a view, or holding a foreign key to `core.users` or `core.personal_ais`, is fine.
    - Writing to another schema is not. Call that service's API instead.

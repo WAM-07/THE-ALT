@@ -140,9 +140,15 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  /// "Continue with ALT": the ALT Account window signs the person in and comes back through
-  /// alter://handoff, which main.dart already turns into a session.
+  /// "Continue with ALT": the ALT sign-in card slides up over ALTER (accounts on this phone, the
+  /// password and any code, or "Continue with ALTERA"). Creating an account opens the ALT Account
+  /// window, which comes back through alter://handoff (main.dart turns that into a session).
   Future<void> _openAltWindow({bool signUp = false}) async {
+    if (!signUp) {
+      final user = await showAltSignInSheet(context, client: altAccount, handoff: altHandoff);
+      if (user != null && mounted) context.go('/');
+      return;
+    }
     if (!await AltAccountWindow.open(altAccount, signUp: signUp) && mounted) {
       _toast('Couldn’t open the ALT sign-in window. Use your email and password here instead.');
       setState(() => _manual = true);
@@ -181,16 +187,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     ContinueWithAltButton(onPressed: _openAltWindow),
                     const SizedBox(height: 12),
                     Btn('Create an ALT account', kind: BtnKind.secondary, expand: true, onTap: () => _openAltWindow(signUp: true)),
-                    const SizedBox(height: 18),
-                    Center(
-                      child: Pressable(
-                        onTap: () => setState(() => _manual = true),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Text('Use email and password in ALTER', style: Ds.caption.copyWith(color: Ds.textSecondary)),
-                        ),
-                      ),
-                    ),
                   ] else ...[
                     AnimatedSize(
                       duration: Ds.calm,

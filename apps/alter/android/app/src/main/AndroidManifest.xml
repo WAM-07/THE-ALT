@@ -32,6 +32,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="alter" android:host="handoff" />
+                <!-- "Continue with ALTER" from ALTERA: alter://signin-request?for=altera (asks first) -->
+                <data android:scheme="alter" android:host="signin-request" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

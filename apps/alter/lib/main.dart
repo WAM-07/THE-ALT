@@ -1,3 +1,4 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/alt/alt_session.dart';
@@ -35,6 +36,14 @@ class _AlterAppState extends State<AlterApp> {
         _messengerKey.currentState?.showSnackBar(SnackBar(content: Text('Signed in as @${user.handle}')));
       },
       onError: (e) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(e.message))),
+    );
+    // The sign-in card lists the accounts used here, however they signed in.
+    AltKnownAccounts.instance.track(altAccount);
+    // "Continue with ALTER" in ALTERA: ask the person here, then sign ALTERA in.
+    answerAltSignInRequests(
+      altHandoff,
+      context: () => goRouter.routerDelegate.navigatorKey.currentContext,
+      onMessage: (m) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(m))),
     );
     // New notifications pop up wherever the person is in the app.
     altInbox.incoming.listen((n) {

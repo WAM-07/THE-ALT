@@ -35,21 +35,22 @@ void main() {
     }
 
     expect(find.byType(AuthScreen), findsOneWidget);
-    // On phones the ALT Account window is the way in; the in-app form is one tap away.
+    // On phones "Continue with ALT" opens the ALT sign-in card over the app (no browser).
     expect(find.text('Continue with ALT'), findsOneWidget);
     expect(find.text('Create an ALT account'), findsOneWidget);
-    final manual = find.text('Use email and password in ALTER');
-    await tester.ensureVisible(manual);
-    await tester.tap(manual);
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Continue with ALT'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Choose an account'), findsOneWidget);
+    expect(find.text('Continue with ALTERA'), findsOneWidget);
+    await tester.tap(find.text('Use another account'));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(find.text('Sign in'), findsOneWidget);
-
-    final create = find.textContaining('Create an account', findRichText: true);
-    await tester.ensureVisible(create);
-    await tester.pump();
-    await tester.tap(create);
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Create account'), findsOneWidget);
+    expect(find.text('Email or handle'), findsOneWidget);
+    expect(find.text('Forgot password?'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }

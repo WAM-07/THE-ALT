@@ -597,3 +597,30 @@ class _IconButton extends StatelessWidget {
         style: IconButton.styleFrom(backgroundColor: _raised, minimumSize: const Size(36, 36), fixedSize: const Size(36, 36), padding: EdgeInsets.zero),
       );
 }
+
+/// Lets the other ALT app on this phone sign in with this app's account ("Continue with ALTER"):
+/// on each request, waits for the saved session to be restored (the request may have started the
+/// app), asks the person with [showAltShareSignInSheet], and only then sends the handoff link.
+/// [context] gives a context under the app's navigator; [onMessage] shows a short note.
+void answerAltSignInRequests(AltHandoff handoff, {required BuildContext? Function() context, required void Function(String message) onMessage}) {
+  final client = handoff.client;
+  handoff.listenForSignInRequests((target) async {
+    for (var i = 0; i < 40 && client.currentUser.value == null; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    // Let the app settle on its first screen, so the card isn't swept away by a redirect.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    final ctx = context();
+    if (client.currentUser.value == null) {
+      onMessage('Sign in to ${client.platform.label} first, then try again from ${target.label}.');
+      return;
+    }
+    if (ctx == null || !ctx.mounted) return;
+    if (!await showAltShareSignInSheet(ctx, client: client, target: target)) return;
+    try {
+      if (!await handoff.open(target)) onMessage('${target.label} could not be opened.');
+    } on AltApiException catch (e) {
+      onMessage(e.message);
+    }
+  });
+}

@@ -224,10 +224,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return null;
   }
 
-  /// "Continue with ALT": the ALT Account window signs the person in and comes back through
-  /// altera://handoff, which app.dart already turns into a session.
+  /// "Continue with ALT": the ALT sign-in card slides up over ALTERA (accounts on this phone, the
+  /// password and any code, or "Continue with ALTER"). Creating an account opens the ALT Account
+  /// window, which comes back through altera://handoff (app.dart turns that into a session).
   Future<void> _openAltWindow({bool signUp = false}) async {
-    final opened = await AltAccountWindow.open(ref.read(authServiceProvider).alt, signUp: signUp);
+    final auth = ref.read(authServiceProvider);
+    if (!signUp) {
+      final user = await showAltSignInSheet(context, client: auth.alt, handoff: auth.handoff);
+      if (user == null || !mounted) return;
+      final result = await ref.read(authStateProvider.notifier).adoptSession();
+      if (result.success && mounted) context.go('/feed');
+      return;
+    }
+    final opened = await AltAccountWindow.open(auth.alt, signUp: signUp);
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Couldn’t open the ALT sign-in window. Use your email and password instead.')),
@@ -299,11 +308,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                         child: const Text('Create an ALT account'),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => setState(() => _manual = true),
-                      child: const Text('Use email and password in ALTERA'),
                     ),
                   ] else
                   // Form

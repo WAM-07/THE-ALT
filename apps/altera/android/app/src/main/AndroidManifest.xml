@@ -30,6 +30,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="altera" android:host="handoff" />
+                <!-- "Continue with ALTERA" from ALTER: altera://signin-request?for=alter (asks first) -->
+                <data android:scheme="altera" android:host="signin-request" />
             </intent-filter>
 
             <!-- App Launcher -->

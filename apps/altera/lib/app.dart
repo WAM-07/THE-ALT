@@ -1,3 +1,4 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme/app_theme.dart';
@@ -29,6 +30,15 @@ class _AlteraAppState extends ConsumerState<AlteraApp> {
         }
       },
       onError: (e) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(e.message))),
+    );
+    final auth = ref.read(authServiceProvider);
+    // The sign-in card lists the accounts used here, however they signed in.
+    AltKnownAccounts.instance.track(auth.alt);
+    // "Continue with ALTERA" in ALTER: ask the person here, then sign ALTER in.
+    answerAltSignInRequests(
+      auth.handoff,
+      context: () => ref.read(routerProvider).routerDelegate.navigatorKey.currentContext,
+      onMessage: (m) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(m))),
     );
   }
 
