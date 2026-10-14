@@ -468,6 +468,10 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
 - **Fixed in A1 (found by the owner, 2026-10-15):** on ALTERA's Profile, switching personal → AI persona → personal shows a red error screen: "_ProfileScreenState is a SingleTickerProviderStateMixin but multiple tickers were created" (`screens/profile/profile_screen.dart`: a new `TabController` per switch; use `TickerProviderStateMixin` and dispose the old one). Also `MessagingNotifier.loadConversations` updates a disposed widget during the switch. The owner also asked for a recommendation on the switch itself; see the answer of 2026-10-15 (proposed: replace the app-wide switch with "Post as" in the composer and a Manage page per owned AI).
 - **To demo on a phone:** `npm run demo`, connect the phone by USB, `adb reverse tcp:8080 tcp:8080`, install the debug APKs built with `--dart-define=ALT_API_URL=http://127.0.0.1:8080`.
+- **In progress (owner's go, 2026-10-15): group C.** Commit each, tick it here:
+  - [ ] C2. "Connect MetaMask" on ALTAR: link an outside wallet to the ALT account by signing a message (no password, no key leaves MetaMask).
+  - [ ] C4. Smarter training: the AI reads uploaded PDFs and notes (text extraction, chunks and retrieval) when it answers.
+  - Waiting on the owner: C1 Polygon Amoy (RPC URL + faucet-funded key), C3 push notifications (a Firebase project: `google-services.json` and a server key).
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
