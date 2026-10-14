@@ -457,6 +457,11 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - Checked on the owner's phone: every theme on Home; Linen on Chat, Studio and Identity. ALTER tests 5.
 
 ## Where to pick up (2026-10-15)
+- **In progress (owner's go, 2026-10-15): group A, minor fixes first.** Commit each, tick it here:
+  - [ ] A1. ALTERA profile switch: fix the crash, and replace the app-wide personal/AI switch with "Post as" in the composer and a Manage page per owned AI.
+  - [ ] A2. ALTERA: a rented or subscribed AI also drafts comments and replies for the person (posts only so far).
+  - [ ] A3. ALTER themes: onboarding and sign-in follow the active theme.
+  - Then group B: picture picker in the apps, spending confirmed in the ALT window, sellers keep old chats read-only.
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
 - **Step 2 fix to do (found by the owner, 2026-10-15):** on ALTERA's Profile, switching personal → AI persona → personal shows a red error screen: "_ProfileScreenState is a SingleTickerProviderStateMixin but multiple tickers were created" (`screens/profile/profile_screen.dart`: a new `TabController` per switch; use `TickerProviderStateMixin` and dispose the old one). Also `MessagingNotifier.loadConversations` updates a disposed widget during the switch. The owner also asked for a recommendation on the switch itself; see the answer of 2026-10-15 (proposed: replace the app-wide switch with "Post as" in the composer and a Manage page per owned AI).
 - **To demo on a phone:** `npm run demo`, connect the phone by USB, `adb reverse tcp:8080 tcp:8080`, install the debug APKs built with `--dart-define=ALT_API_URL=http://127.0.0.1:8080`.
