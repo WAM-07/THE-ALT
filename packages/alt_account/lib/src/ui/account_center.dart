@@ -8,6 +8,7 @@ import '../errors.dart';
 import '../handoff.dart';
 import '../models.dart';
 import 'code_dialog.dart';
+import 'app_lock.dart';
 import 'picture_picker.dart';
 
 /// The ALT Account Center: one place, in every ALT app, to manage the account that works across
@@ -31,6 +32,8 @@ class AltAccountCenterScreen extends StatefulWidget {
 class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
   List<AltSession>? _sessions;
   bool _busy = false;
+  // Biometric unlock on this phone (null while checking, or where the phone can't do it).
+  bool? _lockOn;
 
   AltAccountClient get _client => widget.client;
 
@@ -38,6 +41,17 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
   void initState() {
     super.initState();
     _reload();
+    AltAppLock.available().then((ok) async {
+      final on = ok ? await AltAppLock.isOn(_client) : null;
+      if (mounted) setState(() => _lockOn = on);
+    });
+  }
+
+  Future<void> _setLock(bool on) async {
+    final done = await AltAppLock.setOn(_client, on);
+    if (!mounted) return;
+    if (done) setState(() => _lockOn = on);
+    _toast(done ? (on ? '${_client.platform.label} now asks for your fingerprint or face' : 'Biometric unlock is off') : 'Not changed: the check did not pass');
   }
 
   Future<void> _reload() async {
@@ -318,6 +332,14 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                     value: user.twoFactorEnabled,
                     onChanged: (on) => on ? _enableTwoFactor() : _disableTwoFactor(),
                   ),
+                  if (_lockOn != null)
+                    SwitchListTile(
+                      secondary: const Icon(Icons.fingerprint_rounded),
+                      title: const Text('Unlock with fingerprint or face'),
+                      subtitle: Text('On this phone, ${_client.platform.label} asks when it opens and when you come back'),
+                      value: _lockOn!,
+                      onChanged: _setLock,
+                    ),
                   ]),
                   const _Section('Signed-in devices'),
                   if (_sessions == null)

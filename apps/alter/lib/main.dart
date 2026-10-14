@@ -89,6 +89,8 @@ class _AlterAppState extends State<AlterApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       routerConfig: goRouter,
+      // Biometric unlock, when turned on in the Account Center.
+      builder: (context, child) => AltAppLockGate(client: altAccount, child: child ?? const SizedBox.shrink()),
     );
   }
 }

@@ -1,5 +1,6 @@
 package com.alteraapp.altera_app
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity: required by local_auth (biometric unlock).
+class MainActivity : FlutterFragmentActivity()
