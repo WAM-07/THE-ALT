@@ -14,7 +14,10 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../services/image_service.dart';
 
 class PostComposerScreen extends ConsumerStatefulWidget {
-  const PostComposerScreen({super.key});
+  const PostComposerScreen({super.key, this.initialAuthorId});
+
+  /// Start posting as this AI persona of yours (from its Manage page); otherwise as you.
+  final String? initialAuthorId;
 
   @override
   ConsumerState<PostComposerScreen> createState() => _PostComposerScreenState();
@@ -31,9 +34,51 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
   bool _hasAIGeneratedContent = false;
   // An AI on the ALT account (owned, rented or subscribed) that drafted this post: "posted with".
   AccountAi? _assistedBy;
-  bool get _postingAsAi {
-    final auth = ref.read(authStateProvider);
-    return auth.activeProfileId != auth.user?.humanProfile?.id;
+  // Who the post is from: you (null) or one of your verified AI personas ("Post as").
+  late String? _postAsId = widget.initialAuthorId;
+  bool get _postingAsAi => _postAsAi != null;
+  dynamic get _postAsAi {
+    final ais = ref.read(authStateProvider).user?.aiProfiles ?? const [];
+    for (final p in ais) {
+      if (p.id == _postAsId && p.isVerified) return p;
+    }
+    return null;
+  }
+
+  Future<void> _choosePostAs() async {
+    final user = ref.read(authStateProvider).user;
+    if (user == null) return;
+    final ais = user.aiProfiles.where((p) => p.isVerified).toList();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text('Post as', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+          ListTile(
+            leading: AvatarWidget(avatarUrl: user.humanProfile?.avatar, displayName: user.humanProfile?.displayName ?? '', radius: 18),
+            title: Text(user.humanProfile?.displayName ?? 'Me'),
+            subtitle: const Text('You'),
+            trailing: _postingAsAi ? null : const Icon(Icons.check_rounded, color: AppColors.primary),
+            onTap: () => Navigator.pop(ctx, ''),
+          ),
+          for (final ai in ais)
+            ListTile(
+              leading: AvatarWidget(avatarUrl: ai.avatar, displayName: ai.displayName, radius: 18, isAI: true),
+              title: Text(ai.displayName),
+              subtitle: Text('@${ai.username} · your AI'),
+              trailing: ai.id == _postAsAi?.id ? const Icon(Icons.check_rounded, color: AppColors.primary) : null,
+              onTap: () => Navigator.pop(ctx, ai.id),
+            ),
+        ]),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _postAsId = picked.isEmpty ? null : picked;
+      // "Posted with" only applies to your own posts.
+      if (_postAsId != null) _assistedBy = null;
+    });
   }
   int get _charCount => _contentCtrl.text.length;
   static const int _maxChars = 5000;
@@ -147,8 +192,8 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
     setState(() => _isPosting = true);
 
     final auth = ref.read(authStateProvider);
-    final activeId = auth.activeProfileId;
-    final isAI = activeId != auth.user?.humanProfile?.id;
+    final isAI = _postingAsAi;
+    final activeId = isAI ? _postAsAi.id as String : auth.user?.humanProfile?.id;
 
     if (activeId != null) {
       final post = await ref.read(feedServiceProvider).createPost(
@@ -334,7 +379,7 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
     try {
       final result = await AIService(
         ref.read(authServiceProvider),
-      ).generatePost(instruction: instruction, profileId: ref.read(authStateProvider).activeProfileId);
+      ).generatePost(instruction: instruction, profileId: _postingAsAi ? _postAsAi.id as String : null);
       setState(() {
         _contentCtrl.text = result;
         _hasAIGeneratedContent = true;
@@ -387,10 +432,8 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authStateProvider);
-    final activeId = auth.activeProfileId;
-    final dynamic profile = auth.user?.humanProfile?.id == activeId 
-        ? auth.user?.humanProfile 
-        : auth.user?.aiProfiles.firstWhere((p) => p.id == activeId, orElse: () => auth.user!.aiProfiles.first);
+    final dynamic profile = _postingAsAi ? _postAsAi : auth.user?.humanProfile;
+    final hasAis = auth.user?.aiProfiles.any((p) => p.isVerified) ?? false;
 
     final canPost = (_contentCtrl.text.trim().isNotEmpty || _mediaUrls.isNotEmpty) && _charCount <= _maxChars;
     final progress = _charCount / _maxChars;
@@ -430,6 +473,19 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
         children: [
           if (_isAIGenerating)
             LinearProgressIndicator(backgroundColor: AppColors.badgeAI.withOpacity(0.1), color: AppColors.badgeAI),
+          // "Post as": you, or one of your verified AIs.
+          if (hasAis)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  avatar: Icon(_postingAsAi ? Icons.smart_toy_outlined : Icons.person_outline_rounded, size: 16),
+                  label: Text('Posting as ${profile?.displayName ?? 'you'}  ▾'),
+                  onPressed: _choosePostAs,
+                ),
+              ),
+            ),
           if (_assistedBy != null && !_postingAsAi)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -453,7 +509,10 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AvatarWidget(avatarUrl: profile?.avatar, displayName: profile?.displayName ?? '', radius: 20),
+                      GestureDetector(
+                        onTap: hasAis ? _choosePostAs : null,
+                        child: AvatarWidget(avatarUrl: profile?.avatar, displayName: profile?.displayName ?? '', radius: 20, isAI: _postingAsAi),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextField(

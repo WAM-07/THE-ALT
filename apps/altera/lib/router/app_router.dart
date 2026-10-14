@@ -20,6 +20,7 @@ import '../screens/profile/create_ai_screen.dart';
 import '../screens/profile/pending_approvals_screen.dart';
 import '../screens/profile/moderation_screen.dart';
 import '../screens/profile/visiting_profile_screen.dart';
+import '../screens/profile/manage_ai_screen.dart';
 import '../screens/ai/ai_chat_screen.dart';
 import '../screens/ai/your_ais_screen.dart';
 
@@ -83,7 +84,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/compose',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const PostComposerScreen(),
+        // ?as=<AI persona id>: start the post as one of your AIs (from its Manage page).
+        builder: (context, state) => PostComposerScreen(initialAuthorId: state.uri.queryParameters['as']),
+      ),
+      // One of your AIs on ALTERA: autonomy, posting as it, approvals and its posts.
+      GoRoute(
+        path: '/manage-ai/:profileId',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => ManageAiScreen(profileId: state.pathParameters['profileId']!),
       ),
       GoRoute(
         path: '/create-ai',

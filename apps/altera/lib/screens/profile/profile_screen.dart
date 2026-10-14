@@ -29,7 +29,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoadingOther = false;
   Map<String, dynamic>? _otherProfileData;
@@ -173,19 +173,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.dispose();
   }
 
-  void _switchOwnedProfile(String profileId) {
-    ref.read(authStateProvider.notifier).switchProfile(profileId);
-    _tabController.animateTo(0);
-
-    final user = ref.read(authStateProvider).user;
-    final isAI =
-        user?.aiProfiles.any((profile) => profile.id == profileId) ?? false;
-    final profileType = isAI ? 'ai' : 'human';
-
-    if (!mounted) return;
-    context.go('/profile?id=$profileId&type=$profileType');
-  }
-
   bool _isOwnedProfileId(String? profileId) {
     if (profileId == null) return false;
 
@@ -195,106 +182,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     }
 
     return user?.aiProfiles.any((profile) => profile.id == profileId) ?? false;
-  }
-
-  void _handleProfileSwitcherSelection(String value) {
-    if (value == 'create_ai') {
-      context.push('/create-ai');
-      return;
-    }
-
-    if (value.startsWith('profile:')) {
-      final profileId = value.substring('profile:'.length);
-      if (profileId.isNotEmpty) {
-        _switchOwnedProfile(profileId);
-      }
-    }
-  }
-
-  void _showProfileSwitcher(BuildContext context, WidgetRef ref) {
-    final auth = ref.read(authStateProvider);
-    final user = auth.user;
-    final activeId = auth.activeProfileId;
-    final humanProfile = user?.humanProfile;
-    final aiProfiles = user?.aiProfiles ?? [];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Theme.of(context).dividerColor,
-                    borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
-            Text('Switch Profile',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onSurface)),
-            const SizedBox(height: 16),
-            if (humanProfile != null)
-              _ProfileSwitchTile(
-                emoji: '👤',
-                name: humanProfile.displayName,
-                username: '@${humanProfile.username}',
-                isActive: activeId == humanProfile.id,
-                isAI: false,
-                avatarUrl: humanProfile.avatar,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _switchOwnedProfile(humanProfile.id);
-                },
-              ),
-            ...aiProfiles.map((ai) => _ProfileSwitchTile(
-                  emoji: '🤖',
-                  name: ai.displayName,
-                  username: '@${ai.username}',
-                  isActive: activeId == ai.id,
-                  isAI: true,
-                  avatarUrl: ai.avatar,
-                  token: ai.aitTokenId,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _switchOwnedProfile(ai.id);
-                  },
-                )),
-            const Divider(height: 24),
-            ListTile(
-              leading: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    shape: BoxShape.circle),
-                child: const Icon(Icons.add_rounded, color: AppColors.primary),
-              ),
-              title: const Text('Bring your AI from ALTER',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, color: AppColors.primary)),
-              subtitle: const Text('Add an AI you created and verified in ALTER',
-                  style:
-                      TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                context.push('/create-ai');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   void _showSimpleDialog(BuildContext context, String title, String message) {
@@ -1364,57 +1251,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 color: Theme.of(context).colorScheme.onSurface)),
         actions: [
           if (isMe) ...[
-            PopupMenuButton<String>(
-              tooltip: 'Switch profile',
-              icon: Icon(Icons.swap_horiz_rounded,
-                  size: 24, color: Theme.of(context).colorScheme.onSurface),
-              onSelected: _handleProfileSwitcherSelection,
-              itemBuilder: (ctx) {
-                final humanProfile = user.humanProfile;
-                final aiProfiles = user.aiProfiles;
-                final items = <PopupMenuEntry<String>>[];
-
-                if (humanProfile != null) {
-                  items.add(
-                    PopupMenuItem<String>(
-                      value: 'profile:${humanProfile.id}',
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(humanProfile.displayName)),
-                          if (selectedProfileId == humanProfile.id)
-                            const Icon(Icons.check, size: 18, color: AppColors.primary),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                for (final ai in aiProfiles) {
-                  items.add(
-                    PopupMenuItem<String>(
-                      value: 'profile:${ai.id}',
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(ai.displayName)),
-                          if (selectedProfileId == ai.id)
-                            const Icon(Icons.check, size: 18, color: AppColors.primary),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                items.add(const PopupMenuDivider());
-                items.add(
-                  const PopupMenuItem<String>(
-                    value: 'create_ai',
-                    child: Text('Create New AI Persona'),
-                  ),
-                );
-
-                return items;
-              },
-            ),
             IconButton(
               icon: Icon(Icons.add_box_outlined, size: 26, color: Theme.of(context).colorScheme.onSurface),
               onPressed: () => context.push('/compose'),
@@ -1612,8 +1448,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           label: ai.displayName,
                           avatarUrl: ai.avatar,
                           isVerified: ai.isVerified,
-                          isActive: selectedProfileId == ai.id,
-                          onTap: () => _switchOwnedProfile(ai.id),
+                          isActive: false,
+                          onTap: () => context.push('/manage-ai/${ai.id}'),
                         );
                       },
                     ),
@@ -2093,10 +1929,8 @@ class _AIPersonasTab extends ConsumerWidget {
       itemBuilder: (ctx, i) {
         final ai = personas[i];
         final isActive = activeProfileId == ai.id;
-        final switchProfile = () {
-          ref.read(authStateProvider.notifier).switchProfile(ai.id);
-          context.go('/profile');
-        };
+        // Opens the AI's Manage page; you stay yourself everywhere else.
+        final switchProfile = () => context.push('/manage-ai/${ai.id}');
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
@@ -2473,77 +2307,6 @@ class _PersonaCircle extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ProfileSwitchTile extends StatelessWidget {
-  final String emoji, name, username;
-  final bool isActive, isAI;
-  final String? token;
-  final String? avatarUrl;
-  final VoidCallback onTap;
-  const _ProfileSwitchTile(
-      {required this.emoji,
-      required this.name,
-      required this.username,
-      required this.isActive,
-      required this.isAI,
-      required this.onTap,
-      this.avatarUrl,
-      this.token});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      leading: avatarUrl != null && avatarUrl!.isNotEmpty
-          ? AvatarWidget(
-              avatarUrl: avatarUrl,
-              displayName: name,
-              isAI: isAI,
-              radius: 24,
-              showGradient: false,
-            )
-          : Center(child: Text(emoji, style: const TextStyle(fontSize: 22))),
-      title: Text(name,
-          style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface)),
-      subtitle: Row(
-        children: [
-          Text(username,
-              style: TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
-          if (token != null) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(token!,
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ],
-      ),
-      trailing: isActive
-          ? Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check, color: Colors.white, size: 14),
-            )
-          : null,
-      onTap: onTap,
     );
   }
 }
