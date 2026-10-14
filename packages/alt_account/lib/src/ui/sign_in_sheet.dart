@@ -166,7 +166,14 @@ class _SignInSheetState extends State<_SignInSheet> {
 
   Future<void> _done(AltUser user) async {
     await AltKnownAccounts.instance.remember(user);
-    if (mounted) Navigator.pop(context, user);
+    if (mounted) _close(user);
+  }
+
+  /// Closes the card, but only while it is still on top: signing in can make the app navigate on
+  /// its own (taking the card away), and popping then would remove the app's new screen instead.
+  void _close([AltUser? user]) {
+    final route = ModalRoute.of(context);
+    if (route != null && route.isCurrent) Navigator.of(context).pop(user);
   }
 
   Future<void> _signIn() => _run(() async {
@@ -199,14 +206,14 @@ class _SignInSheetState extends State<_SignInSheet> {
     final opened = await widget.handoff!.requestFrom(partner);
     if (!mounted) return;
     if (opened) {
-      Navigator.pop(context);
+      _close();
     } else {
       setState(() => _error = '${partner.label} isn’t installed on this phone.');
     }
   }
 
   Future<void> _window({bool signUp = false}) async {
-    Navigator.pop(context);
+    _close();
     await AltAccountWindow.open(widget.client, signUp: signUp);
   }
 
@@ -243,7 +250,7 @@ class _SignInSheetState extends State<_SignInSheet> {
           ],
           const _Brand(),
           const Spacer(),
-          _IconButton(icon: Icons.close_rounded, tooltip: 'Close', onTap: () => Navigator.pop(context)),
+          _IconButton(icon: Icons.close_rounded, tooltip: 'Close', onTap: _close),
         ]),
         const SizedBox(height: 18),
         Text(title, style: _title),
