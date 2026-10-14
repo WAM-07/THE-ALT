@@ -14,6 +14,8 @@ import '../../features/persona_interface/screens/chat_screen.dart';
 import '../../features/persona_interface/screens/home_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/training_manager/screens/training_screen.dart';
+import '../../features/your_ais/talk_screen.dart';
+import '../../features/your_ais/your_ais_screen.dart';
 import '../ui/ui.dart';
 import '../widgets/offline_screen.dart';
 import 'scaffold_with_nav_bar.dart';
@@ -32,6 +34,11 @@ String? _guard(BuildContext context, GoRouterState state) {
     case AiPhase.error:
       return loc == '/offline' || loc == '/account' ? null : '/offline';
     case AiPhase.none:
+      // Without an AI of their own, someone may still rent or subscribe to one: show those first.
+      if ((accountAis.value ?? const []).isNotEmpty) {
+        const open = {'/yours', '/onboarding', '/account', '/inbox'};
+        return open.contains(loc) || loc.startsWith('/talk/') ? null : '/yours';
+      }
       return loc == '/onboarding' || loc == '/account' ? null : '/onboarding';
     case AiPhase.exists:
       if (loc == '/auth' || loc == '/splash' || loc == '/' || loc == '/onboarding' || loc == '/offline') return '/home';
@@ -43,7 +50,7 @@ final goRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
   // Re-run the guard on sign-in/out and once the person's AI has been loaded.
-  refreshListenable: Listenable.merge([altAccount.currentUser, altSessionReady, aiPhase]),
+  refreshListenable: Listenable.merge([altAccount.currentUser, altSessionReady, aiPhase, accountAis]),
   redirect: _guard,
   routes: [
     GoRoute(path: '/', builder: (context, state) => const SizedBox.shrink()),
@@ -81,6 +88,9 @@ final goRouter = GoRouter(
         GoRoute(path: 'versions', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const VersionsScreen()),
       ],
     ),
+    // Every AI on the ALT account, and talking to the ones the person rents or subscribes to.
+    GoRoute(path: '/yours', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const YourAisScreen()),
+    GoRoute(path: '/talk/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => TalkScreen(aiId: state.pathParameters['id']!)),
     // The ALT inbox, shared by every ALT app (Module 2).
     GoRoute(
       path: '/inbox',

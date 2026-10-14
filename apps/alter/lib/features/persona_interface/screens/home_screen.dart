@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    await Future.wait([refreshCurrentAi().catchError((_) => null), _loadRecent()]);
+    await Future.wait([refreshCurrentAi().catchError((_) => null), loadAccountAis(), _loadRecent()]);
   }
 
   Future<void> _open(AltPlatform app) async {
@@ -138,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ]),
                 ).animate().fadeIn(delay: 80.ms, duration: Ds.calm),
               ],
+              const _AccountStrip(),
               const SectionLabel('Your AI'),
               GridView(
                 shrinkWrap: true,
@@ -209,6 +210,66 @@ class _HomeScreenState extends State<HomeScreen> {
     if (d.inDays < 1) return '${d.inHours}h ago';
     return '${d.inDays}d ago';
   }
+}
+
+/// The AIs on the ALT account as picture bubbles (owned, rented, subscribed), when there is more
+/// than the one ALTER is working on. Owned ones switch ALTER to them; the others open a chat.
+class _AccountStrip extends StatelessWidget {
+  const _AccountStrip();
+
+  Future<void> _open(BuildContext context, AccountAi ai) async {
+    if (!ai.owned) {
+      context.push('/talk/${ai.id}');
+      return;
+    }
+    if (ai.id == currentAi.value?.id) return;
+    try {
+      await switchAi(ai.id);
+    } on AltApiException catch (e) {
+      if (context.mounted) toast(context, e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<List<AccountAi>?>(
+        valueListenable: accountAis,
+        builder: (context, list, _) {
+          if (list == null || list.length < 2) return const SizedBox.shrink();
+          final current = currentAi.value?.id;
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SectionLabel('Your AIs', action: 'See all', onAction: () => context.push('/yours')),
+            SizedBox(
+              height: 112,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
+                itemBuilder: (context, i) {
+                  final ai = list[i];
+                  final on = ai.id == current;
+                  return Pressable(
+                    onTap: () => _open(context, ai),
+                    child: SizedBox(
+                      width: 64,
+                      child: Column(children: [
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? Ds.iris : Colors.transparent, width: 2)),
+                          child: Opacity(opacity: ai.active ? 1 : 0.5, child: AiAvatar(ai: ai, size: 52)),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(ai.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: Ds.caption.copyWith(color: Ds.text, fontSize: 11.5)),
+                        Text(ai.owned ? (on ? 'In ALTER' : ai.label) : ai.active ? (ai.role == 'subscriber' ? 'Subscribed' : 'Rented') : 'Ended',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.caption.copyWith(fontSize: 10.5, color: ai.owned ? Ds.iris : ai.active ? Ds.mint : Ds.textTertiary)),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ]);
+        },
+      );
 }
 
 class _Action extends StatelessWidget {

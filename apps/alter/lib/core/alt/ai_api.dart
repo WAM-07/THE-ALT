@@ -42,6 +42,41 @@ class AltAi {
   int count(String key) => ((j['counts'] as Map?)?[key] as num?)?.toInt() ?? 0;
 }
 
+/// An AI on the person's ALT account (the same list in ALTER, ALTERA and ALTAR): one they own, or
+/// one they rent or subscribe to. [active] is false once a rental or subscription has ended; its
+/// conversations stay readable, and renting or subscribing again carries them on.
+class AccountAi extends AltAi {
+  AccountAi(super.j);
+  Map<String, dynamic> get _access => Map<String, dynamic>.from(j['access'] as Map);
+  /// 'owner', 'renter' or 'subscriber'.
+  String get role => _access['role'] as String;
+  bool get owned => role == 'owner';
+  bool get active => _access['active'] == true;
+  DateTime? get until => _access['until'] == null ? null : DateTime.parse(_access['until'] as String);
+  /// The person made it themselves (as opposed to buying it).
+  bool get created => j['created'] == true;
+
+  /// "Yours", "Bought", "Rented · 2 days left", "Subscribed · ended"…
+  String get label {
+    if (owned) return created ? 'Yours' : 'Bought';
+    final kind = role == 'subscriber' ? 'Subscribed' : 'Rented';
+    final left = until?.difference(DateTime.now());
+    if (!active || left == null || left.isNegative) return '$kind · ended';
+    if (left.inHours < 1) return '$kind · ${left.inMinutes + 1} min left';
+    if (left.inHours < 48) return '$kind · ${left.inHours} h left';
+    return '$kind · ${left.inDays} days left';
+  }
+}
+
+/// One of the person's conversations with an AI they rent or subscribe to.
+class Conversation {
+  Conversation(this.j);
+  final Map<String, dynamic> j;
+  String get id => j['id'] as String;
+  String get title => (j['title'] as String?) ?? 'New conversation';
+  DateTime get updatedAt => DateTime.parse(j['updatedAt'] as String);
+}
+
 class DatasetEntry {
   DatasetEntry(this.j);
   final Map<String, dynamic> j;
@@ -120,6 +155,10 @@ class AiApi {
     if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, decoded);
     return decoded;
   }
+
+  /// Every AI on the account: owned, rented and subscribed (active first, then ended).
+  Future<List<AccountAi>> accountAis() async =>
+      (await _call('GET', '/me/ais') as List).map((e) => AccountAi(Map<String, dynamic>.from(e as Map))).toList();
 
   Future<List<AltAi>> myAis() async => (await _call('GET', '/ais') as List).map((e) => AltAi(Map<String, dynamic>.from(e as Map))).toList();
 
@@ -214,6 +253,25 @@ class AiApi {
       ChatMsg(Map<String, dynamic>.from(body['reply'] as Map)),
       body['proposedMemory'] == null ? null : Map<String, dynamic>.from(body['proposedMemory'] as Map),
     );
+  }
+
+  // Talking to an AI you rent or subscribe to: the same conversations as on ALTAR and ALTERA.
+  /// Your conversations with it, newest first, and whether you may still talk (role and until).
+  Future<(List<Conversation>, bool canTalk)> conversations(String id) async {
+    final body = Map<String, dynamic>.from(await _call('GET', '/ais/$id/conversations') as Map);
+    final list = (body['conversations'] as List).map((e) => Conversation(Map<String, dynamic>.from(e as Map))).toList();
+    return (list, (body['access'] as Map)['role'] != null);
+  }
+
+  Future<String> startConversation(String id) async => ((await _call('POST', '/ais/$id/conversations', body: <String, dynamic>{})) as Map)['id'] as String;
+
+  Future<List<ChatMsg>> conversationMessages(String id, String conversationId) async =>
+      (await _call('GET', '/ais/$id/conversations/$conversationId/messages') as List).map((e) => ChatMsg(Map<String, dynamic>.from(e as Map))).toList();
+
+  /// Returns the AI's reply.
+  Future<ChatMsg> say(String id, String conversationId, String content) async {
+    final body = Map<String, dynamic>.from(await _call('POST', '/ais/$id/conversations/$conversationId/messages', body: {'content': content}) as Map);
+    return ChatMsg(Map<String, dynamic>.from(body['reply'] as Map));
   }
 
   // lifecycle
