@@ -5,6 +5,7 @@ import type { ChainService } from './lib/chain.js';
 import type { IpfsStore } from './lib/ipfs.js';
 import type { LlmRouter } from './modules/ai/llm.js';
 import type { NotificationHub } from './lib/notify.js';
+import type { PushSender } from './lib/push.js';
 import type { Mailer } from './lib/mailer.js';
 import type { TokenService } from './lib/tokens.js';
 
@@ -21,6 +22,8 @@ export interface Ctx {
   llm: LlmRouter;
   /** Pushes committed notifications to people's open streams. */
   hub: NotificationHub;
+  /** Sends them to closed apps through Firebase Cloud Messaging (off until configured). */
+  push: PushSender;
 }
 
 export const PLATFORMS = ['alter', 'altera', 'altar', 'admin'] as const;

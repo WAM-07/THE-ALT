@@ -1,3 +1,4 @@
+import { loadPushConfig } from './lib/push.js';
 import { z } from 'zod';
 
 const list = (value: string | undefined) =>
@@ -28,6 +29,8 @@ const EnvSchema = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('THE ALT <no-reply@alt.local>'),
   GOOGLE_CLIENT_IDS: z.string().optional(),
+  // Push notifications (Firebase Cloud Messaging): a service-account key, as JSON, a path or base64. Off when empty.
+  FCM_SERVICE_ACCOUNT: z.string().optional(),
   ADMIN_EMAILS: z.string().optional(),
   CORS_ORIGINS: z.string().optional(),
   STORAGE_DIR: z.string().default('.data/uploads'),
@@ -98,6 +101,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     refreshTokenTtlDays: e.REFRESH_TOKEN_TTL_DAYS,
     mail: { mode: e.MAIL_MODE, smtpUrl: e.SMTP_URL, from: e.MAIL_FROM },
     googleClientIds: list(e.GOOGLE_CLIENT_IDS),
+    push: loadPushConfig(e.FCM_SERVICE_ACCOUNT),
     adminEmails: list(e.ADMIN_EMAILS).map((s) => s.toLowerCase()),
     corsOrigins: list(e.CORS_ORIGINS),
     storageDir: e.STORAGE_DIR,

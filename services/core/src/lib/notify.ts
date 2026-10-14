@@ -52,6 +52,7 @@ export class NotificationHub extends EventEmitter {
       try {
         const { id, userId } = JSON.parse(msg.payload ?? '{}') as { id: string; userId: string };
         this.emit(`user:${userId}`, id);
+        this.emit('notification', { id, userId });
       } catch {
         // ignore malformed payloads
       }

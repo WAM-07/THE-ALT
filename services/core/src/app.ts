@@ -16,6 +16,7 @@ import { ChainService } from './lib/chain.js';
 import { localIpfs, pinataIpfs, type IpfsStore } from './lib/ipfs.js';
 import { createMailer, type Mailer } from './lib/mailer.js';
 import { NotificationHub } from './lib/notify.js';
+import { PushSender } from './lib/push.js';
 import { notificationRoutes } from './http/routes/notifications.js';
 import { accountPageRoutes } from './http/routes/account-page.js';
 import { avatarRoutes } from './http/routes/avatars.js';
@@ -79,10 +80,17 @@ export async function buildApp(opts: BuildOptions) {
       (config.ipfs.mode === 'pinata' ? pinataIpfs(config.ipfs.pinataJwt!, config.ipfs.gatewayUrl) : localIpfs(config.storageDir, config.publicUrl)),
     llm: opts.llmProviders ? new LlmRouter(opts.llmProviders) : createLlmRouter(config.llm),
     hub: new NotificationHub(config.databaseUrl),
+    push: new PushSender(db, config.push, (m) => app.log.warn(m)),
   };
   app.addHook('onReady', async () => {
     await ctx.hub.start();
   });
+  // Every committed inbox item also goes to the person's phones, once push is configured.
+  if (ctx.push.enabled) {
+    ctx.hub.on('notification', ({ id }: { id: string }) => {
+      ctx.push.sendNotification(id).catch((err: Error) => app.log.warn(`push: ${err.message}`));
+    });
+  }
   const jobs = new JobRunner(ctx);
   app.decorate('jobs', jobs);
   if (opts.jobs ?? config.jobsEnabled) {

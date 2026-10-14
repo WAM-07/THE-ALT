@@ -183,4 +183,31 @@ export async function notificationRoutes(app: FastifyInstance, ctx: Ctx) {
       return { sent };
     },
   );
+
+  // ---------------------------------------------------------------- push to closed apps
+
+  const PushDevice = z.object({ token: z.string().min(10).max(4096), platform: z.enum(['alter', 'altera', 'altar']) });
+
+  r.put(
+    '/me/push-devices',
+    { preHandler: authed, schema: { tags: ['notifications'], summary: 'Register this phone for push notifications (its Firebase token); says whether ALT can push yet', body: PushDevice } },
+    async (req) => {
+      // A token belongs to one install: if someone else signs in on that phone, it moves to them.
+      await ctx.db.query(
+        `INSERT INTO core.push_devices (token, user_id, platform) VALUES ($1, $2, $3)
+         ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform, last_seen_at = now()`,
+        [req.body.token, req.auth!.userId, req.body.platform],
+      );
+      return { registered: true, pushEnabled: ctx.push.enabled };
+    },
+  );
+
+  r.delete(
+    '/me/push-devices',
+    { preHandler: authed, schema: { tags: ['notifications'], summary: 'Stop push notifications on this phone (on sign-out)', body: PushDevice.pick({ token: true }) } },
+    async (req) => {
+      await ctx.db.query('DELETE FROM core.push_devices WHERE token = $1 AND user_id = $2', [req.body.token, req.auth!.userId]);
+      return { removed: true };
+    },
+  );
 }
