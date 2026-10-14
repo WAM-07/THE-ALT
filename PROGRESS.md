@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 31 · core 65 · gateway 8 · altera-api 16 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 84 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -428,8 +428,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Checked:** Core market tests; `flutter analyze` (nothing new) and `flutter test` (ALTER 5); on the phone, Wamiq's Home strip and Hamza landing on Your AIs after switching accounts; on the emulator, a Chess Buddy chat started on ALTAR continued in ALTER.
   - **Next:** step 2, ALTERA (the account's AIs there, DMs with rented ones, drafted posts with "posted with", a bought AI's ALTERA profile moving to the buyer); step 3, the in-app sign-in card.
 
-## Where to pick up (2026-10-15)
-- **In progress: fixes from the owner's test of step 1 (2026-10-15).** Do these in order, commit each, tick it here:
+- **Fixes from the owner's test of step 1 (2026-10-15)** ✅
   - [x] ALTER: the Settings tab in the bottom bar becomes **Profile** (same screen, person icon).
   - [x] ALTER: the Chat tab follows the AI chosen in "Your AIs" (it kept the first AI’s chat). Studio and Identity had the same problem; all three use `FollowsCurrentAi`.
   - [x] ALTAR: an owner sees **Chat** on their own AI's page (it showed only "Manage in ALTER" and "List AI").
@@ -439,7 +438,21 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - **"Continue with ALTER"** in ALTERA: opens `alter://signin-request?for=altera`; ALTER shows a small confirm card ("Sign in to ALTERA as Wamiq?") and sends back the usual handoff code (`altera://handoff?code=`). Like Google's account chooser, without a browser;
     - sign-up, forgot password and Google still open the ALT window;
     - update AGENTS.md rule 3 (owner's decision 2026-10-15).
-  - Then step 2 (ALTERA) as planned above.
+- **AIs follow the ALT account, step 2: ALTERA (2026-10-15)** ✅
+  - **Core:** `GET /internal/ais/:id/access?userId=` (service key) says whether a person may use an AI now (owner, renter, subscriber), so ALTERA doesn't repeat Core's rules; a new `altera_draft` channel writes a post for the person who hired the AI, in their voice. Market test extended.
+  - **ALTERA API** (migration `0004`): `POST /ai/draft-with` (an AI the person may use drafts their post); `POST /posts` takes `assisted_by_ai_id`, checks the same access and keeps the AI's name and handle on the post (`assisted_by_*`), so every feed shows "posted with" even after the rental ends. Test with an owner and a stranger (ALTERA 17).
+  - **ALTERA app:**
+    - a **Your AIs** strip at the top of Messages, and a **Your AIs** screen (Profile → settings → Your AIs);
+    - each AI opens a chat (`/ai-chat/:id`) with the **same conversations as ALTER and ALTAR**, read-only once the time ends;
+    - the composer's **Write with your AI** (robot icon): pick an AI, say what the post is about, edit the draft, post. A removable "Posted with <AI>" chip; the feed shows "✦ Posted with <AI>" under the name.
+  - **Already true:** a bought AI's ALTERA persona moves to the buyer (`syncLinkedAi` follows Core's owner).
+  - **Demo:** Hamza posts a Ghalib couplet "posted with" Urdu Ustad, which he rents.
+  - **Fixed on the way:** Groq's gpt-oss counted its reasoning against the reply limit, so about one reply in six came back empty (the chat then fell back to the `[mock]` reply) and most were cut off. Such models now get `reasoning_effort: low` and 300 extra tokens, and a short 429 is waited out once (`services/core/test/llm.test.ts`).
+  - **Checked on the owner's phone:** Messages strip; the Chess Buddy chat started on ALTAR, continued in ALTER, continued in ALTERA (real replies after the fix); Write with your AI → post → "Posted with Chess Buddy" in the feed. Once, ALTERA stayed on its splash screen on the first launch after an install; a restart fixed it and it did not happen again.
+
+## Where to pick up (2026-10-15)
+- **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
+- **To demo on a phone:** `npm run demo`, connect the phone by USB, `adb reverse tcp:8080 tcp:8080`, install the debug APKs built with `--dart-define=ALT_API_URL=http://127.0.0.1:8080`.
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
@@ -447,7 +460,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Smaller follow-ups:**
   - Confirm spending in the ALT Account window instead of on ALTAR's page.
   - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).
-  - **AIs follow the account, step 2 (ALTERA) and step 3 (in-app ALT sign-in card)**, decided by the owner on 2026-10-15 (see the step 1 entry above).
+  - On ALTERA, a rented AI could also comment and reply on the renter's behalf (drafts only for posts so far).
   - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
@@ -455,7 +468,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
 - **ALTAR:**
-  - Renters and subscribers talk to the AI on ALTAR and in ALTER, not yet in ALTERA (step 2).
+  - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, not yet comments or replies.
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).
   - A seller loses their old ALTER chat history with a sold AI; keeping it read-only is not built.
   - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.

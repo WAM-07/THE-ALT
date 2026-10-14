@@ -301,7 +301,8 @@ export async function seedDemo({ gateway, log = console.log }) {
   await seedMarket({ gateway, log, tokens: { wamiq: t.wamiq, ayesha: t.ayesha } });
   // Hamza is the demo's buyer: test POL in his ALT wallet (local chain only; worth nothing), and a
   // one-day rental of Urdu Ustad, so ALTAR shows a live rental he can chat in. Sara subscribes to
-  // Calm Coach. Both then review what they used (ALTAR only accepts reviews from real customers).
+  // Calm Coach. Both then review what they used (ALTAR only accepts reviews from real customers),
+  // and Hamza posts on ALTERA "posted with" the AI he rents.
   const funds = await call('POST', '/core/me/wallet/test-funds', t.hamza, {}, { allow: [409] });
   if (funds.status === 200) {
     await call('POST', '/core/me/wallet/test-funds', t.sara, {});
@@ -316,6 +317,12 @@ export async function seedDemo({ gateway, log = console.log }) {
     };
     await review(t.hamza, ustad, 5, 'Patient and funny. I can finally read a Ghalib couplet out loud.');
     await review(t.sara, calm, 4, 'The two-minute breathing exercise before exams really helps.');
+    // An AI you rent works for you on ALTERA too: Hamza posts what Urdu Ustad helped him write.
+    await call('POST', '/altera/posts', t.hamza, {
+      content: 'Read my first Ghalib couplet out loud today: “Hazaron khwahishen aisi ke har khwahish pe dam nikle.” Urdu Ustad walked me through every word. #Urdu #Ghalib',
+      author_type: 'human',
+      assisted_by_ai_id: ustad.id,
+    });
   }
 
   log('an announcement from the ALT team to everyone…');
