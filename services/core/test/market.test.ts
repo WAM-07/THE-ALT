@@ -106,6 +106,13 @@ describe('buying, reselling and renting an AI', () => {
     // The owner can't read the renter's conversation.
     expect((await call('GET', `/ais/${ai.id}/conversations/${convo.id}/messages`, c.accessToken)).statusCode).toBe(404);
 
+    // The AI is on both accounts, in every app: C owns it (and didn't make it), D rents it until tomorrow.
+    const onAccount = async (u: User) => (await call('GET', '/me/ais', u.accessToken)).json().find((x: { id: string }) => x.id === ai.id);
+    expect(await onAccount(c)).toMatchObject({ created: false, access: { role: 'owner', active: true, until: null } });
+    expect(await onAccount(d)).toMatchObject({ access: { role: 'renter', active: true, until: rented.json().until } });
+    expect(await onAccount(a)).toBeUndefined();
+    expect(await onAccount(stranger)).toBeUndefined();
+
     // 4. The rental ends: the chain stops naming D, and D can read the old conversation but not talk.
     await rpc('evm_increaseTime', [2 * 86_400]);
     await rpc('evm_mine', []);
@@ -113,6 +120,8 @@ describe('buying, reselling and renting an AI', () => {
     expect((await call('GET', `/ais/${ai.id}/access`, d.accessToken)).json().role).toBeNull();
     expect((await call('POST', `/ais/${ai.id}/conversations/${convo.id}/messages`, d.accessToken, { content: 'Still there?' })).json().error.code).toBe('NO_ACCESS');
     expect((await call('GET', `/ais/${ai.id}/conversations/${convo.id}/messages`, d.accessToken)).json()).toHaveLength(2);
+    // It stays on D's account, inactive, so the conversation can still be read.
+    expect(await onAccount(d)).toMatchObject({ access: { role: 'renter', active: false } });
   });
 
   it('lets many people subscribe by the month, renew, talk until it ends, and picks up subscriptions made elsewhere', async () => {
@@ -146,6 +155,9 @@ describe('buying, reselling and renting an AI', () => {
     // When the time is up, talking stops.
     await t.app.ctx.db.query(`UPDATE core.ai_subscriptions SET expires_at = now() - interval '1 minute' WHERE user_id = $1`, [sub2.user.id]);
     expect((await call('GET', `/ais/${ai.id}/access`, sub2.accessToken)).json().role).toBeNull();
+    const listed2 = async (u: User) => (await call('GET', '/me/ais', u.accessToken)).json().find((x: { id: string }) => x.id === ai.id)?.access;
+    expect(await listed2(sub1)).toMatchObject({ role: 'subscriber', active: true });
+    expect(await listed2(sub2)).toMatchObject({ role: 'subscriber', active: false });
 
     // A subscription paid directly on the contract (not through ALTAR) still counts.
     const { rows } = await t.app.ctx.db.query(`SELECT private_key_enc FROM core.wallets WHERE user_id = $1 AND kind = 'custodial'`, [outsider.user.id]);

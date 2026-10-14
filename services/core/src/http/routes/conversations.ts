@@ -12,10 +12,12 @@ const AiId = z.object({ id: z.uuid() });
 const SessionParams = z.object({ id: z.uuid(), sessionId: z.uuid() });
 
 /**
- * Talking to a verified AI on ALTAR (Module 11 with ALTAR steps 3 and 4). Its owner may always talk
- * to it; a renter may until the rental ends (the token's ERC-4907 user) and a subscriber until their
- * subscription ends (both mirrored by Core from the chain). Each person sees only their own
- * conversations, and always the published version of the AI.
+ * Talking to a verified AI from any ALT app (Module 11 with ALTAR steps 3 and 4). Its owner may
+ * always talk to it; a renter may until the rental ends (the token's ERC-4907 user) and a subscriber
+ * until their subscription ends (both mirrored by Core from the chain). The conversations belong to
+ * the ALT account, so ALTER, ALTERA and ALTAR show the same ones. Each person sees only their own,
+ * and always the published version of the AI. (The channel is still called 'altar_rental', where
+ * paid access began.)
  */
 export async function conversationRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();

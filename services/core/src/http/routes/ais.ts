@@ -198,6 +198,53 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     return Promise.all(rows.map(summary));
   });
 
+  // Every AI on this ALT account, the same in ALTER, ALTERA and ALTAR: the ones the person owns
+  // (until they sell them) and the ones they rent or subscribe to (until that time ends). An ended
+  // rental or subscription stays listed, inactive, so its conversations can still be read; renting
+  // or subscribing again makes it active and the same conversations carry on.
+  r.get(
+    '/me/ais',
+    { preHandler: authed, schema: { tags: ['ai'], summary: 'Every AI on my account: owned, rented and subscribed, active or ended' } },
+    async (req) => {
+      const me = req.auth!.userId;
+      const [owned, rented, subscribed, talked] = await Promise.all([
+        ctx.db.query<{ id: string }>('SELECT id FROM core.personal_ais WHERE owner_id = $1 AND deleted_at IS NULL', [me]),
+        ctx.db.query<{ id: string; until: Date }>(
+          `SELECT t.ai_id AS id, t.user_expires AS until FROM core.ai_identity_tokens t JOIN core.wallets w ON w.address = t.user_address
+            WHERE w.user_id = $1 AND t.user_expires > now()`,
+          [me],
+        ),
+        ctx.db.query<{ id: string; until: Date }>(
+          `SELECT s.ai_id AS id, max(s.expires_at) AS until FROM core.ai_subscriptions s JOIN core.wallets w ON w.address = s.subscriber_address
+            WHERE w.user_id = $1 GROUP BY s.ai_id`,
+          [me],
+        ),
+        // Paid conversations (rentals and subscriptions share this channel) from an access that has ended.
+        ctx.db.query<{ id: string }>(`SELECT DISTINCT ai_id AS id FROM core.chat_sessions WHERE user_id = $1 AND channel = 'altar_rental'`, [me]),
+      ]);
+      type Access = { role: 'owner' | 'renter' | 'subscriber'; until: Date | null; active: boolean };
+      const access = new Map<string, Access>();
+      const add = (id: string, a: Access) => {
+        const had = access.get(id);
+        if (!had || (!had.active && a.active)) access.set(id, a);
+      };
+      for (const r of owned.rows) add(r.id, { role: 'owner', until: null, active: true });
+      for (const r of rented.rows) add(r.id, { role: 'renter', until: r.until, active: true });
+      for (const r of subscribed.rows) add(r.id, { role: 'subscriber', until: r.until, active: r.until.getTime() > Date.now() });
+      for (const r of talked.rows) add(r.id, { role: 'renter', until: null, active: false });
+
+      const { rows } = await ctx.db.query<AiRow>('SELECT * FROM core.personal_ais WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY created_at', [[...access.keys()]]);
+      const rank = (a: Access) => (a.role === 'owner' ? 0 : a.active ? 1 : 2);
+      const items = await Promise.all(
+        rows.map(async (ai) => {
+          const a = access.get(ai.id)!;
+          return { ...(await summary(ai)), created: ai.creator_id === me, access: { role: a.role, until: a.until?.toISOString() ?? null, active: a.active } };
+        }),
+      );
+      return items.sort((x, y) => rank(x.access as Access) - rank(y.access as Access));
+    },
+  );
+
   r.get('/ais/:id', { preHandler: authed, schema: { tags: ['ai'], summary: 'One of my AIs, in full', params: AiId } }, async (req) =>
     detail(await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id)),
   );
