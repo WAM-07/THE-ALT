@@ -175,6 +175,34 @@ describe('buying, reselling and renting an AI', () => {
     expect((await call('GET', `/ais/${ai.id}/access`, outsider.accessToken)).json().role).toBe('subscriber');
   });
 
+  it('takes a one-time approval from the ALT window instead of a password, for exactly that spend', async () => {
+    const [owner, buyer, other] = [await signUp(t), await funded(), await funded()];
+    const ai = await verifiedAi(owner);
+    await call('PUT', `/ais/${ai.id}/market`, owner.accessToken, { sale: { price: '2' }, rent: null, ...pw(owner) });
+    const approve = (u: User, body: object) => call('POST', '/me/spend-approvals', u.accessToken, body);
+
+    // The window checks the password (or 2FA code) itself.
+    expect((await approve(buyer, { action: 'buy', aiId: ai.id, params: { price: '2' }, confirm: { password: 'not it' } })).json().error.code).toBe('CONFIRMATION_FAILED');
+    const { approval, expiresAt } = (await approve(buyer, { action: 'buy', aiId: ai.id, params: { price: '2' }, ...pw(buyer) })).json();
+    expect(approval).toEqual(expect.any(String));
+    expect(new Date(expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(2 * 60_000);
+
+    // Bound to the person, the action and the amounts: anything else is refused (and doesn't use it up).
+    const buy = (u: User, body: object) => call('POST', `/ais/${ai.id}/market/buy`, u.accessToken, body);
+    expect((await buy(other, { confirm: { approval }, expectedPrice: '2' })).json().error.code).toBe('APPROVAL_INVALID');
+    expect((await buy(buyer, { confirm: { approval }, expectedPrice: '3' })).json().error.code).toBe('APPROVAL_INVALID');
+    expect((await call('POST', '/me/wallet/withdraw', buyer.accessToken, { confirm: { approval } })).json().error.code).toBe('APPROVAL_INVALID');
+    expect((await buy(buyer, { confirm: { approval: `${approval}x` }, expectedPrice: '2' })).json().error.code).toBe('APPROVAL_INVALID');
+    expect((await buy(buyer, { confirm: { approval }, expectedPrice: '2' })).statusCode).toBe(200);
+    expect((await call('GET', `/ais/${ai.id}`, buyer.accessToken)).statusCode).toBe(200);
+
+    // Used once: sending POL twice with one approval is refused the second time.
+    const to = '0x000000000000000000000000000000000000dEaD';
+    const send = (await approve(buyer, { action: 'send', params: { to, amount: '0.01' }, ...pw(buyer) })).json().approval;
+    expect((await call('POST', '/me/wallet/send', buyer.accessToken, { to, amount: '0.01', confirm: { approval: send } })).statusCode).toBe(200);
+    expect((await call('POST', '/me/wallet/send', buyer.accessToken, { to, amount: '0.01', confirm: { approval: send } })).json().error.code).toBe('APPROVAL_INVALID');
+  });
+
   it('follows the token when it moves outside ALTAR', async () => {
     const [owner, friend] = [await signUp(t), await signUp(t)];
     const ai = await verifiedAi(owner);

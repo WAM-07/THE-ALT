@@ -11,6 +11,7 @@ import { AppError, badRequest, conflict, notFound, unauthorized } from '../../li
 import { notify } from '../../lib/notify.js';
 import { verifyTotp } from '../../lib/totp.js';
 import { loadAi, requireOwnedAi } from '../../modules/ai/repo.js';
+import { SPEND_ACTIONS, SpendApprovals, type SpendIntent } from '../../modules/market/approvals.js';
 import { syncSubscription, syncToken } from '../../modules/market/holders.js';
 import { findUserById, type UserRow } from '../../modules/accounts/users.js';
 import { requireUser } from '../auth-guard.js';
@@ -27,8 +28,16 @@ const Pol = z
   .transform((v) => parseEther(v))
   .refine((v) => v > 0n, 'The amount must be more than zero.');
 
-/** Spending needs the person themselves: their password, or a code from their authenticator app. */
-const Confirm = z.object({ password: z.string().max(128).optional(), code: z.string().max(20).optional() });
+/**
+ * Spending needs the person themselves: their password, a code from their authenticator app, or a
+ * one-time approval from the ALT Account window (where they typed one of those, not on the platform).
+ */
+const Confirm = z.object({ password: z.string().max(128).optional(), code: z.string().max(20).optional(), approval: z.string().max(2000).optional() });
+
+/** Details given in POL ("2.5") that an approval binds as wei; whole numbers; and 'off' / 'keep' for listings. */
+const WEI_PARAMS = new Set(['price', 'pricePerDay', 'pricePerMonth', 'amount', 'salePrice', 'rentPricePerDay', 'subscriptionPricePerMonth']);
+const INT_PARAMS = new Set(['days', 'months', 'rentMaxDays']);
+const wei = (v: bigint | undefined) => (v === undefined ? '' : v.toString());
 
 const pol = (wei: bigint) => ({ wei: wei.toString(), pol: formatEther(wei) });
 
@@ -42,7 +51,13 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
   const authed = requireUser(ctx);
   const spendLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
-  async function confirmSpend(user: UserRow, confirm: z.infer<typeof Confirm>) {
+  const approvals = new SpendApprovals(ctx.config.encryptionKey);
+
+  async function confirmSpend(user: UserRow, confirm: z.infer<typeof Confirm>, intent: SpendIntent) {
+    if (confirm.approval) {
+      if (approvals.consume(user.id, confirm.approval, intent)) return;
+      throw unauthorized('APPROVAL_INVALID', 'This approval has expired, was used already or was for something else. Confirm again.');
+    }
     if (confirm.password && user.password_hash && (await bcrypt.compare(confirm.password, user.password_hash))) return;
     if (confirm.code && user.two_fa_enabled && user.two_fa_secret_enc && verifyTotp(decrypt(ctx.config.encryptionKey, user.two_fa_secret_enc), confirm.code) !== null) return;
     if (!user.password_hash && !user.two_fa_enabled) {
@@ -69,6 +84,53 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
       await audit(client, { action, actorUserId: userId, entityType: 'wallet', entityId: userId, ip, data });
       if (note) await notify(client, { userId, category: 'transaction', type: action, title: note.title, body: note.body, platform: 'altar', link: note.link ?? null, data });
     });
+
+  /** The person's confirmation for one spend: details as the ALT window shows them, normalised. */
+  function intentFrom(action: SpendIntent['action'], aiId: string | undefined, params: Record<string, string>): SpendIntent {
+    const p: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (WEI_PARAMS.has(k) && v !== 'off' && v !== 'keep') {
+        const parsed = Pol.safeParse(v);
+        if (!parsed.success) throw badRequest('INVALID_AMOUNT', `${k}: enter an amount like 2 or 0.5.`);
+        p[k] = parsed.data.toString();
+      } else if (INT_PARAMS.has(k) && v !== 'off') {
+        if (!/^\d{1,4}$/.test(v)) throw badRequest('INVALID_NUMBER', `${k}: enter a whole number.`);
+        p[k] = String(Number(v));
+      } else if (k === 'to') {
+        if (!isAddress(v)) throw badRequest('INVALID_ADDRESS', 'Enter a wallet address starting with 0x.');
+        p[k] = v.toLowerCase();
+      } else {
+        p[k] = v;
+      }
+    }
+    return { action, aiId: aiId ?? null, params: p };
+  }
+
+  r.post(
+    '/me/spend-approvals',
+    {
+      preHandler: authed,
+      config: spendLimit,
+      schema: {
+        tags: ['wallet'],
+        summary: 'Confirm one spend in the ALT Account window: checks your password or 2FA code and returns a one-time approval (2 minutes) for exactly that spend',
+        body: z.object({
+          action: z.enum(SPEND_ACTIONS),
+          aiId: z.uuid().optional(),
+          params: z.record(z.string().max(40), z.string().max(200)).default({}),
+          confirm: Confirm.omit({ approval: true }),
+        }),
+      },
+    },
+    async (req) => {
+      const user = await findUserById(ctx.db, req.auth!.userId);
+      if (!user) throw unauthorized();
+      const intent = intentFrom(req.body.action, req.body.aiId, req.body.params);
+      await confirmSpend(user, req.body.confirm, intent);
+      await tx(ctx.db, (client) => audit(client, { action: 'wallet.spend_approved', actorUserId: user.id, entityType: 'wallet', entityId: user.id, ip: req.ip, data: { ...intent } }));
+      return approvals.issue(user.id, intent);
+    },
+  );
 
   r.get('/me/wallet', { preHandler: authed, schema: { tags: ['wallet'], summary: 'Your ALT wallet: balance, marketplace earnings and the AI tokens you own' } }, async (req) => {
     const { address } = await custodialOf(req.auth!.userId);
@@ -114,7 +176,7 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
     { preHandler: authed, config: spendLimit, schema: { tags: ['wallet'], summary: 'Move your marketplace earnings into your ALT wallet', body: z.object({ confirm: Confirm }) } },
     async (req) => {
       const w = await custodialOf(req.auth!.userId);
-      await confirmSpend(w.user, req.body.confirm);
+      await confirmSpend(w.user, req.body.confirm, { action: 'withdraw', params: {} });
       const chain = requireChain(ctx);
       const earnings = await chain.earningsOf(w.address);
       if (earnings === 0n) throw badRequest('NOTHING_TO_WITHDRAW', 'You have no earnings to withdraw yet.');
@@ -137,7 +199,7 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
     },
     async (req) => {
       const w = await custodialOf(req.auth!.userId);
-      await confirmSpend(w.user, req.body.confirm);
+      await confirmSpend(w.user, req.body.confirm, { action: 'send', params: { to: req.body.to.toLowerCase(), amount: wei(req.body.amount) } });
       if (req.body.to.toLowerCase() === w.address) throw badRequest('SAME_WALLET', 'That is your own ALT wallet.');
       const chain = requireChain(ctx);
       if ((await chain.balanceOf(w.address)) < req.body.amount) throw badRequest('INSUFFICIENT_FUNDS', 'Your ALT wallet does not have that much POL (the network fee needs a little too).');
@@ -197,7 +259,17 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req) => {
       const { ai, tokenId } = await tokenOfOwnedAi(req.auth!.userId, req.params.id);
       const w = await custodialOf(req.auth!.userId);
-      await confirmSpend(w.user, req.body.confirm);
+      const offer = req.body;
+      await confirmSpend(w.user, req.body.confirm, {
+        action: 'list',
+        aiId: ai.id,
+        params: {
+          salePrice: offer.sale ? wei(offer.sale.price) : 'off',
+          rentPricePerDay: offer.rent ? wei(offer.rent.pricePerDay) : 'off',
+          rentMaxDays: offer.rent ? String(offer.rent.maxDays) : 'off',
+          subscriptionPricePerMonth: offer.subscription === undefined ? 'keep' : offer.subscription ? wei(offer.subscription.pricePerMonth) : 'off',
+        },
+      });
       const chain = requireChain(ctx);
       const before = await chain.marketState(tokenId);
       const signer = w.signer();
@@ -269,7 +341,7 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req) => {
       const { ai, tokenId } = await tokenToAcquire(req.auth!.userId, req.params.id);
       const w = await custodialOf(req.auth!.userId);
-      await confirmSpend(w.user, req.body.confirm);
+      await confirmSpend(w.user, req.body.confirm, { action: 'buy', aiId: ai.id, params: { price: wei(req.body.expectedPrice) } });
       const chain = requireChain(ctx);
       const { sale } = await chain.marketState(tokenId);
       if (!sale) throw conflict('NOT_FOR_SALE', `${ai.name} is not for sale right now.`);
@@ -297,7 +369,7 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req) => {
       const { ai, tokenId } = await tokenToAcquire(req.auth!.userId, req.params.id);
       const w = await custodialOf(req.auth!.userId);
-      await confirmSpend(w.user, req.body.confirm);
+      await confirmSpend(w.user, req.body.confirm, { action: 'rent', aiId: ai.id, params: { days: String(req.body.days), pricePerDay: wei(req.body.expectedPricePerDay) } });
       const chain = requireChain(ctx);
       const { rent, rentedTo } = await chain.marketState(tokenId);
       if (!rent) throw conflict('NOT_FOR_RENT', `${ai.name} is not offered for rent right now.`);
@@ -327,7 +399,7 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req) => {
       const { ai, tokenId } = await tokenToAcquire(req.auth!.userId, req.params.id);
       const w = await custodialOf(req.auth!.userId);
-      await confirmSpend(w.user, req.body.confirm);
+      await confirmSpend(w.user, req.body.confirm, { action: 'subscribe', aiId: ai.id, params: { months: String(req.body.months), pricePerMonth: wei(req.body.expectedPricePerMonth) } });
       const chain = requireChain(ctx);
       const { subscription } = await chain.marketState(tokenId);
       if (!subscription) throw conflict('NOT_FOR_SUBSCRIPTION', `${ai.name} does not offer subscriptions right now.`);
