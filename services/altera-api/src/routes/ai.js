@@ -55,7 +55,9 @@ router.post('/draft-with', authMiddleware, async (req, res) => {
     if (!access.role) {
       return res.status(403).json({ message: 'Rent or subscribe to this AI to write with it. If you did, that time has ended.', code: 'NO_ACCESS' });
     }
-    const reply = await core.respond(aiId, 'altera_draft', [{ role: 'user', content: `${brief}`.trim().slice(0, 1000) }], req.userId);
+    // Framed so the AI writes as the person posting, not as itself.
+    const ask = `Write a post for my own ALTERA profile, in my voice: I am the one posting it, not you. What I want to say: ${`${brief}`.trim().slice(0, 1000)}`;
+    const reply = await core.respond(aiId, 'altera_draft', [{ role: 'user', content: ask }], req.userId);
     res.json({ content: reply.text.trim().replace(/^"|"$/g, ''), ai: access.ai });
   } catch (err) {
     fail(res, err, 'Failed to draft the post');

@@ -252,7 +252,7 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: on ? FontWeight.w700 : FontWeight.w500)),
-                        Text(a.owned ? 'Yours' : a.role == 'subscriber' ? 'Subscribed' : 'Rented', style: const TextStyle(fontSize: 10.5, color: AppColors.textTertiary)),
+                        Text(a.owned ? (a.created ? 'Yours' : 'Bought') : a.role == 'subscriber' ? 'Subscribed' : 'Rented', style: const TextStyle(fontSize: 10.5, color: AppColors.textTertiary)),
                       ]),
                     ),
                   );
