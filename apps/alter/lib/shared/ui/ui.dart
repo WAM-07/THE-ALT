@@ -478,7 +478,7 @@ class AiIdentityCard extends StatelessWidget {
     final p = Ds.palette;
     final ink = p.cardInk;
     final status = switch (ai.status) {
-      'verified' => ('Verified', Ds.mint),
+      'verified' => ('Verified', Ds.isObsidian ? Ds.mint : Ds.palette.cardAccent),
       'minting' => ('Minting…', Ds.amber),
       'ready' => ('Ready to deploy', Ds.sky),
       'suspended' => ('Suspended', Ds.rose),
@@ -530,7 +530,7 @@ class AiIdentityCard extends StatelessWidget {
                 const SizedBox(width: 26),
                 _field('VERSION', ai.currentVersion != null ? 'v${ai.currentVersion}' : (ai.latestVersion != null ? 'v${ai.latestVersion!['version']}' : '—'), ink),
                 const Spacer(),
-                Icon(verified ? Icons.verified_rounded : Icons.hexagon_outlined, color: (verified && !Ds.isObsidian ? p.signature.first : ink).withValues(alpha: verified ? 0.95 : 0.4), size: 26),
+                Icon(verified ? Icons.verified_rounded : Icons.hexagon_outlined, color: (verified && !Ds.isObsidian ? p.cardAccent : ink).withValues(alpha: verified ? 0.95 : 0.4), size: 26),
               ]),
             ]),
           ),

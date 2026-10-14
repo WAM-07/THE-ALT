@@ -450,6 +450,12 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Fixed on the way:** Groq's gpt-oss counted its reasoning against the reply limit, so about one reply in six came back empty (the chat then fell back to the `[mock]` reply) and most were cut off. Such models now get `reasoning_effort: low` and 300 extra tokens, and a short 429 is waited out once (`services/core/test/llm.test.ts`).
   - **Checked on the owner's phone:** Messages strip; the Chess Buddy chat started on ALTAR, continued in ALTER, continued in ALTERA (real replies after the fix); Write with your AI → post → "Posted with Chess Buddy" in the feed. Once, ALTERA stayed on its splash screen on the first launch after an install; a restart fixed it and it did not happen again.
 
+- **ALTER redesign: premium themes (2026-10-15)** ✅
+  - The owner's palettes: **Sapphire** (Royal Blue #112250, Sapphire #3c507d, Quicksand #e0c58f, Swan Wing #f5fde9, Shellstone #d9cbc2), now the default; **Linen** (Linen #f5f1ea, Khaki #d7c9b8, Camel #b2967d, Cocoa #7d5a44, Espresso #4a342a), a light theme. Also **Obsidian** (the first design, unchanged), **Emerald** and **Porcelain** to compare.
+  - `Ds` reads the active palette (`core/theme/palettes.dart`), so the app re-themes at once (`main.dart` rebuilds every element). Hidden switch: Profile → Advanced → Theme, remembered per phone.
+  - Elements, not just colours: the identity card's material per theme (navy with gold light; cocoa leather; emerald and brass; graphite), the main button (gold on navy, espresso on linen…), tinted glass on dark themes and paper with a soft shadow on light ones, the backdrop light, the dock and the logo. Headings use **Fraunces** (OFL, bundled in `assets/fonts`) in Sapphire, Linen and Emerald.
+  - Checked on the owner's phone: every theme on Home; Linen on Chat, Studio and Identity. ALTER tests 5.
+
 ## Where to pick up (2026-10-15)
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
 - **Step 2 fix to do (found by the owner, 2026-10-15):** on ALTERA's Profile, switching personal → AI persona → personal shows a red error screen: "_ProfileScreenState is a SingleTickerProviderStateMixin but multiple tickers were created" (`screens/profile/profile_screen.dart`: a new `TabController` per switch; use `TickerProviderStateMixin` and dispose the old one). Also `MessagingNotifier.loadConversations` updates a disposed widget during the switch. The owner also asked for a recommendation on the switch itself; see the answer of 2026-10-15 (proposed: replace the app-wide switch with "Post as" in the composer and a Manage page per owned AI).
@@ -457,7 +463,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
-  - **The ALTER redesign** (no blue or purple).
+  - **ALTER themes:** which one stays the default after trying them (Sapphire for now), and whether onboarding and sign-in (still in the first design's colours) should follow the theme.
 - **Smaller follow-ups:**
   - Confirm spending in the ALT Account window instead of on ALTAR's page.
   - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).

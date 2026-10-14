@@ -36,6 +36,7 @@ class AlterPalette {
     required this.cardGlows,
     required this.cardInk,
     required this.cardEdge,
+    required this.cardAccent,
     this.displayWeight = 600,
   });
 
@@ -90,6 +91,9 @@ class AlterPalette {
   final Color cardInk;
   final Color cardEdge;
 
+  /// The card's highlight: its "Verified" pill and tick.
+  final Color cardAccent;
+
   bool get isLight => brightness == Brightness.light;
 }
 
@@ -126,9 +130,10 @@ class AlterPalettes {
     fill: Color(0xFFE0C58F),
     onFill: Color(0xFF112250),
     cardBase: [Color(0xFF22386E), Color(0xFF0B1636)],
-    cardGlows: [Color(0x80E0C58F), Color(0x663C507D), Color(0x40F5FDE9)],
+    cardGlows: [Color(0xB3E0C58F), Color(0x803C507D), Color(0x4DF5FDE9)],
     cardInk: Color(0xFFF5FDE9),
     cardEdge: Color(0x99E0C58F),
+    cardAccent: Color(0xFFE0C58F),
   );
 
   /// Linen, Khaki, Camel, Cocoa and Espresso: a warm, paper-light theme.
@@ -163,6 +168,7 @@ class AlterPalettes {
     cardGlows: [Color(0x80B2967D), Color(0x55D7C9B8), Color(0x33F5F1EA)],
     cardInk: Color(0xFFF5F1EA),
     cardEdge: Color(0x66D7C9B8),
+    cardAccent: Color(0xFFEAD9C0),
   );
 
   /// ALTER's first design: obsidian glass with the iris-to-mint aurora.
@@ -196,6 +202,7 @@ class AlterPalettes {
     cardGlows: [Color(0x998E7DFF), Color(0x8841E2BE), Color(0x665AA9FF)],
     cardInk: Colors.white,
     cardEdge: Color(0x26FFFFFF),
+    cardAccent: Color(0xFF41E2BE),
   );
 
   /// Deep emerald with brass and ivory: a club-library feel.
@@ -230,6 +237,7 @@ class AlterPalettes {
     cardGlows: [Color(0x80C9A86A), Color(0x558FB8A8), Color(0x33F1EEE4)],
     cardInk: Color(0xFFF1EEE4),
     cardEdge: Color(0x80C9A86A),
+    cardAccent: Color(0xFFD9BC80),
   );
 
   /// Cool porcelain and ink: crisp, light and quiet.
@@ -263,6 +271,7 @@ class AlterPalettes {
     cardGlows: [Color(0x55A9B4C6), Color(0x33FFFFFF), Color(0x40C9CED6)],
     cardInk: Colors.white,
     cardEdge: Color(0x40FFFFFF),
+    cardAccent: Color(0xFFD5DBE5),
   );
 
   static const all = [sapphire, linen, obsidian, emerald, porcelain];
