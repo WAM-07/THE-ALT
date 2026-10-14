@@ -412,6 +412,22 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Demo posts have pictures again**, from ALTERA's original images (`services/altera-api/seed-assets`); 3 more posts. With Cloudinary keys in `.env`, each `npm run demo` uploads about 11 pictures to that Cloudinary account.
   - **Checked on a real phone** (Redmi Note 11, Android 13, over USB with `adb reverse tcp:8080 tcp:8080` and apps built with `ALT_API_URL=http://127.0.0.1:8080`): ALTERA signed in by handoff link shows the feed, profile pictures and post pictures; ALTER shows the verified AI, its training and the inbox; the ALT window opens in the phone's browser. Tests: Core 81, gateway 9, `altar-api` 6.
 
+- **AIs follow the ALT account, step 1 of 3: Core and ALTER (2026-10-15)** ✅
+  - **The owner's decisions (2026-10-15):**
+    - owned, rented and subscribed AIs belong to the ALT account and appear in all three apps;
+    - a rented or subscribed AI "works for you": chat in ALTER, ALTAR and ALTERA DMs, and on ALTERA it drafts posts for the renter's own profile. The renter approves each one, and it is shown "posted with <AI>". When the time ends, posts and chats stay but are read-only; renting or subscribing again carries on;
+    - apps sign in with a designed in-app ALT card (step 3).
+  - **Core:** `GET /me/ais` lists every AI on the account: owned (`created` says whether the person made it), rented and subscribed, with `access: { role, until, active }`. Ended rentals and subscriptions stay listed (inactive) so their conversations can be read. The conversation routes (`/ais/:id/conversations…`) were already account-wide, so a chat started on ALTAR carries on in ALTER. Market test extended.
+  - **ALTER:**
+    - a "Your AIs" strip on Home (picture bubbles) and a **Your AIs** screen (`/yours`): owned, rented and subscribed, and ended;
+    - tapping an owned AI makes it the one ALTER works on (teaching, memories, versions), remembered per account;
+    - tapping a rented or subscribed AI opens **`/talk/:id`**, the same conversations as ALTAR, read-only once the time ends, with a way back to ALTAR;
+    - someone without an AI of their own but with rented or subscribed ones lands on Your AIs, not onboarding;
+    - **fixed:** another account signing in over the current one (a handoff link) kept the previous person's AI on screen; ALTER now starts afresh when the account changes.
+  - **ALTAR:** the chat page's "Your AIs" column uses Core's `/me/ais`, so it shows the same list, including ended ones.
+  - **Checked:** Core market tests; `flutter analyze` (nothing new) and `flutter test` (ALTER 5); on the phone, Wamiq's Home strip and Hamza landing on Your AIs after switching accounts; on the emulator, a Chess Buddy chat started on ALTAR continued in ALTER.
+  - **Next:** step 2, ALTERA (the account's AIs there, DMs with rented ones, drafted posts with "posted with", a bought AI's ALTERA profile moving to the buyer); step 3, the in-app sign-in card.
+
 ## Where to pick up (2026-10-15)
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
@@ -420,7 +436,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Smaller follow-ups:**
   - Confirm spending in the ALT Account window instead of on ALTAR's page.
   - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).
-  - Renters and subscribers talking to an AI in ALTERA DMs.
+  - **AIs follow the account, step 2 (ALTERA) and step 3 (in-app ALT sign-in card)**, decided by the owner on 2026-10-15 (see the step 1 entry above).
   - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
@@ -428,7 +444,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
 - **ALTAR:**
-  - Renters and subscribers talk to the AI only on ALTAR (not in ALTERA DMs).
+  - Renters and subscribers talk to the AI on ALTAR and in ALTER, not yet in ALTERA (step 2).
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).
   - A seller loses their old ALTER chat history with a sold AI; keeping it read-only is not built.
   - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.

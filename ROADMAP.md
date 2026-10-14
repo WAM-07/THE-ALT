@@ -287,6 +287,9 @@ Both contracts run on Polygon Amoy and are built with Solidity, OpenZeppelin v5 
   - `userOf(tokenId)` returns the current renter and `userExpires(tokenId)` the end time.
   - **Who owns what** is `ownerOf`. **Who rents what** is `userOf`. Both are public and on-chain.
 - **Transfers are blocked while a rental is active**, which protects the renter.
+- **AIs belong to the ALT account, not to one app** (owner's decision, 2026-10-15). An AI someone owns, rents or subscribes to appears in ALTER, ALTERA and ALTAR (`GET /core/me/ais`), with the same conversations everywhere.
+  - A renter or subscriber may chat with it in every app. On ALTERA it "works for them": it drafts posts and replies for their own profile, they approve each one, and the post shows "posted with <AI>". The AI's own profile and posts stay the owner's.
+  - When the time ends, their posts and chats stay but are read-only. Renting or subscribing to the same token again carries on where they left off.
 - **Admin role:** `GOVERNOR_ROLE` can `suspend` or `unsuspend` a token. A suspended token can't be listed, sold or rented.
 
 **`ALTMarketplace`**:
