@@ -468,10 +468,16 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
 - **Fixed in A1 (found by the owner, 2026-10-15):** on ALTERA's Profile, switching personal → AI persona → personal shows a red error screen: "_ProfileScreenState is a SingleTickerProviderStateMixin but multiple tickers were created" (`screens/profile/profile_screen.dart`: a new `TabController` per switch; use `TickerProviderStateMixin` and dispose the old one). Also `MessagingNotifier.loadConversations` updates a disposed widget during the switch. The owner also asked for a recommendation on the switch itself; see the answer of 2026-10-15 (proposed: replace the app-wide switch with "Post as" in the composer and a Manage page per owned AI).
 - **To demo on a phone:** `npm run demo`, connect the phone by USB, `adb reverse tcp:8080 tcp:8080`, install the debug APKs built with `--dart-define=ALT_API_URL=http://127.0.0.1:8080`.
-- **In progress (owner's go, 2026-10-15): group C.** Commit each, tick it here:
+- **Group C (2026-10-15)**: C2 and C4 done; C1 skipped for now (see Later).
   - [x] C2. "Connect MetaMask" on ALTAR: link an outside wallet to the ALT account by signing a message (no password, no key leaves MetaMask). Wallet page → **Your wallets**: Connect MetaMask (or Install MetaMask), linked wallets with Remove. Uses Core's existing SIWE linking (`/me/wallets/nonce`, `/me/wallets/link`); the message is built in `lib/metamask.js`. Linked wallets are not offered as primary on purpose (ALT signs listings and purchases with the ALT wallet). Checked in Chrome with a stand-in wallet that signs like MetaMask.
   - [x] C4. Smarter training: the AI reads uploaded PDFs and notes when it answers. PDF text is extracted at upload (`unpdf`, MIT), kept encrypted beside the file (`<id>.txt.enc`) and readable in ALTER's Studio (`/content?as=text`); retrieval is BM25 over overlapping passages with light stemming (`retrieve` in `modules/ai/repo.ts`). **Fixed on the way:** building a version marked images and documents as processed, so their raw bytes could reach the AI's prompt; now only items with real text (`text_chars > 0`) are read. Tests: `knowledge.test.ts` (Core 88).
-  - Waiting on the owner: C1 Polygon Amoy (RPC URL + faucet-funded key), C3 push notifications (a Firebase project: `google-services.json` and a server key).
+- **In progress (owner's go, 2026-10-15): group D, part.** Commit each, tick it here:
+  - [ ] D1. Biometric unlock in ALTER and ALTERA (fingerprint or face, on this phone; switch in the Account Center).
+  - [ ] C3. Notifications module: push to closed apps through Firebase Cloud Messaging. Everything is built and switched off until the owner adds a Firebase project (the apps' `google-services.json` and Core's service-account key).
+- **Later (owner, 2026-10-15), not now:**
+  - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
+  - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.
+  - **C1 Polygon Amoy**: needs an RPC URL (e.g. Alchemy) and a faucet-funded key in `.env`; `CHAIN_MODE=amoy` is already supported.
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
