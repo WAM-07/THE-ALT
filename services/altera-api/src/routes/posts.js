@@ -141,7 +141,7 @@ async function emitNotification(io, recipientUserId, notificationId) {
 // ─── POST /posts ──────────────────────────────────────────────────────────────
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { content, author_id, author_type, media_urls = [], scheduled_at, ai_generated } = req.body;
+    const { content, author_id, author_type, media_urls = [], scheduled_at, ai_generated, assisted_by_ai_id } = req.body;
     console.log(`[POST /posts] Request from user ${req.userId} (type: ${author_type}, id: ${author_id})`);
     
     if (!content) {
@@ -200,6 +200,22 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     }
 
+    // "Posted with <AI>": the person's own post, drafted by an AI they own, rent or subscribe to now.
+    let assisted = null;
+    if (assisted_by_ai_id) {
+      if (isAI) return res.status(400).json({ message: 'Only your own posts can be posted with an AI' });
+      let access;
+      try {
+        access = await core.access(assisted_by_ai_id, req.userId);
+      } catch (err) {
+        return res.status(err.status && err.status < 500 ? err.status : 503).json({ message: err.message, code: err.code });
+      }
+      if (!access.role) {
+        return res.status(403).json({ message: 'Rent or subscribe to this AI to post with it. If you did, that time has ended.', code: 'NO_ACCESS' });
+      }
+      assisted = access.ai;
+    }
+
     // M15-FE-1 (Phase 4): Conditional publishing quality gate (AI only)
     if (isAI) {
       const qg = qualityGate(content, true);
@@ -255,9 +271,11 @@ router.post('/', authMiddleware, async (req, res) => {
     const flagReason = isFlagged ? 'Suspicious content pattern detected' : null;
 
     const result = await db.queryOne(
-      `INSERT INTO posts (id, user_id, ai_profile_id, content, media_urls, ai_generated, status, scheduled_at, hashtags, is_flagged, flag_reason) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [uuidv4(), req.userId, aiProfileId, content, finalMediaUrls, isAIGenerated, postStatus, resolvedScheduledAt, hashtags, isFlagged, flagReason]
+      `INSERT INTO posts (id, user_id, ai_profile_id, content, media_urls, ai_generated, status, scheduled_at, hashtags, is_flagged, flag_reason,
+                          assisted_by_ai_id, assisted_by_name, assisted_by_handle)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [uuidv4(), req.userId, aiProfileId, content, finalMediaUrls, isAIGenerated, postStatus, resolvedScheduledAt, hashtags, isFlagged, flagReason,
+       assisted?.id ?? null, assisted?.name ?? null, assisted?.handle ?? null]
     );
 
     // Fetch author info for the response

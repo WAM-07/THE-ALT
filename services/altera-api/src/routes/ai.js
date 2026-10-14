@@ -2,6 +2,7 @@ const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 const { runAIPostWorker, generateAIPost, generateGenericPost } = require('../services/ai_generator');
+const core = require('../services/core_client');
 
 const router = express.Router();
 
@@ -38,6 +39,26 @@ router.post('/generate', authMiddleware, async (req, res) => {
     res.json({ content: await generateGenericPost(instruction, req.userId), author: 'assistant' });
   } catch (err) {
     fail(res, err, 'Failed to generate content');
+  }
+});
+
+// ─── POST /ai/draft-with ─────────────────────────────────────────────────────
+// An AI the person owns, rents or subscribes to (anywhere in ALT) drafts a post for their OWN
+// profile. They edit and publish it themselves, and it then shows "posted with <AI>".
+router.post('/draft-with', authMiddleware, async (req, res) => {
+  try {
+    const { core_ai_id: aiId, brief } = req.body;
+    if (!aiId || !brief || `${brief}`.trim().length < 3) {
+      return res.status(400).json({ message: 'Choose an AI and say what the post should be about' });
+    }
+    const access = await core.access(aiId, req.userId);
+    if (!access.role) {
+      return res.status(403).json({ message: 'Rent or subscribe to this AI to write with it. If you did, that time has ended.', code: 'NO_ACCESS' });
+    }
+    const reply = await core.respond(aiId, 'altera_draft', [{ role: 'user', content: `${brief}`.trim().slice(0, 1000) }], req.userId);
+    res.json({ content: reply.text.trim().replace(/^"|"$/g, ''), ai: access.ai });
+  } catch (err) {
+    fail(res, err, 'Failed to draft the post');
   }
 });
 

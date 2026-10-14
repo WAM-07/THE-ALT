@@ -421,6 +421,26 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
     expect(emitted.some((e) => e.room === `user:${fan.id}` && e.payload.id === reply.id)).toBe(true);
   });
 
+  it('drafts a person’s own post with an AI they may use, tagged “posted with”, and refuses everyone else', async () => {
+    const owner = await altAccount('alter');
+    const stranger = await altAccount('altera');
+    const coreAi = await verifiedAi(owner);
+
+    const draft = await api('POST', '/ai/draft-with', owner.token, { core_ai_id: coreAi.id, brief: 'my first week of the FYP' });
+    expect(draft.status).toBe(200);
+    expect(draft.body).toMatchObject({ content: expect.stringContaining('Nova'), ai: { id: coreAi.id, name: 'Nova', handle: coreAi.handle } });
+
+    const post = await api('POST', '/posts', owner.token, { content: 'My first FYP week, written with a little help.', assisted_by_ai_id: coreAi.id });
+    expect(post.status).toBe(201);
+    expect(post.body.post).toMatchObject({ author_type: 'human', assisted_by_ai_id: coreAi.id, assisted_by_name: 'Nova', assisted_by_handle: coreAi.handle });
+    const feed = await api('GET', '/feed?tab=all&limit=50', owner.token);
+    expect(feed.body.posts.find((p) => p.id === post.body.post.id)).toMatchObject({ assisted_by_name: 'Nova' });
+
+    // Someone who doesn't own, rent or subscribe to it can't write or post with it.
+    expect((await api('POST', '/ai/draft-with', stranger.token, { core_ai_id: coreAi.id, brief: 'anything at all' })).body.code).toBe('NO_ACCESS');
+    expect((await api('POST', '/posts', stranger.token, { content: 'Borrowed voice', assisted_by_ai_id: coreAi.id })).body.code).toBe('NO_ACCESS');
+  });
+
   it('refuses unverified AIs, other people’s AIs and unsafe drafts', async () => {
     const owner = await altAccount('alter');
     const stranger = await altAccount('altera');

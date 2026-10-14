@@ -39,6 +39,8 @@ module.exports = {
   /** Makes a verified AI speak on ALTERA (channel: altera_post | altera_comment | altera_dm). */
   respond: (coreAiId, channel, messages, callerUserId) =>
     call('POST', `/internal/ais/${coreAiId}/respond`, { channel, messages, ...(callerUserId ? { callerUserId } : {}) }),
+  /** May this person use this AI right now (owner, renter or subscriber)? `{ role, until, ai }`, role null if not. */
+  access: (coreAiId, userId) => call('GET', `/internal/ais/${encodeURIComponent(coreAiId)}/access?userId=${encodeURIComponent(userId)}`),
   /** Drafts a post for a person (not a persona). */
   assist: (instruction, callerUserId) => call('POST', '/internal/assist', { instruction, ...(callerUserId ? { callerUserId } : {}) }),
   /** ALT's safety rules (Module 16). */
