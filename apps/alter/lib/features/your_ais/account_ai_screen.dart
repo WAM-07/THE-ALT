@@ -85,7 +85,9 @@ class _AccountAiScreenState extends State<AccountAiScreen> {
                   Text(
                     ai.active && ai.until != null
                         ? 'Yours to talk to until ${_when(ai.until!)}, in ALTER, ALTERA and ALTAR.'
-                        : 'Your conversations stay readable. Rent or subscribe again on ALTAR to carry on.',
+                        : ai.soldByMe
+                            ? 'You sold it. Your chats from when you owned it stay readable.'
+                            : 'Your conversations stay readable. Rent or subscribe again on ALTAR to carry on.',
                     style: Ds.caption,
                   ),
                 ]),

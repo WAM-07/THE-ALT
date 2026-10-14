@@ -195,7 +195,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(ai.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    Text(_canTalk ? ai.label : '${ai.role == 'subscriber' ? 'Subscription' : 'Rental'} ended · read only',
+                    Text(_canTalk ? ai.label : ai.soldByMe ? 'Sold · read only' : '${ai.role == 'subscriber' ? 'Subscription' : 'Rental'} ended · read only',
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: _canTalk ? AccountAiTile.colorFor(ai) : AppColors.textTertiary)),
                   ]),
                 ),

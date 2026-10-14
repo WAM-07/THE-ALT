@@ -259,7 +259,7 @@ class _AccountStrip extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(ai.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: Ds.caption.copyWith(color: Ds.text, fontSize: 11.5)),
-                        Text(ai.owned ? (on ? 'In ALTER' : ai.label) : ai.active ? (ai.role == 'subscriber' ? 'Subscribed' : 'Rented') : 'Ended',
+                        Text(ai.owned ? (on ? 'In ALTER' : ai.label) : ai.soldByMe ? 'Sold' : ai.active ? (ai.role == 'subscriber' ? 'Subscribed' : 'Rented') : 'Ended',
                             maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.caption.copyWith(fontSize: 10.5, color: ai.owned ? Ds.iris : ai.active ? Ds.mint : Ds.textTertiary)),
                       ]),
                     ),

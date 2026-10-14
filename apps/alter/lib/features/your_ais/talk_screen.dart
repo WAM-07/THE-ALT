@@ -240,7 +240,7 @@ class _TalkScreenState extends State<TalkScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(ai.name, style: Ds.headline, maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              Text(_canTalk ? ai.label : '${ai.role == 'subscriber' ? 'Subscription' : 'Rental'} ended · read only',
+              Text(_canTalk ? ai.label : ai.soldByMe ? 'Sold · read only' : '${ai.role == 'subscriber' ? 'Subscription' : 'Rental'} ended · read only',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.caption.copyWith(color: _canTalk ? Ds.mint : Ds.textTertiary)),
             ]),
           ),

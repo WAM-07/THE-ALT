@@ -47,7 +47,7 @@ function useMyAis(user) {
               handle: a.handle,
               name: a.name,
               image: toModel(a).image,
-              role: a.access.role === "owner" ? (a.created ? "Yours" : "Bought") : a.access.role === "subscriber" ? "Subscribed" : "Rented",
+              role: a.access.role === "owner" ? (a.created ? "Yours" : "Bought") : a.access.role === "former_owner" ? "Sold" : a.access.role === "subscriber" ? "Subscribed" : "Rented",
               until: a.access.active ? a.access.until : null,
               ended: !a.access.active,
             })),

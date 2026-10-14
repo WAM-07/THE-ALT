@@ -64,13 +64,16 @@ export async function conversationRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.get(
     '/ais/:id/conversations',
-    { preHandler: authed, schema: { tags: ['chat'], summary: 'Your conversations with this AI on ALTAR (kept after a rental ends, read-only)', params: AiId } },
+    { preHandler: authed, schema: { tags: ['chat'], summary: 'Your conversations with this AI (kept, read-only, after a rental or subscription ends or after you sell it)', params: AiId } },
     async (req) => {
       const a = await accessOf(req.auth!.userId, req.params.id);
+      // Without access now, everything the person ever said to it stays readable: paid conversations,
+      // and a seller's own ALTER chats from when they owned it.
+      const channels = a.role ? [a.channel] : ['altar_rental', 'alter_chat'];
       const { rows } = await ctx.db.query(
         `SELECT s.id, s.title, s.channel, s.created_at, s.updated_at FROM core.chat_sessions s
-          WHERE s.ai_id = $1 AND s.user_id = $2 AND s.channel = $3 ORDER BY s.updated_at DESC LIMIT 50`,
-        [a.ai.id, req.auth!.userId, a.channel],
+          WHERE s.ai_id = $1 AND s.user_id = $2 AND s.channel = ANY($3::text[]) ORDER BY s.updated_at DESC LIMIT 50`,
+        [a.ai.id, req.auth!.userId, channels],
       );
       return {
         access: { role: a.role, until: a.until?.toISOString() ?? null },

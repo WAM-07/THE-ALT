@@ -145,7 +145,7 @@ class AccountAiStrip extends ConsumerWidget {
                   Opacity(opacity: ai.active ? 1 : 0.5, child: AvatarWidget(avatarUrl: ai.avatarUrl, displayName: ai.name, radius: 26, isAI: true)),
                   const SizedBox(height: 6),
                   Text(ai.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                  Text(ai.owned ? (ai.created ? 'Yours' : 'Bought') : ai.active ? (ai.role == 'subscriber' ? 'Subscribed' : 'Rented') : 'Ended',
+                  Text(ai.owned ? (ai.created ? 'Yours' : 'Bought') : ai.soldByMe ? 'Sold' : ai.active ? (ai.role == 'subscriber' ? 'Subscribed' : 'Rented') : 'Ended',
                       maxLines: 1, style: TextStyle(fontSize: 10.5, color: AccountAiTile.colorFor(ai))),
                 ]),
               ),

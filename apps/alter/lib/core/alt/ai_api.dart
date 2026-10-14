@@ -51,6 +51,7 @@ class AccountAi extends AltAi {
   /// 'owner', 'renter' or 'subscriber'.
   String get role => _access['role'] as String;
   bool get owned => role == 'owner';
+  bool get soldByMe => role == 'former_owner';
   bool get active => _access['active'] == true;
   DateTime? get until => _access['until'] == null ? null : DateTime.parse(_access['until'] as String);
   /// The person made it themselves (as opposed to buying it).
@@ -59,6 +60,8 @@ class AccountAi extends AltAi {
   /// "Yours", "Bought", "Rented · 2 days left", "Subscribed · ended"…
   String get label {
     if (owned) return created ? 'Yours' : 'Bought';
+    // An AI the person sold: their chats from when they owned it stay readable.
+    if (soldByMe) return 'Sold · read only';
     final kind = role == 'subscriber' ? 'Subscribed' : 'Rented';
     final left = until?.difference(DateTime.now());
     if (!active || left == null || left.isNegative) return '$kind · ended';

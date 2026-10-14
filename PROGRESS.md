@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 84 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 85 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -461,10 +461,10 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - [x] A1. ALTERA profile switch: fix the crash, and replace the app-wide personal/AI switch with "Post as" in the composer and a Manage page per owned AI. Profile is always yours; tapping one of your AIs opens `/manage-ai/:id` (identity, Post as it, public profile, "Acts on its own", approvals, its posts); the composer has a "Posting as" chip (`/compose?as=<id>`). Checked on the phone.
   - [x] A2. ALTERA: a rented or subscribed AI also drafts comments and replies for the person. The robot button in a post's comment box ("Reply with your AI", brief optional) drafts in your voice; the comment shows "✦ Replied with <AI>" (Core channel `altera_draft_comment`, ALTERA migration `0005`, shared `write_with_ai_sheet.dart`). Fixed on the way: a comment could appear twice (the live update raced the reply) and commenting dropped the post's "posted with" tag. Checked on the phone.
   - [x] A3. ALTER themes: onboarding and sign-in follow the active theme. The old colour, gradient and heading names (`colors.dart`, `gradients.dart`, `typography.dart`) now read `Ds`, so onboarding, memories, versions and the status badge follow every theme (headings in the theme's face, Fraunces in Sapphire). Checked on the phone in Sapphire: sign-in and onboarding.
-- **In progress (owner's go, 2026-10-15): group B.** Commit each, tick it here:
+- **Group B (2026-10-15)** ✅
   - [x] B1. Picture picker in ALTER and ALTERA (`showAltPicturePicker` in `alt_account`): ready-made sets with their credits, "Upload a photo" (the app's own gallery picker), **Everywhere** or **Only in this app**, and "Use my main picture here". Opened from the Account Center picture, ALTER's Profile picture and ALTERA's Edit Profile. `AltUser.platformAvatars` / `avatarFor(app)`. Checked on the phone: an ALTERA-only picture leaves the main one unchanged.
   - [x] B2. Spending confirmed in the ALT Account window (password or 2FA there, not on ALTAR's page). ALTAR's confirm dialog says "… in ALT" and opens `/core/account/?mode=confirm` (what is paid, the AI looked up by the window itself); Core's `POST /me/spend-approvals` returns a one-time approval (2 minutes) bound to the person, action, AI and amounts, which ALTAR sends as `confirm.approval`. ALTAR lends the window its session by a same-origin message; typing the password on ALTAR's page is only the fallback when pop-ups are blocked. Market test; checked in Chrome: Hamza subscribed to Calm Coach through the window.
-  - [ ] B3. A seller keeps their old chats with a sold AI, read-only.
+  - [x] B3. A seller keeps their old chats with a sold AI, read-only. Without access, `GET /ais/:id/conversations` lists the person's own paid chats and, for a seller, their ALTER chats from when they owned it; `/me/ais` keeps a sold AI as `former_owner` (inactive), shown as "Sold · read only" in ALTER, ALTERA and ALTAR. Market test. (The demo seed has no sale, so it doesn't show there.)
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
 - **Fixed in A1 (found by the owner, 2026-10-15):** on ALTERA's Profile, switching personal → AI persona → personal shows a red error screen: "_ProfileScreenState is a SingleTickerProviderStateMixin but multiple tickers were created" (`screens/profile/profile_screen.dart`: a new `TabController` per switch; use `TickerProviderStateMixin` and dispose the old one). Also `MessagingNotifier.loadConversations` updates a disposed widget during the switch. The owner also asked for a recommendation on the switch itself; see the answer of 2026-10-15 (proposed: replace the app-wide switch with "Post as" in the composer and a Manage page per owned AI).
 - **To demo on a phone:** `npm run demo`, connect the phone by USB, `adb reverse tcp:8080 tcp:8080`, install the debug APKs built with `--dart-define=ALT_API_URL=http://127.0.0.1:8080`.
@@ -473,7 +473,6 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
   - **ALTER themes:** which one stays the default after trying them (Sapphire for now).
 - **Smaller follow-ups:**
-  - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
 
@@ -481,7 +480,6 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **ALTAR:**
   - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, comments and replies (DM replies stay the person's own).
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).
-  - A seller loses their old ALTER chat history with a sold AI; keeping it read-only is not built.
   - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.
   - Rentals are not replayed when the local dev chain restarts.
   - "Connect MetaMask" isn't built: sending POL to a MetaMask address works.

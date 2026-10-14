@@ -201,7 +201,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
   // Every AI on this ALT account, the same in ALTER, ALTERA and ALTAR: the ones the person owns
   // (until they sell them) and the ones they rent or subscribe to (until that time ends). An ended
   // rental or subscription stays listed, inactive, so its conversations can still be read; renting
-  // or subscribing again makes it active and the same conversations carry on.
+  // or subscribing again makes it active and the same conversations carry on. An AI the person sold
+  // stays too ("former_owner", inactive) while they have chats with it, read-only.
   r.get(
     '/me/ais',
     { preHandler: authed, schema: { tags: ['ai'], summary: 'Every AI on my account: owned, rented and subscribed, active or ended' } },
@@ -222,7 +223,9 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
         // Paid conversations (rentals and subscriptions share this channel) from an access that has ended.
         ctx.db.query<{ id: string }>(`SELECT DISTINCT ai_id AS id FROM core.chat_sessions WHERE user_id = $1 AND channel = 'altar_rental'`, [me]),
       ]);
-      type Access = { role: 'owner' | 'renter' | 'subscriber'; until: Date | null; active: boolean };
+      // ALTER chats from when the person owned an AI they have since sold.
+      const ownedChats = await ctx.db.query<{ id: string }>(`SELECT DISTINCT ai_id AS id FROM core.chat_sessions WHERE user_id = $1 AND channel = 'alter_chat'`, [me]);
+      type Access = { role: 'owner' | 'renter' | 'subscriber' | 'former_owner'; until: Date | null; active: boolean };
       const access = new Map<string, Access>();
       const add = (id: string, a: Access) => {
         const had = access.get(id);
@@ -232,6 +235,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       for (const r of rented.rows) add(r.id, { role: 'renter', until: r.until, active: true });
       for (const r of subscribed.rows) add(r.id, { role: 'subscriber', until: r.until, active: r.until.getTime() > Date.now() });
       for (const r of talked.rows) add(r.id, { role: 'renter', until: null, active: false });
+      for (const r of ownedChats.rows) add(r.id, { role: 'former_owner', until: null, active: false });
 
       const { rows } = await ctx.db.query<AiRow>('SELECT * FROM core.personal_ais WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY created_at', [[...access.keys()]]);
       const rank = (a: Access) => (a.role === 'owner' ? 0 : a.active ? 1 : 2);

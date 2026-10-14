@@ -68,6 +68,15 @@ describe('buying, reselling and renting an AI', () => {
     // B owns it everywhere now; A has lost access. A's private files stay sealed from B.
     expect((await call('GET', `/ais/${ai.id}`, b.accessToken)).statusCode).toBe(200);
     expect((await call('GET', `/ais/${ai.id}`, a.accessToken)).statusCode).toBe(404);
+    // A keeps their own chats with it from before the sale, read-only; B can't see them.
+    const sold = (await call('GET', '/me/ais', a.accessToken)).json().find((x: { id: string }) => x.id === ai.id);
+    expect(sold).toMatchObject({ access: { role: 'former_owner', active: false } });
+    const aChats = (await call('GET', `/ais/${ai.id}/conversations`, a.accessToken)).json();
+    expect(aChats.access.role).toBeNull();
+    expect(aChats.conversations).toHaveLength(1);
+    expect((await call('GET', `/ais/${ai.id}/conversations/${aChats.conversations[0].id}/messages`, a.accessToken)).json().length).toBeGreaterThan(0);
+    expect((await call('POST', `/ais/${ai.id}/conversations/${aChats.conversations[0].id}/messages`, a.accessToken, { content: 'still mine?' })).json().error.code).toBe('NO_ACCESS');
+    expect((await call('GET', `/ais/${ai.id}/conversations/${aChats.conversations[0].id}/messages`, b.accessToken)).statusCode).toBe(404);
     expect((await call('GET', '/ais', b.accessToken)).json().map((x: { id: string }) => x.id)).toContain(ai.id);
     expect((await call('GET', `/ais/${ai.id}/datasets`, b.accessToken)).json()).toEqual([]);
     expect((await call('GET', '/me', b.accessToken)).json().roles).toContain('consumer');
@@ -110,7 +119,8 @@ describe('buying, reselling and renting an AI', () => {
     const onAccount = async (u: User) => (await call('GET', '/me/ais', u.accessToken)).json().find((x: { id: string }) => x.id === ai.id);
     expect(await onAccount(c)).toMatchObject({ created: false, access: { role: 'owner', active: true, until: null } });
     expect(await onAccount(d)).toMatchObject({ access: { role: 'renter', active: true, until: rented.json().until } });
-    expect(await onAccount(a)).toBeUndefined();
+    // A, who made and sold it, sees it only as sold (read-only chats).
+    expect(await onAccount(a)).toMatchObject({ created: true, access: { role: 'former_owner', active: false } });
     expect(await onAccount(stranger)).toBeUndefined();
 
     // Other ALT services (ALTERA drafting a post with it) ask Core, with the service key only.
