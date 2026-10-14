@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
+import '../../../core/alt/follows_current_ai.dart';
 import '../../../core/theme/ds.dart';
 import '../../../shared/ui/ui.dart';
 import 'add_text_screen.dart';
@@ -18,7 +19,13 @@ class DatasetScreen extends StatefulWidget {
   State<DatasetScreen> createState() => _DatasetScreenState();
 }
 
-class _DatasetScreenState extends State<DatasetScreen> {
+class _DatasetScreenState extends State<DatasetScreen> with FollowsCurrentAi {
+  @override
+  void onAiSwitched() {
+    setState(() => _items = null);
+    _reload();
+  }
+
   List<DatasetEntry>? _items;
   String? _error;
 

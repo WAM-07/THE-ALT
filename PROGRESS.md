@@ -430,8 +430,8 @@ Work one step at a time, then stop for the owner's review before starting the ne
 
 ## Where to pick up (2026-10-15)
 - **In progress: fixes from the owner's test of step 1 (2026-10-15).** Do these in order, commit each, tick it here:
-  - [ ] ALTER: the Settings tab in the bottom bar becomes **Profile** (same screen, person icon).
-  - [ ] ALTER: the Chat tab follows the AI chosen in "Your AIs" (it kept the first AI's chat).
+  - [x] ALTER: the Settings tab in the bottom bar becomes **Profile** (same screen, person icon).
+  - [x] ALTER: the Chat tab follows the AI chosen in "Your AIs" (it kept the first AI’s chat). Studio and Identity had the same problem; all three use `FollowsCurrentAi`.
   - [ ] ALTAR: an owner sees **Chat** on their own AI's page (it showed only "Manage in ALTER" and "List AI").
   - [ ] ALTER: tapping a rented or subscribed AI opens its profile card first (identity card, details, time left), with **Chat** and **Open in ALTAR**.
   - [ ] **In-app ALT sign-in card** (step 3, brought forward; no browser). A bottom-sheet card from `alt_account`:

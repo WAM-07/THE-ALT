@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
+import '../../../core/alt/follows_current_ai.dart';
 import '../../../core/theme/ds.dart';
 import '../../../shared/ui/ui.dart';
 
@@ -20,7 +21,16 @@ class TrainingScreen extends StatefulWidget {
   State<TrainingScreen> createState() => _TrainingScreenState();
 }
 
-class _TrainingScreenState extends State<TrainingScreen> {
+class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
+  @override
+  void onAiSwitched() {
+    setState(() {
+      _versions = [];
+      _gate = null;
+    });
+    _reload();
+  }
+
   List<AiVersionInfo> _versions = [];
   (bool, List<ClearanceCheck>)? _gate;
   bool _busy = false;

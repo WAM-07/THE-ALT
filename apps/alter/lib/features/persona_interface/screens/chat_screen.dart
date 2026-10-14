@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
+import '../../../core/alt/follows_current_ai.dart';
 import '../../../core/theme/ds.dart';
 import '../../../shared/ui/ui.dart';
 
@@ -17,7 +18,17 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with FollowsCurrentAi {
+  @override
+  void onAiSwitched() {
+    setState(() {
+      _sessionId = null;
+      _live = false;
+      _messages.clear();
+    });
+    _load();
+  }
+
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final List<ChatMsg> _messages = [];
