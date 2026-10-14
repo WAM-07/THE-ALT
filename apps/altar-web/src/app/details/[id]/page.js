@@ -248,7 +248,7 @@ export default function AgentDetails() {
             <Card style={{ animationDelay: "120ms" }} className="animate-rise p-6">
               <p className="font-display text-xl font-bold">You own this AI</p>
               <p className="mt-2 text-ink-2">
-                You hold its AI Identity Token. Its personality, knowledge and versions are managed in ALTER.{" "}
+                You hold its AI Identity Token, so you can talk to it any time. Its personality, knowledge and versions are managed in ALTER.{" "}
                 {listing ? "It's listed on ALTAR:" : "It isn't listed yet."}
               </p>
               {listing && (
@@ -259,7 +259,10 @@ export default function AgentDetails() {
                 </div>
               )}
               <div className="mt-5 flex flex-wrap gap-3">
-                <Button href={`/list-ai?ai=${model.id}`}>{listing ? "Edit listing" : "List it"}</Button>
+                <Button href={`/chat/${model.handle}`}>Chat now</Button>
+                <Button href={`/list-ai?ai=${model.id}`} kind="outline">
+                  {listing ? "Edit listing" : "List it"}
+                </Button>
                 <Button kind="outline" onClick={openInAlter}>
                   Manage in ALTER
                 </Button>
