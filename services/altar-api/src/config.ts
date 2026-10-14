@@ -10,6 +10,8 @@ const Env = z.object({
   CORE_URL: z.url().default('http://127.0.0.1:4000'),
   /** Tokens are issued by `${ALT_PUBLIC_URL}/core`. */
   ALT_PUBLIC_URL: z.url().default('http://localhost:8080'),
+  /** Lets ALTAR ask ALT Core to moderate reviews (POST /internal/moderate). */
+  INTERNAL_SERVICE_KEY: z.string().optional(),
   // The chain, read-only: ALTAR mirrors the marketplace contract but never signs anything.
   CHAIN_RPC_URL: z.string().optional(),
   AIT_REGISTRY_ADDRESS: z.string().optional(),
@@ -27,7 +29,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     host: e.ALTAR_HOST,
     port: e.ALTAR_PORT,
     databaseUrl: e.DATABASE_URL,
+    coreUrl: e.CORE_URL.replace(/\/$/, ''),
     jwksUrl: `${e.CORE_URL.replace(/\/$/, '')}/.well-known/jwks.json`,
+    internalServiceKey: e.INTERNAL_SERVICE_KEY || null,
     issuer: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/core`,
     chain: chainOn ? { rpcUrl: e.CHAIN_RPC_URL!, registry: e.AIT_REGISTRY_ADDRESS!, marketplace: e.ALT_MARKETPLACE_ADDRESS! } : null,
   };

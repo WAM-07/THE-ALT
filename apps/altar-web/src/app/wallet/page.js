@@ -25,6 +25,7 @@ export default function WalletPage() {
   const [send, setSend] = useState({ to: "", amount: "" });
   const [copied, setCopied] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [royalties, setRoyalties] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -34,6 +35,10 @@ export default function WalletPage() {
         .myActivity()
         .then(setActivity)
         .catch(() => setActivity([]));
+      altar
+        .myRoyalties()
+        .then(setRoyalties)
+        .catch(() => setRoyalties(null));
     } catch (err) {
       setError(err.message);
     }
@@ -216,6 +221,29 @@ export default function WalletPage() {
         </Card>
       </div>
 
+      {royalties?.ais.length > 0 && (
+        <Card className="mt-5 p-7">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="font-display text-lg font-bold">Royalties as a creator</h2>
+            <p className="font-display text-2xl font-extrabold text-accent-text">{polText(royalties.total)}</p>
+          </div>
+          <p className="mt-1 text-sm text-ink-2">What you earned when AIs you made were resold, rented or subscribed to by their later owners. It arrives in your earnings above.</p>
+          <ul className="mt-3 divide-y divide-line">
+            {royalties.ais.map((r) => (
+              <li key={r.aiId} className="flex items-center justify-between gap-4 py-3">
+                <Link href={`/details/${r.handle}`} className="min-w-0 hover:underline">
+                  <span className="block truncate font-semibold">{r.name}</span>
+                  <span className="text-sm text-ink-3">
+                    {r.payments} {r.payments === 1 ? "payment" : "payments"} · last {timeAgo(r.lastAt)}
+                  </span>
+                </Link>
+                <span className="font-semibold text-accent-text">+{polText(r.total)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card className="mt-5 p-7">
         <h2 className="font-display text-lg font-bold">Activity</h2>
         {activity === null ? (
@@ -230,13 +258,15 @@ export default function WalletPage() {
                 sold: [`Sold ${a.ai?.name ?? "an AI"}`, "+"],
                 rented: [`Rented ${a.ai?.name ?? "an AI"} for ${a.days} ${a.days === 1 ? "day" : "days"}`, "−"],
                 rented_out: [`${a.ai?.name ?? "Your AI"} was rented for ${a.days} ${a.days === 1 ? "day" : "days"}`, "+"],
+                subscribed: [`Subscribed to ${a.ai?.name ?? "an AI"} for ${a.months} ${a.months === 1 ? "month" : "months"}`, "−"],
+                subscribed_out: [`New subscriber to ${a.ai?.name ?? "your AI"} (${a.months} ${a.months === 1 ? "month" : "months"})`, "+"],
                 royalty: [`Royalty from ${a.ai?.name ?? "your AI"}`, "+"],
               }[a.role];
               // What reached (or left) this person: the seller's share after fee and royalty, the royalty itself, or the full price.
               const amount =
                 a.role === "royalty"
                   ? a.royalty.pol
-                  : a.role === "sold" || a.role === "rented_out"
+                  : a.role === "sold" || a.role === "rented_out" || a.role === "subscribed_out"
                     ? String(Number(a.amount.pol) - Number(a.fee.pol) - Number(a.royalty.pol))
                     : a.amount.pol;
               return (

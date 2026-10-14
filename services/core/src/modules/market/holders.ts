@@ -67,6 +67,44 @@ export async function syncToken(ctx: Ctx, tokenId: bigint, txHash: string | null
   });
 }
 
+/**
+ * Mirrors one person's subscription to an AI from the chain (ALTMarketplace.subscriptionExpires),
+ * and tells the subscriber and the owner when it starts or is renewed.
+ */
+export async function syncSubscription(ctx: Ctx, tokenId: bigint, subscriber: string, txHash: string | null = null) {
+  const chain = ctx.chain;
+  if (!chain?.marketplaceAddress) return null;
+  const { rows } = await ctx.db.query<{ ai_id: string; owner_id: string; name: string; handle: string }>(
+    `SELECT t.ai_id, a.owner_id, a.name, a.handle FROM core.ai_identity_tokens t JOIN core.personal_ais a ON a.id = t.ai_id
+      WHERE t.token_id = $1 AND t.chain_id = $2 AND lower(t.contract_address) = lower($3)`,
+    [tokenId.toString(), chain.chainId, chain.registryAddress],
+  );
+  const token = rows[0];
+  if (!token) return null;
+  const address = subscriber.toLowerCase();
+  const until = await chain.subscriptionOf(tokenId, address);
+  if (!until) return null;
+  const user = (await ctx.db.query<{ user_id: string }>('SELECT user_id FROM core.wallets WHERE address = $1', [address])).rows[0]?.user_id ?? null;
+
+  return tx(ctx.db, async (client) => {
+    const before = await client.query<{ expires_at: Date }>('SELECT expires_at FROM core.ai_subscriptions WHERE ai_id = $1 AND subscriber_address = $2', [token.ai_id, address]);
+    if (before.rows[0] && before.rows[0].expires_at.getTime() === until.getTime()) return { aiId: token.ai_id, userId: user, until, changed: false };
+    await client.query(
+      `INSERT INTO core.ai_subscriptions (ai_id, subscriber_address, user_id, expires_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (ai_id, subscriber_address) DO UPDATE SET user_id = EXCLUDED.user_id, expires_at = EXCLUDED.expires_at, updated_at = now()`,
+      [token.ai_id, address, user, until],
+    );
+    const when = until.toISOString().slice(0, 16).replace('T', ' ');
+    if (user) {
+      await client.query(`UPDATE core.users SET roles = array_append(roles, 'consumer') WHERE id = $1 AND NOT ('consumer' = ANY(roles))`, [user]);
+      await notify(client, { userId: user, category: 'transaction', type: 'ai.subscription_started', title: `You're subscribed to ${token.name}`, body: `Chat with ${token.name} on ALTAR until ${when} UTC.`, platform: 'altar', link: `/chat/${token.handle}`, data: { aiId: token.ai_id, until: until.toISOString(), txHash } });
+    }
+    await notify(client, { userId: token.owner_id, category: 'transaction', type: 'ai.subscribed', title: `New subscriber for ${token.name}`, body: `Someone subscribed to ${token.name} until ${when} UTC. Your earnings are in your wallet's marketplace balance.`, platform: 'altar', link: '/wallet', data: { aiId: token.ai_id, until: until.toISOString(), txHash } });
+    await audit(client, { action: 'ai.subscribed', actorService: 'chain', entityType: 'ai', entityId: token.ai_id, data: { subscriber: user, address, until: until.toISOString(), txHash } });
+    return { aiId: token.ai_id, userId: user, until, changed: true };
+  });
+}
+
 const CURSOR = 'ait_registry';
 const MAX_RANGE = 2_000n;
 
@@ -85,9 +123,14 @@ export async function indexRegistry(ctx: Ctx, log: (msg: string) => void = () =>
   let synced = 0;
   while (from <= head) {
     const to = from + MAX_RANGE - 1n < head ? from + MAX_RANGE - 1n : head;
-    for (const change of await chain.registryChanges(from, to)) {
+    const changes = await chain.registryChanges(from, to);
+    for (const change of changes.holders) {
       const r = await syncToken(ctx, change.tokenId, change.txHash);
       if (r) synced++;
+    }
+    for (const s of changes.subscriptions) {
+      const r = await syncSubscription(ctx, s.tokenId, s.subscriber, s.txHash);
+      if (r?.changed) synced++;
     }
     await ctx.db.query(
       `INSERT INTO core.chain_cursors (name, chain_id, block) VALUES ($1, $2, $3)
@@ -96,7 +139,7 @@ export async function indexRegistry(ctx: Ctx, log: (msg: string) => void = () =>
     );
     from = to + 1n;
   }
-  if (synced) log(`chain indexer: ${synced} identity token change(s) applied`);
+  if (synced) log(`chain indexer: ${synced} ownership, rental or subscription change(s) applied`);
   return synced;
 }
 

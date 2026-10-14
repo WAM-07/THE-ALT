@@ -5,7 +5,8 @@ import pg from 'pg';
 import { createPublicClient, createWalletClient, defineChain, http, parseEther, type Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { afterAll, beforeAll, describe, expect, it, inject } from 'vitest';
-import { buildApp } from '../src/app.js';
+import { buildApp, coreModeration } from '../src/app.js';
+import { createServer } from 'node:http';
 import { createChainReader } from '../src/chain.js';
 import { loadConfig } from '../src/config.js';
 import { indexMarketplace } from '../src/indexer.js';
@@ -33,7 +34,9 @@ beforeAll(async () => {
       .setExpirationTime('10m')
       .sign(privateKey);
   const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: inject('databaseUrl'), CHAIN_RPC_URL: chainCfg.rpcUrl, AIT_REGISTRY_ADDRESS: registry, ALT_MARKETPLACE_ADDRESS: market });
-  app = await buildApp(config, { keySet: createLocalJWKSet({ keys: [jwk] }), logger: false, indexer: false });
+  // Reviews are moderated by ALT Core in real life; here anything containing "BADWORD" is flagged.
+  const moderate = async (text: string) => ({ flagged: text.includes('BADWORD') });
+  app = await buildApp(config, { keySet: createLocalJWKSet({ keys: [jwk] }), logger: false, indexer: false, moderate });
   await app.ready();
   db = new pg.Pool({ connectionString: inject('databaseUrl') });
 });
@@ -96,9 +99,10 @@ describe('listings', () => {
     // Nothing on offer yet: no listing.
     expect((await req('PUT', `/listings/${aiId}`, seller.token, { pitch: 'Great AI' })).json()).toEqual({ listing: null });
 
-    // A subscription price alone makes a listing (subscribing itself opens later).
-    const sub = (await req('PUT', `/listings/${aiId}`, seller.token, { pitch: 'Great AI', subscriptionPrice: '1.5' })).json().listing;
-    expect(sub).toMatchObject({ tokenId: tokenId.toString(), pitch: 'Great AI', sale: null, rent: null, subscription: { pricePerMonth: { pol: '1.5' }, open: false } });
+    // A subscription price alone (on-chain, like every price) makes a listing.
+    await wait(await seller.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSubscription', args: [tokenId, parseEther('1.5')] }));
+    const sub = (await req('PUT', `/listings/${aiId}`, seller.token, { pitch: 'Great AI' })).json().listing;
+    expect(sub).toMatchObject({ tokenId: tokenId.toString(), pitch: 'Great AI', sale: null, rent: null, subscription: { pricePerMonth: { pol: '1.5' } } });
 
     // The seller lists on-chain (through ALT Core in real life); ALTAR reads it back.
     await wait(await seller.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSale', args: [tokenId, parseEther('3')] }));
@@ -121,7 +125,7 @@ describe('listings', () => {
     const p = await person();
     const draft = randomUUID();
     await db.query(`INSERT INTO core.personal_ais (id, owner_id, creator_id, handle, name) VALUES ($1, $2, $2, $3, 'Draft')`, [draft, p.user, `d_${randomBytes(4).toString('hex')}`]);
-    expect((await req('PUT', `/listings/${draft}`, p.token, { subscriptionPrice: '1' })).json().error.code).toBe('AI_NOT_VERIFIED');
+    expect((await req('PUT', `/listings/${draft}`, p.token, { pitch: 'Mine' })).json().error.code).toBe('AI_NOT_VERIFIED');
 
     expect((await req('GET', '/wishlist', p.token)).statusCode).toBe(200);
     // Signing out (Core revokes the session and announces it) works here at once, despite the cache.
@@ -157,7 +161,7 @@ describe('marketplace history', () => {
 
     // The creator sells to the buyer (no royalty on a creator's own sale).
     await wait(await creator.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSale', args: [tokenId, parseEther('1')] }));
-    await req('PUT', `/listings/${aiId}`, creator.token, { pitch: 'First owner', subscriptionPrice: '0.1' });
+    await req('PUT', `/listings/${aiId}`, creator.token, { pitch: 'First owner' });
     await wait(await buy(buyer, '1'));
     await db.query('UPDATE core.personal_ais SET owner_id = $2 WHERE id = $1', [aiId, buyer.user]); // what ALT Core does on the Transfer
     expect(await index()).toBe(1);
@@ -191,5 +195,75 @@ describe('marketplace history', () => {
     expect(await roles(renter)).toEqual(['rented']);
     const rentals = (await req('GET', '/me/rentals', renter.token)).json();
     expect(rentals).toEqual([expect.objectContaining({ kind: 'rental', days: 1, ai: expect.objectContaining({ id: aiId }) })]);
+  });
+});
+
+describe('subscriptions, reviews and royalties', () => {
+  it('records subscriptions, lets real customers review, and shows the creator their royalties', async () => {
+    const reader = createChainReader({ rpcUrl: chainCfg.rpcUrl, registry, marketplace: market });
+    const index = () => indexMarketplace(db, reader);
+    await index();
+    const [creator, owner, fan, stranger] = [await person(), await person(), await person(), await person()];
+    const { aiId, tokenId } = await verifiedAi(creator);
+
+    // The creator sells it; the new owner offers it by the month and a fan subscribes for 2 months.
+    await wait(await creator.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSale', args: [tokenId, parseEther('1')] }));
+    await wait(await owner.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'buy', args: [tokenId], value: parseEther('1') }));
+    await db.query('UPDATE core.personal_ais SET owner_id = $2 WHERE id = $1', [aiId, owner.user]);
+    await wait(await owner.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'listForSubscription', args: [tokenId, parseEther('0.2')] }));
+    await wait(await fan.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'subscribe', args: [tokenId, 2], value: parseEther('0.4') }));
+    expect(await index()).toBe(2);
+
+    const history = (await req('GET', `/activity?aiId=${aiId}`)).json();
+    expect(history[0]).toMatchObject({ kind: 'subscription', months: 2, amount: { pol: '0.4' }, royalty: { pol: '0.02' } });
+    expect((await req('GET', '/me/activity', fan.token)).json()[0].role).toBe('subscribed');
+    expect((await req('GET', '/me/activity', owner.token)).json()[0].role).toBe('subscribed_out');
+    expect((await req('GET', '/me/rentals', fan.token)).json()).toEqual([expect.objectContaining({ kind: 'subscription', months: 2 })]);
+    expect((await req('GET', `/listings/${aiId}`)).json().subscription.pricePerMonth.pol).toBe('0.2');
+
+    // The creator sees royalties per AI.
+    const royalties = (await req('GET', '/me/royalties', creator.token)).json();
+    expect(royalties).toMatchObject({ total: { pol: '0.02' }, ais: [expect.objectContaining({ aiId, payments: 1 })] });
+
+    // Reviews: only customers, never the owner or creator, and moderated.
+    expect((await req('GET', `/me/reviews/${aiId}`, stranger.token)).json()).toMatchObject({ canReview: false, review: null });
+    expect((await req('PUT', `/reviews/${aiId}`, stranger.token, { rating: 5 })).json().error.code).toBe('NOT_A_CUSTOMER');
+    expect((await req('PUT', `/reviews/${aiId}`, creator.token, { rating: 5 })).json().error.code).toBe('OWN_AI');
+    expect((await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 6 })).statusCode).toBe(400);
+    expect((await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 1, body: 'BADWORD here' })).json().error.code).toBe('REVIEW_REJECTED');
+    const review = (await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 4, body: 'Helpful and kind.' })).json();
+    expect(review).toMatchObject({ rating: 4, basis: 'subscribed', reviewer: { id: fan.user } });
+    await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 5, body: 'Even better the second week.' });
+    expect((await req('PUT', `/reviews/${aiId}`, owner.token, { rating: 5 })).json().error.code).toBe('OWN_AI');
+
+    const all = (await req('GET', `/reviews?aiId=${aiId}`)).json();
+    expect(all).toMatchObject({ average: 5, count: 1, reviews: [expect.objectContaining({ body: 'Even better the second week.' })] });
+    expect((await req('GET', '/ratings')).json()).toEqual(expect.arrayContaining([{ aiId, average: 5, count: 1 }]));
+    expect((await req('GET', `/me/reviews/${aiId}`, fan.token)).json()).toMatchObject({ canReview: true, basis: 'subscribed', review: { rating: 5 } });
+
+    expect((await req('DELETE', `/reviews/${aiId}`, fan.token)).statusCode).toBe(204);
+    expect((await req('GET', `/reviews?aiId=${aiId}`)).json()).toMatchObject({ average: null, count: 0 });
+  });
+});
+
+describe("ALT Core's moderation", () => {
+  it('is called as the "altar" service, with the service key', async () => {
+    // A stand-in for Core's /internal/moderate that, like Core, needs both headers.
+    const seen: Record<string, unknown>[] = [];
+    const server = createServer((r, res) => {
+      seen.push(r.headers);
+      const ok = r.headers['x-alt-service'] === 'altar' && r.headers['x-alt-service-key'] === 'service-key';
+      res.writeHead(ok ? 200 : 401, { 'content-type': 'application/json' }).end(JSON.stringify(ok ? { flagged: false } : { error: {} }));
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const { port } = server.address() as { port: number };
+    try {
+      expect(await coreModeration({ coreUrl: `http://127.0.0.1:${port}`, internalServiceKey: 'service-key' })('hello')).toEqual({ flagged: false });
+      await expect(coreModeration({ coreUrl: `http://127.0.0.1:${port}`, internalServiceKey: 'wrong' })('hello')).rejects.toMatchObject({ code: 'MODERATION_UNAVAILABLE' });
+      await expect(coreModeration({ coreUrl: `http://127.0.0.1:${port}`, internalServiceKey: null })('hello')).rejects.toMatchObject({ code: 'MODERATION_UNAVAILABLE' });
+      expect(seen).toHaveLength(2);
+    } finally {
+      server.close();
+    }
   });
 });

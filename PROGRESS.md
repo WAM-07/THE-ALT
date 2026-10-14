@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | 🟡 Steps 1–3 of 4 done (2026-10-13/14): `apps/altar-web` redesigned on ALT accounts; `services/altar-api`; the ALT wallet and on-chain listings; buying, reselling with royalties, renting and rental chat. Next: subscriptions, reviews and the demo polish. Plan: `Documentations/ALTAR_EVALUATION.md` §7. |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ✅ All 4 steps done (2026-10-13 to 15): `apps/altar-web` redesigned on ALT accounts; `services/altar-api`; the ALT wallet and on-chain listings; buying, reselling with royalties, renting and rental chat; subscriptions, reviews and the creator's royalties. Plan: `Documentations/ALTAR_EVALUATION.md` §7. Next: Polygon Amoy (needs the owner's key). |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
@@ -371,25 +371,55 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **`npm run demo` stopped part-way:** the seed now signs up 8 people, and Core allows 5 sign-ups a minute, so the 6th was refused. The limit stays; the seed waits as long as Core asks ("Try again in N seconds") and retries. A full demo now takes a few minutes.
   - **Password field:** the ALT Account window showed the browser's eye (Edge) and our "Show" text. Now there is one eye icon, crossed out while the password shows, and the browser's own eye is hidden (also on ALTAR).
 
-## Where to pick up (end of 2026-10-14)
-- **First:** run `npm run demo` once and check it ends with "demo data ready" (the full fresh run with the new seed hasn't been seen end to end yet).
-- **Next step, ALTAR step 4** (`Documentations/ALTAR_EVALUATION.md` §7): add `subscribe` to `ALTMarketplace` (owner approved the contract change), a creator royalty view, reviews from real buyers and renters, and demo polish.
+- ✅ **ALTAR step 4: subscriptions, reviews and royalties** (2026-10-15).
+  - **Contract** (`ALTMarketplace`, owner-approved change):
+    - `listForSubscription`, `cancelSubscriptionOffer`, `subscribe(tokenId, months)` (1–12 months of 30 days; renewing adds to the time left), `subscriptionExpires` and `isSubscribed`.
+    - Payments split like sales: platform fee, the creator's royalty, then the owner.
+    - Any number of people may subscribe; ownership never moves. A sale clears the old owner's subscription price; subscribers keep the time they paid for.
+    - 5 new tests (36 in all). The ABI is re-exported.
+  - **ALT Core:**
+    - `PUT /ais/:id/market` takes `subscription` (absent = leave it as it is);
+    - `POST /ais/:id/market/subscribe` (password or 2FA, price guard);
+    - `core.ai_subscriptions` mirrors who may use the AI until when (migration `0006`); `syncSubscription` fills it, also from the indexer for subscriptions paid elsewhere;
+    - subscribers may talk to the AI on ALTAR like renters (role `subscriber`).
+  - **`altar-api`** (migration `0003`):
+    - subscriptions join the history (`kind = 'subscription'`, `months`);
+    - listings now follow the contract alone: the indexer creates, updates or removes them however the AI was listed, and a new owner starts with a blank description;
+    - **reviews**: one per person per AI, only from people the chain shows bought, rented or subscribed (never the owner or creator), moderated by ALT Core (`/internal/moderate`, `INTERNAL_SERVICE_KEY`); `GET /reviews`, `/ratings`, `/me/reviews/:aiId`, `PUT`/`DELETE /reviews/:aiId`;
+    - `GET /me/royalties`: a creator's royalties per AI.
+  - **ALTAR web:**
+    - Subscribe on AI pages (a months picker with the total) and a "You're subscribed" banner;
+    - a reviews section with stars, and ratings on cards;
+    - subscriptions on List AI (on-chain now);
+    - a **Rented & subscribed** profile tab;
+    - a **Royalties as a creator** card and subscription activity in the wallet.
+  - **Demo:** Sara subscribes to Calm Coach and Hamza rents Urdu Ustad; both leave reviews. `Documentations/60_DEMO_SCRIPT.md` gains **Scene 9: ALTAR** and the new accounts.
+  - **Fixed along the way:** test runs could leave a PostgreSQL 18 I/O worker holding the test port, so the next run found "no test files". The embedded database now runs with `io_method=sync` (`packages/devkit`).
+  - **Checked:**
+    - tests: contracts 36, Core 81, `altar-api` 5, ALTERA 16, gateway 9, and nothing left running afterwards;
+    - ALTAR web `eslint` and `next build`;
+    - a full fresh `npm run demo` ends cleanly (93 s): 9 AIs, 6 listings, a rental, a subscription and two reviews;
+    - in a browser: Hamza subscribed to Calm Coach for 2 months and chatted ("60 days left"), reviews and ratings show, and the wallet lists his payments.
+  - **Found by the demo run:** reviews failed with "moderation unavailable" because `altar-api` sent Core its service key but not its name (`x-alt-service`). Fixed, with a test against a stand-in Core that checks both headers (`altar-api` 6 tests).
+
+## Where to pick up (2026-10-15)
+- **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
   - **The ALTER redesign** (no blue or purple).
 - **Smaller follow-ups:**
   - Confirm spending in the ALT Account window instead of on ALTAR's page.
   - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).
-  - Renters talking to an AI in ALTERA DMs.
+  - Renters and subscribers talking to an AI in ALTERA DMs.
   - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
 
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
-- **ALTAR, until step 4:**
-  - Subscription prices are saved off-chain and Subscribe stays disabled until `ALTMarketplace` gets a subscribe function.
-  - Renters talk to the AI only on ALTAR (not in ALTERA DMs).
+- **ALTAR:**
+  - Renters and subscribers talk to the AI only on ALTAR (not in ALTERA DMs).
+  - Subscriptions are not replayed when the local dev chain restarts (like rentals).
   - A seller loses their old ALTER chat history with a sold AI; keeping it read-only is not built.
   - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.
   - Rentals are not replayed when the local dev chain restarts.

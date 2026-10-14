@@ -34,6 +34,11 @@ export default function AICard({ model }) {
           </div>
           <p className="mt-0.5 truncate text-sm text-ink-2">
             by {model.creatorName} · {model.category}
+            {model.rating && (
+              <span className="ml-1.5 font-semibold text-ink" aria-label={`Rated ${model.rating.average} out of 5 by ${model.rating.count}`}>
+                · <span className="text-amber-500">★</span> {model.rating.average.toFixed(1)}
+              </span>
+            )}
           </p>
           <div className="mt-3 flex items-end justify-between rounded-2xl bg-sunken px-3 py-2">
             <div>

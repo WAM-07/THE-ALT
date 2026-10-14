@@ -6,8 +6,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {AITRegistry} from "./AITRegistry.sol";
 
 /// @title ALTAR marketplace for AI Identity Tokens
-/// @notice Owners can SELL an AI (ownership moves to the buyer) or RENT it out (the renter becomes
-///         its ERC-4907 user until the rental ends; ownership does not move).
+/// @notice Owners can SELL an AI (ownership moves to the buyer), RENT it out (the renter becomes
+///         its ERC-4907 user until the rental ends; ownership does not move) or offer a SUBSCRIPTION
+///         (any number of people may use it, month by month; ownership does not move).
 ///         Every payment is split three ways and credited to balances that people withdraw:
 ///           - platform fee   -> treasury
 ///           - creator royalty (ERC-2981 of the AIT) -> the AI's creator, unless the creator is the one being paid
@@ -26,8 +27,15 @@ contract ALTMarketplace is Ownable, ReentrancyGuard {
         uint32 maxDays;
     }
 
+    struct SubscriptionOffer {
+        address owner;
+        uint256 pricePerMonth;
+    }
+
     uint96 public constant MAX_FEE_BPS = 1_000;
     uint32 public constant MAX_RENTAL_DAYS = 365;
+    uint64 public constant SUBSCRIPTION_PERIOD = 30 days;
+    uint32 public constant MAX_SUBSCRIPTION_MONTHS = 12;
 
     AITRegistry public immutable registry;
     address public treasury;
@@ -35,6 +43,9 @@ contract ALTMarketplace is Ownable, ReentrancyGuard {
 
     mapping(uint256 tokenId => Sale) public sales;
     mapping(uint256 tokenId => RentalOffer) public rentalOffers;
+    mapping(uint256 tokenId => SubscriptionOffer) public subscriptionOffers;
+    /// @notice Until when each subscriber may use each AI (0 = never subscribed).
+    mapping(uint256 tokenId => mapping(address subscriber => uint64 expires)) public subscriptionExpires;
 
     /// @notice Withdrawable earnings per account (sellers, owners, creators, treasury).
     mapping(address account => uint256 amount) public balances;
@@ -57,6 +68,18 @@ contract ALTMarketplace is Ownable, ReentrancyGuard {
         address indexed owner,
         address indexed renter,
         uint32 numDays,
+        uint64 expires,
+        uint256 paid,
+        uint256 royalty,
+        uint256 fee
+    );
+    event ListedForSubscription(uint256 indexed tokenId, address indexed owner, uint256 pricePerMonth);
+    event SubscriptionOfferCancelled(uint256 indexed tokenId);
+    event Subscribed(
+        uint256 indexed tokenId,
+        address indexed owner,
+        address indexed subscriber,
+        uint32 months,
         uint64 expires,
         uint256 paid,
         uint256 royalty,
@@ -119,6 +142,7 @@ contract ALTMarketplace is Ownable, ReentrancyGuard {
         // Effects before the transfer (which can call back into a contract buyer).
         delete sales[tokenId];
         delete rentalOffers[tokenId]; // the new owner sets their own rental terms
+        delete subscriptionOffers[tokenId]; // and price; current subscribers keep the time they paid for
         (address royaltyReceiver, uint256 royalty, uint256 fee) = _split(tokenId, sale.seller, sale.price);
 
         registry.safeTransferFrom(sale.seller, msg.sender, tokenId);
@@ -160,6 +184,51 @@ contract ALTMarketplace is Ownable, ReentrancyGuard {
         (, uint256 royalty, uint256 fee) = _split(tokenId, offer.owner, total);
         registry.setUser(tokenId, msg.sender, expires);
         emit Rented(tokenId, offer.owner, msg.sender, numDays, expires, total, royalty, fee);
+    }
+
+    // ------------------------------------------------------------------ subscriptions
+
+    /// @notice Offers the AI by the month. Nothing is transferred, so no marketplace approval is needed.
+    function listForSubscription(uint256 tokenId, uint256 pricePerMonth) external {
+        if (registry.ownerOf(tokenId) != msg.sender) revert NotTokenOwner(msg.sender);
+        if (registry.isSuspended(tokenId)) revert TokenSuspended(tokenId);
+        if (pricePerMonth == 0) revert InvalidPrice();
+        subscriptionOffers[tokenId] = SubscriptionOffer({owner: msg.sender, pricePerMonth: pricePerMonth});
+        emit ListedForSubscription(tokenId, msg.sender, pricePerMonth);
+    }
+
+    /// @notice Stops new subscriptions; people already subscribed keep the time they paid for.
+    function cancelSubscriptionOffer(uint256 tokenId) external {
+        SubscriptionOffer memory offer = subscriptionOffers[tokenId];
+        if (offer.pricePerMonth == 0) revert NotListed(tokenId);
+        if (msg.sender != offer.owner && registry.ownerOf(tokenId) == offer.owner) revert NotTokenOwner(msg.sender);
+        delete subscriptionOffers[tokenId];
+        emit SubscriptionOfferCancelled(tokenId);
+    }
+
+    /// @notice Subscribes (or renews) for `months` periods of 30 days. Renewing adds to the time left.
+    function subscribe(uint256 tokenId, uint32 months) external payable nonReentrant {
+        SubscriptionOffer memory offer = subscriptionOffers[tokenId];
+        if (offer.pricePerMonth == 0) revert NotListed(tokenId);
+        if (months == 0 || months > MAX_SUBSCRIPTION_MONTHS) revert InvalidDuration(months);
+        if (registry.ownerOf(tokenId) != offer.owner) revert StaleListing(tokenId);
+        if (msg.sender == offer.owner) revert CannotBuyOwnToken();
+        if (registry.isSuspended(tokenId)) revert TokenSuspended(tokenId);
+
+        uint256 total = offer.pricePerMonth * months;
+        if (msg.value != total) revert WrongPayment(total, msg.value);
+
+        uint64 from = subscriptionExpires[tokenId][msg.sender];
+        if (from < block.timestamp) from = uint64(block.timestamp);
+        uint64 expires = from + uint64(months) * SUBSCRIPTION_PERIOD;
+        subscriptionExpires[tokenId][msg.sender] = expires;
+
+        (, uint256 royalty, uint256 fee) = _split(tokenId, offer.owner, total);
+        emit Subscribed(tokenId, offer.owner, msg.sender, months, expires, total, royalty, fee);
+    }
+
+    function isSubscribed(uint256 tokenId, address account) external view returns (bool) {
+        return subscriptionExpires[tokenId][account] > block.timestamp;
     }
 
     // ------------------------------------------------------------------ payouts

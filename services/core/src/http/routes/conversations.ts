@@ -12,9 +12,10 @@ const AiId = z.object({ id: z.uuid() });
 const SessionParams = z.object({ id: z.uuid(), sessionId: z.uuid() });
 
 /**
- * Talking to a verified AI on ALTAR (Module 11 with ALTAR step 3). Its owner may always talk to it;
- * a renter may until the rental ends (the token's ERC-4907 user, mirrored by Core). Each person
- * sees only their own conversations, and always the published version of the AI.
+ * Talking to a verified AI on ALTAR (Module 11 with ALTAR steps 3 and 4). Its owner may always talk
+ * to it; a renter may until the rental ends (the token's ERC-4907 user) and a subscriber until their
+ * subscription ends (both mirrored by Core from the chain). Each person sees only their own
+ * conversations, and always the published version of the AI.
  */
 export async function conversationRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -30,11 +31,18 @@ export async function conversationRoutes(app: FastifyInstance, ctx: Ctx) {
       [ai.id, userId],
     );
     if (rows[0]) return { ai, role: 'renter' as const, until: rows[0].user_expires, channel: 'altar_rental' as const };
+    const sub = await ctx.db.query<{ expires_at: Date }>(
+      `SELECT max(s.expires_at) AS expires_at FROM core.ai_subscriptions s JOIN core.wallets w ON w.address = s.subscriber_address
+        WHERE s.ai_id = $1 AND w.user_id = $2 AND s.expires_at > now()`,
+      [ai.id, userId],
+    );
+    // Paid ALTAR access either way, so subscribers share the renters' channel and conversation list.
+    if (sub.rows[0]?.expires_at) return { ai, role: 'subscriber' as const, until: sub.rows[0].expires_at, channel: 'altar_rental' as const };
     return { ai, role: null, until: null, channel: 'altar_rental' as const };
   }
 
   const requireAccess = (access: Awaited<ReturnType<typeof accessOf>>) => {
-    if (!access.role) throw new AppError(403, 'NO_ACCESS', 'Rent this AI to talk to it. If you rented it, the rental has ended.');
+    if (!access.role) throw new AppError(403, 'NO_ACCESS', 'Rent or subscribe to this AI to talk to it. If you did, that time has ended.');
   };
 
   r.get('/ais/:id/access', { preHandler: authed, schema: { tags: ['chat'], summary: 'May I talk to this AI? (owner, renter until when, or no)', params: AiId } }, async (req) => {

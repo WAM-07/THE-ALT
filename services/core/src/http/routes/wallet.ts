@@ -11,7 +11,7 @@ import { AppError, badRequest, conflict, notFound, unauthorized } from '../../li
 import { notify } from '../../lib/notify.js';
 import { verifyTotp } from '../../lib/totp.js';
 import { loadAi, requireOwnedAi } from '../../modules/ai/repo.js';
-import { syncToken } from '../../modules/market/holders.js';
+import { syncSubscription, syncToken } from '../../modules/market/holders.js';
 import { findUserById, type UserRow } from '../../modules/accounts/users.js';
 import { requireUser } from '../auth-guard.js';
 import { requireChain } from './chain.js';
@@ -165,6 +165,7 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
       platformFeeBps: feeBps,
       sale: state.sale ? { seller: state.sale.seller, price: pol(state.sale.priceWei) } : null,
       rent: state.rent ? { owner: state.rent.owner, pricePerDay: pol(state.rent.pricePerDayWei), maxDays: state.rent.maxDays } : null,
+      subscription: state.subscription ? { owner: state.subscription.owner, pricePerMonth: pol(state.subscription.pricePerMonthWei) } : null,
       rentedTo: state.rentedTo ? { address: state.rentedTo.address, until: state.rentedTo.until.toISOString() } : null,
     };
   };
@@ -182,11 +183,13 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
       config: spendLimit,
       schema: {
         tags: ['wallet'],
-        summary: 'List your AI on-chain for sale and/or rent (null takes it off); signed by your ALT wallet, network fee paid by ALT',
+        summary: 'List your AI on-chain for sale, rent and/or subscription (null takes that offer off); signed by your ALT wallet, network fee paid by ALT',
         params: z.object({ id: z.uuid() }),
         body: z.object({
           sale: z.object({ price: Pol }).nullable(),
           rent: z.object({ pricePerDay: Pol, maxDays: z.number().int().min(1).max(365) }).nullable(),
+          // Optional, so callers written before subscriptions keep working (absent = leave as it is).
+          subscription: z.object({ pricePerMonth: Pol }).nullable().optional(),
           confirm: Confirm,
         }),
       },
@@ -212,15 +215,27 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
         await run('list_for_rent', 'market', 'listForRent', [tokenId, rent.pricePerDay, rent.maxDays], 'offer your AI for rent');
       }
       if (!rent && before.rent) await run('cancel_rent', 'market', 'cancelRentalOffer', [tokenId], 'stop renting out your AI');
+      const { subscription } = req.body;
+      if (subscription && before.subscription?.pricePerMonthWei !== subscription.pricePerMonth) {
+        await run('list_for_subscription', 'market', 'listForSubscription', [tokenId, subscription.pricePerMonth], 'offer subscriptions to your AI');
+      }
+      if (subscription === null && before.subscription) await run('cancel_subscription', 'market', 'cancelSubscriptionOffer', [tokenId], 'stop new subscriptions');
 
       if (txs.length) {
-        const offers = [sale && `for sale at ${formatEther(sale.price)} POL`, rent && `for rent at ${formatEther(rent.pricePerDay)} POL a day`].filter(Boolean).join(' and ');
+        const keepsSubscription = subscription ?? (subscription === undefined ? before.subscription && { pricePerMonth: before.subscription.pricePerMonthWei } : null);
+        const offers = [
+          sale && `for sale at ${formatEther(sale.price)} POL`,
+          rent && `for rent at ${formatEther(rent.pricePerDay)} POL a day`,
+          keepsSubscription && `by subscription at ${formatEther(keepsSubscription.pricePerMonth)} POL a month`,
+        ]
+          .filter(Boolean)
+          .join(', ');
         await record(
           req.auth!.userId,
           'market.listing_changed',
           req.ip,
-          { aiId: ai.id, tokenId: tokenId.toString(), txs, salePriceWei: sale?.price.toString() ?? null, rentPricePerDayWei: rent?.pricePerDay.toString() ?? null },
-          { title: offers ? `${ai.name} is listed` : `${ai.name} is off the market`, body: offers ? `${ai.name} is now ${offers} on ALTAR.` : `${ai.name} is no longer for sale or rent.`, link: `/details/${ai.handle}` },
+          { aiId: ai.id, tokenId: tokenId.toString(), txs, salePriceWei: sale?.price.toString() ?? null, rentPricePerDayWei: rent?.pricePerDay.toString() ?? null, subscriptionPriceWei: keepsSubscription?.pricePerMonth.toString() ?? null },
+          { title: offers ? `${ai.name} is listed` : `${ai.name} is off the market`, body: offers ? `${ai.name} is now ${offers} on ALTAR.` : `${ai.name} is no longer for sale, rent or subscription.`, link: `/details/${ai.handle}` },
         );
       }
       return { ...(await marketView(tokenId)), txs };
@@ -294,6 +309,36 @@ export async function walletRoutes(app: FastifyInstance, ctx: Ctx) {
       const synced = await syncToken(ctx, tokenId, hash);
       await record(req.auth!.userId, 'market.rented', req.ip, { aiId: ai.id, tokenId: tokenId.toString(), hash, days: req.body.days, paidWei: total.toString() });
       return { hash, aiId: ai.id, paid: pol(total), until: synced?.renterUntil?.toISOString() ?? null, balance: pol(await chain.balanceOf(w.address)) };
+    },
+  );
+
+  r.post(
+    '/ais/:id/market/subscribe',
+    {
+      preHandler: authed,
+      config: spendLimit,
+      schema: {
+        tags: ['wallet'],
+        summary: 'Subscribe to an AI for some months (renewing adds to the time left); many people may subscribe at once',
+        params: z.object({ id: z.uuid() }),
+        body: z.object({ months: z.number().int().min(1).max(12), confirm: Confirm, expectedPricePerMonth: Pol.optional() }),
+      },
+    },
+    async (req) => {
+      const { ai, tokenId } = await tokenToAcquire(req.auth!.userId, req.params.id);
+      const w = await custodialOf(req.auth!.userId);
+      await confirmSpend(w.user, req.body.confirm);
+      const chain = requireChain(ctx);
+      const { subscription } = await chain.marketState(tokenId);
+      if (!subscription) throw conflict('NOT_FOR_SUBSCRIPTION', `${ai.name} does not offer subscriptions right now.`);
+      if (req.body.expectedPricePerMonth !== undefined && req.body.expectedPricePerMonth !== subscription.pricePerMonthWei) {
+        throw conflict('PRICE_CHANGED', 'The price changed. Check it and try again.');
+      }
+      const total = subscription.pricePerMonthWei * BigInt(req.body.months);
+      const { hash } = await w.signer().call('market', 'subscribe', [tokenId, req.body.months], 'subscribe to this AI', total);
+      const synced = await syncSubscription(ctx, tokenId, w.address, hash);
+      await record(req.auth!.userId, 'market.subscribed', req.ip, { aiId: ai.id, tokenId: tokenId.toString(), hash, months: req.body.months, paidWei: total.toString() });
+      return { hash, aiId: ai.id, paid: pol(total), until: synced?.until.toISOString() ?? null, balance: pol(await chain.balanceOf(w.address)) };
     },
   );
 }

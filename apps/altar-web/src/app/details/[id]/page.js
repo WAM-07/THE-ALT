@@ -11,6 +11,7 @@ import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../comp
 import { useTilt } from "../../../components/motion";
 import { altar, auth, continueWithAlt, conversations, mediaUrl, pictures, publicApi, wallet } from "../../../lib/alt";
 import ConfirmSpend from "../../../components/ConfirmSpend";
+import Reviews from "../../../components/Reviews";
 import PicturePicker from "../../../components/PicturePicker";
 import { useAI } from "../../../contexts/AIContext";
 import { networkName, percent, polText, shortAddress, timeAgo } from "../../../lib/format";
@@ -33,6 +34,7 @@ export default function AgentDetails() {
   const [activity, setActivity] = useState([]);
   const [access, setAccess] = useState(null);
   const [days, setDays] = useState(1);
+  const [months, setMonths] = useState(1);
   const [checkout, setCheckout] = useState(null); // "buy" | "rent"
   const [notice, setNotice] = useState(null);
   // Bumped after a purchase or rental, to read everything again.
@@ -171,6 +173,17 @@ export default function AgentDetails() {
           You pay <b className="text-ink">{polText(String(Number(listing.rent.pricePerDay.pol) * days))}</b> for {days} {days === 1 ? "day" : "days"} of sole use. You can talk to {model.name} on ALTAR until then; the owner keeps the token.
         </ConfirmSpend>
       )}
+      {checkout === "subscribe" && listing?.subscription && (
+        <ConfirmSpend
+          title={`Subscribe to ${model.name}`}
+          action={`Pay ${polText(String(Number(listing.subscription.pricePerMonth.pol) * months))}`}
+          onClose={() => setCheckout(null)}
+          onConfirm={(confirm) => wallet.subscribe(model.id, months, confirm, listing.subscription.pricePerMonth.pol)}
+          onDone={() => router.push(`/chat/${model.handle}`)}
+        >
+          You pay <b className="text-ink">{polText(String(Number(listing.subscription.pricePerMonth.pol) * months))}</b> for {months} {months === 1 ? "month" : "months"} (30 days each). You can talk to {model.name} on ALTAR until then, alongside other subscribers; renewing adds to your time.
+        </ConfirmSpend>
+      )}
       {picking && <PicturePicker kind="ai" title={`${model.name}'s picture`} name={model.name} current={model.image} onClose={() => setPicking(false)} onSave={savePicture} />}
       <nav className="mb-6 flex items-center gap-2 text-sm text-ink-3" aria-label="Breadcrumb">
         <Link href="/#explore" className="hover:text-ink">
@@ -219,10 +232,12 @@ export default function AgentDetails() {
             </div>
           </div>
 
-          {access?.role === "renter" && (
+          {(access?.role === "renter" || access?.role === "subscriber") && (
             <Card className="animate-page-in flex flex-wrap items-center justify-between gap-4 border-accent/40 bg-accent/10 p-6">
               <div>
-                <p className="font-display text-xl font-bold">You&apos;re renting {model.name}</p>
+                <p className="font-display text-xl font-bold">
+                  {access.role === "renter" ? "You're renting" : "You're subscribed to"} {model.name}
+                </p>
                 <p className="mt-1 text-ink-2">Talk to it until {new Date(access.until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.</p>
               </div>
               <Button href={`/chat/${model.handle}`}>Chat now</Button>
@@ -288,8 +303,25 @@ export default function AgentDetails() {
                     </p>
                     {offer === "rent" && listing?.rent && <p className="mt-1 text-sm text-ink-3">Up to {listing.rent.maxDays} days</p>}
                   </div>
-                  {offer === "subscribe" && price && <Chip tone="soon">Opens soon</Chip>}
                 </div>
+                {offer === "subscribe" && listing?.subscription && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sunken/60 p-3">
+                    <div className="flex items-center gap-2" role="group" aria-label="Months">
+                      <button onClick={() => setMonths((m) => Math.max(1, m - 1))} className="h-9 w-9 rounded-full border border-line bg-surface font-bold" aria-label="One month less">
+                        −
+                      </button>
+                      <span className="min-w-24 text-center font-semibold">
+                        {months} {months === 1 ? "month" : "months"}
+                      </span>
+                      <button onClick={() => setMonths((m) => Math.min(12, m + 1))} className="h-9 w-9 rounded-full border border-line bg-surface font-bold" aria-label="One month more">
+                        +
+                      </button>
+                    </div>
+                    <p className="text-sm text-ink-2">
+                      Total <b className="text-ink">{polText(String(Number(listing.subscription.pricePerMonth.pol) * months))}</b>
+                    </p>
+                  </div>
+                )}
                 {offer === "rent" && listing?.rent && (
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sunken/60 p-3">
                     <div className="flex items-center gap-2" role="group" aria-label="Days">
@@ -312,11 +344,21 @@ export default function AgentDetails() {
                 <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
                   <Button
                     size="lg"
-                    disabled={!price || offer === "subscribe" || (offer === "rent" && access?.role === "renter")}
-                    onClick={() => (user ? setCheckout(offer === "own" ? "buy" : "rent") : continueWithAlt("signin", `/details/${model.handle}`).catch(() => {}))}
+                    disabled={!price || (offer === "rent" && access?.role === "renter")}
+                    onClick={() => (user ? setCheckout({ own: "buy", rent: "rent", subscribe: "subscribe" }[offer]) : continueWithAlt("signin", `/details/${model.handle}`).catch(() => {}))}
                   >
-                    {!user && price && offer !== "subscribe" ? "Sign in to " : ""}
-                    {offer === "own" ? (user && price ? `Buy for ${price}` : "Buy") : offer === "rent" ? (user && price ? `Rent for ${days} ${days === 1 ? "day" : "days"}` : "Rent") : "Subscribe"}
+                    {!user && price ? "Sign in to " : ""}
+                    {offer === "own"
+                      ? user && price
+                        ? `Buy for ${price}`
+                        : "Buy"
+                      : offer === "rent"
+                        ? user && price
+                          ? `Rent for ${days} ${days === 1 ? "day" : "days"}`
+                          : "Rent"
+                        : user && price
+                          ? `Subscribe for ${months} ${months === 1 ? "month" : "months"}`
+                          : "Subscribe"}
                   </Button>
                   <Button
                     kind="outline"
@@ -334,7 +376,7 @@ export default function AgentDetails() {
                 {listing?.pitch && <p className="mt-4 text-[15px] font-medium">“{listing.pitch}”</p>}
                 {listing?.terms && <p className="mt-2 whitespace-pre-line text-sm text-ink-2">{listing.terms}</p>}
                 <p className="mt-4 text-xs leading-relaxed text-ink-3">
-                  On every resale, {percent(model.royaltyBps)} goes to the creator, {model.creatorName}, automatically.
+                  Whenever a later owner sells, rents out or takes subscriptions for it, {percent(model.royaltyBps)} goes to the creator, {model.creatorName}, automatically.
                 </p>
               </div>
             </Card>
@@ -345,6 +387,8 @@ export default function AgentDetails() {
             <p className="mt-2 whitespace-pre-line leading-relaxed text-ink-2">{model.description || model.about || "No description yet."}</p>
             {model.description && model.about && model.about !== model.description && <p className="mt-3 text-sm leading-relaxed text-ink-3">Its creator: {model.about}</p>}
           </Card>
+
+          <Reviews ai={model} onChange={reloadCatalog} />
 
           <Card style={{ animationDelay: "390ms" }} className="animate-rise p-6">
             <h2 className="font-display text-lg font-bold">Traits</h2>

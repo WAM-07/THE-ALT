@@ -25,9 +25,14 @@ export const AIProvider = ({ children }) => {
   const reload = useCallback(async () => {
     try {
       // Prices come from ALTAR's listings (a mirror of the marketplace contract); browsing still works without them.
-      const [list, listings] = await Promise.all([publicApi("/core/public/ais?limit=100&platform=altar"), publicApi("/altar/listings").catch(() => [])]);
+      const [list, listings, ratings] = await Promise.all([
+        publicApi("/core/public/ais?limit=100&platform=altar"),
+        publicApi("/altar/listings").catch(() => []),
+        publicApi("/altar/ratings").catch(() => []),
+      ]);
       const byAi = new Map(listings.map((l) => [l.aiId, l]));
-      setAIModels(list.map((ai) => ({ ...toModel(ai), listing: byAi.get(ai.id) ?? null })));
+      const stars = new Map(ratings.map((r) => [r.aiId, r]));
+      setAIModels(list.map((ai) => ({ ...toModel(ai), listing: byAi.get(ai.id) ?? null, rating: stars.get(ai.id) ?? null })));
       setError(null);
     } catch (err) {
       setError(err);

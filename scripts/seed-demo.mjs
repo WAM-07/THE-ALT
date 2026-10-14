@@ -15,8 +15,8 @@ export const DEMO_ADMIN_EMAIL = 'admin@demo.alt';
 export const DEMO_PEOPLE = [
   { key: 'wamiq', email: 'wamiq@demo.alt', handle: 'wamiq', name: 'Wamiq Ejaz', role: 'Creator · verified AI on v2, auto-replies on' },
   { key: 'ayesha', email: 'ayesha@demo.alt', handle: 'ayesha', name: 'Ayesha Siddiqui', role: 'Creator · verified AI “Muse”' },
-  { key: 'hamza', email: 'hamza@demo.alt', handle: 'hamza', name: 'Hamza Ali', role: 'Participant · no AI, follows and DMs' },
-  { key: 'sara', email: 'sara@demo.alt', handle: 'sara', name: 'Sara Malik', role: 'Creator · AI still a draft (not verified)' },
+  { key: 'hamza', email: 'hamza@demo.alt', handle: 'hamza', name: 'Hamza Ali', role: 'Buyer · no AI; DMs on ALTERA, rents Urdu Ustad on ALTAR, 100 test POL' },
+  { key: 'sara', email: 'sara@demo.alt', handle: 'sara', name: 'Sara Malik', role: 'Creator · AI still a draft; subscribes to Calm Coach on ALTAR' },
 ];
 
 const CONSENTS = { persona_training: true, third_party_processing: true, public_deployment: true, interaction_learning: true };
@@ -283,11 +283,22 @@ export async function seedDemo({ gateway, log = console.log }) {
   log('filling ALTAR: more creators and verified AIs, each minted on-chain and some listed…');
   await seedMarket({ gateway, log, tokens: { wamiq: t.wamiq, ayesha: t.ayesha } });
   // Hamza is the demo's buyer: test POL in his ALT wallet (local chain only; worth nothing), and a
-  // one-day rental of Urdu Ustad, so ALTAR shows a live rental he can chat in.
+  // one-day rental of Urdu Ustad, so ALTAR shows a live rental he can chat in. Sara subscribes to
+  // Calm Coach. Both then review what they used (ALTAR only accepts reviews from real customers).
   const funds = await call('POST', '/core/me/wallet/test-funds', t.hamza, {}, { allow: [409] });
   if (funds.status === 200) {
+    await call('POST', '/core/me/wallet/test-funds', t.sara, {});
     const ustad = (await call('GET', '/core/public/ais/zainab.ustad')).data;
+    const calm = (await call('GET', '/core/public/ais/zainab.calm')).data;
     await call('POST', `/core/ais/${ustad.id}/market/rent`, t.hamza, { days: 1, confirm: { password: DEMO_PASSWORD } });
+    await call('POST', `/core/ais/${calm.id}/market/subscribe`, t.sara, { months: 1, confirm: { password: DEMO_PASSWORD } });
+    const review = async (token, ai, rating, body) => {
+      // ALTAR learns about the payment from the chain within a few seconds.
+      for (let i = 0; i < 30 && !(await call('GET', `/altar/me/reviews/${ai.id}`, token)).data.canReview; i++) await sleep(1000);
+      await call('PUT', `/altar/reviews/${ai.id}`, token, { rating, body });
+    };
+    await review(t.hamza, ustad, 5, 'Patient and funny. I can finally read a Ghalib couplet out loud.');
+    await review(t.sara, calm, 4, 'The two-minute breathing exercise before exams really helps.');
   }
 
   log('an announcement from the ALT team to everyone…');
@@ -375,8 +386,13 @@ export async function seedMarket({ gateway, log = console.log, tokens = {} }) {
     if (spec.listing) {
       // On-chain prices first (ALT Core signs with the owner's ALT wallet), then ALTAR's listing details.
       const { sale, rent, subscription, pitch } = spec.listing;
-      if (sale || rent) await call('PUT', `/core/ais/${ai.id}/market`, t[spec.owner], { sale: sale ? { price: sale } : null, rent: rent ?? null, confirm: { password: DEMO_PASSWORD } });
-      await call('PUT', `/altar/listings/${ai.id}`, t[spec.owner], { pitch, subscriptionPrice: subscription ?? null });
+      await call('PUT', `/core/ais/${ai.id}/market`, t[spec.owner], {
+        sale: sale ? { price: sale } : null,
+        rent: rent ?? null,
+        subscription: subscription ? { pricePerMonth: subscription } : null,
+        confirm: { password: DEMO_PASSWORD },
+      });
+      await call('PUT', `/altar/listings/${ai.id}`, t[spec.owner], { pitch });
     }
   }
 }

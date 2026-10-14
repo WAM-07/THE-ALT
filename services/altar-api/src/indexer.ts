@@ -33,27 +33,41 @@ export async function indexMarketplace(db: pg.Pool, chain: ChainReader, log: (ms
     for (const e of await chain.events(from, to)) {
       const tokenId = e.args.tokenId;
       touched.add(tokenId);
-      if (e.eventName !== 'Sold' && e.eventName !== 'Rented') continue;
+      if (e.eventName !== 'Sold' && e.eventName !== 'Rented' && e.eventName !== 'Subscribed') continue;
       const info = await tokenInfo(tokenId);
       const base = { tokenId: tokenId.toString(), aiId: info?.ai_id ?? null, txHash: e.transactionHash, logIndex: e.logIndex, block: e.blockNumber.toString(), at: e.at };
       const row =
         e.eventName === 'Sold'
-          ? { kind: 'sale', from: e.args.seller, to: e.args.buyer, amount: e.args.price, royalty: e.args.royalty, royaltyTo: e.args.royalty > 0n ? e.args.royaltyReceiver : null, fee: e.args.fee, days: null, expires: null }
-          : {
-              kind: 'rental',
-              from: e.args.owner,
-              to: e.args.renter,
-              amount: e.args.paid,
-              royalty: e.args.royalty,
-              royaltyTo: e.args.royalty > 0n ? (info?.creator_address ?? null) : null,
-              fee: e.args.fee,
-              days: Number(e.args.numDays),
-              expires: new Date(Number(e.args.expires) * 1000),
-            };
+          ? { kind: 'sale', from: e.args.seller, to: e.args.buyer, amount: e.args.price, royalty: e.args.royalty, royaltyTo: e.args.royalty > 0n ? e.args.royaltyReceiver : null, fee: e.args.fee, days: null, months: null, expires: null }
+          : e.eventName === 'Rented'
+            ? {
+                kind: 'rental',
+                from: e.args.owner,
+                to: e.args.renter,
+                amount: e.args.paid,
+                royalty: e.args.royalty,
+                royaltyTo: e.args.royalty > 0n ? (info?.creator_address ?? null) : null,
+                fee: e.args.fee,
+                days: Number(e.args.numDays),
+                months: null,
+                expires: new Date(Number(e.args.expires) * 1000),
+              }
+            : {
+                kind: 'subscription',
+                from: e.args.owner,
+                to: e.args.subscriber,
+                amount: e.args.paid,
+                royalty: e.args.royalty,
+                royaltyTo: e.args.royalty > 0n ? (info?.creator_address ?? null) : null,
+                fee: e.args.fee,
+                days: null,
+                months: Number(e.args.months),
+                expires: new Date(Number(e.args.expires) * 1000),
+              };
       const { rowCount } = await db.query(
         `INSERT INTO altar.transactions (kind, ai_id, token_id, from_address, to_address, from_user_id, to_user_id, amount_wei, royalty_wei, royalty_address,
-                                         royalty_user_id, fee_wei, days, expires_at, chain_id, tx_hash, log_index, block_number, occurred_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                                         royalty_user_id, fee_wei, days, expires_at, chain_id, tx_hash, log_index, block_number, occurred_at, months)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
          ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING`,
         [
           row.kind,
@@ -75,18 +89,44 @@ export async function indexMarketplace(db: pg.Pool, chain: ChainReader, log: (ms
           base.logIndex,
           base.block,
           base.at,
+          row.months,
         ],
       );
       recorded += rowCount ?? 0;
       // A sold AI's old listing (and its subscription price) belonged to the seller; the new owner lists afresh.
       if (e.eventName === 'Sold' && base.aiId) await db.query('DELETE FROM altar.listings WHERE ai_id = $1 AND seller_id IS DISTINCT FROM (SELECT owner_id FROM core.personal_ais WHERE id = $1)', [base.aiId]);
     }
-    // Listings follow what the contract offers now.
+    // Listings follow what the contract offers now, however it was listed (ALTAR or straight on the
+    // contract): created when something is offered, removed when nothing is.
     for (const tokenId of touched) {
       const offer = await chain.offer(tokenId);
+      if (!offer.sale && !offer.rent && !offer.subscription) {
+        await db.query('DELETE FROM altar.listings WHERE token_id = $1', [tokenId.toString()]);
+        continue;
+      }
+      const [info, seller] = await Promise.all([tokenInfo(tokenId), userOf(offer.owner)]);
+      if (!info || !seller) continue; // not an ALT AI, or held outside ALT
       await db.query(
-        `UPDATE altar.listings SET sale_price_wei = $2, rent_price_per_day_wei = $3, rent_max_days = $4, synced_at = now() WHERE token_id = $1`,
-        [tokenId.toString(), offer.sale?.priceWei.toString() ?? null, offer.rent?.pricePerDayWei.toString() ?? null, offer.rent?.maxDays ?? null],
+        `INSERT INTO altar.listings (ai_id, token_id, seller_id, sale_price_wei, rent_price_per_day_wei, rent_max_days, subscription_price_wei, synced_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
+         ON CONFLICT (ai_id) DO UPDATE SET
+           token_id = EXCLUDED.token_id,
+           -- A new owner starts with a blank description; the old one's words were about their offer.
+           pitch = CASE WHEN altar.listings.seller_id = EXCLUDED.seller_id THEN altar.listings.pitch END,
+           terms = CASE WHEN altar.listings.seller_id = EXCLUDED.seller_id THEN altar.listings.terms END,
+           seller_id = EXCLUDED.seller_id,
+           sale_price_wei = EXCLUDED.sale_price_wei, rent_price_per_day_wei = EXCLUDED.rent_price_per_day_wei,
+           rent_max_days = EXCLUDED.rent_max_days, subscription_price_wei = EXCLUDED.subscription_price_wei,
+           synced_at = now(), updated_at = now()`,
+        [
+          info.ai_id,
+          tokenId.toString(),
+          seller,
+          offer.sale?.priceWei.toString() ?? null,
+          offer.rent?.pricePerDayWei.toString() ?? null,
+          offer.rent?.maxDays ?? null,
+          offer.subscription?.pricePerMonthWei.toString() ?? null,
+        ],
       );
     }
     await db.query(

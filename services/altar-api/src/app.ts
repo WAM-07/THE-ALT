@@ -43,8 +43,7 @@ const view = (l: ListingRow) => ({
   terms: l.terms,
   sale: l.sale_price_wei ? { price: pol(l.sale_price_wei)! } : null,
   rent: l.rent_price_per_day_wei ? { pricePerDay: pol(l.rent_price_per_day_wei)!, maxDays: l.rent_max_days! } : null,
-  // Shown with its price now; subscribing opens when the marketplace contract supports it (ALTAR step 4).
-  subscription: l.subscription_price_wei ? { pricePerMonth: pol(l.subscription_price_wei)!, open: false } : null,
+  subscription: l.subscription_price_wei ? { pricePerMonth: pol(l.subscription_price_wei)! } : null,
   syncedAt: l.synced_at.toISOString(),
   updatedAt: l.updated_at.toISOString(),
 });
@@ -54,9 +53,32 @@ const LIVE = `SELECT l.* FROM altar.listings l
                 JOIN core.personal_ais a ON a.id = l.ai_id
                WHERE a.status = 'verified' AND a.deleted_at IS NULL AND a.owner_id = l.seller_id`;
 
-export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey; chain?: ChainReader | null; logger?: boolean; indexer?: boolean } = {}) {
+/** Checks text against ALT's safety rules (ALT Core's moderation). */
+export type Moderate = (text: string) => Promise<{ flagged: boolean; categories?: string[] }>;
+
+/** ALT Core's moderation (POST /internal/moderate), called as the "altar" service. */
+export function coreModeration(config: Pick<Config, 'coreUrl' | 'internalServiceKey'>): Moderate {
+  return async (text) => {
+    if (!config.internalServiceKey) throw new AltarError(503, 'MODERATION_UNAVAILABLE', 'Reviews are unavailable right now.');
+    const res = await fetch(`${config.coreUrl}/internal/moderate`, {
+      method: 'POST',
+      // Core wants both: the shared service key and which service is asking.
+      headers: { 'content-type': 'application/json', 'x-alt-service': 'altar', 'x-alt-service-key': config.internalServiceKey },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new AltarError(503, 'MODERATION_UNAVAILABLE', 'Reviews are unavailable right now.');
+    return (await res.json()) as { flagged: boolean };
+  };
+}
+
+export async function buildApp(
+  config: Config,
+  opts: { keySet?: JWTVerifyGetKey; chain?: ChainReader | null; logger?: boolean; indexer?: boolean; moderate?: Moderate } = {},
+) {
   const db = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
   const chain = opts.chain !== undefined ? opts.chain : config.chain ? createChainReader(config.chain) : null;
+  // Reviews go through the same moderation as everything else people write in ALT.
+  const moderate: Moderate = opts.moderate ?? coreModeration(config);
   const { requireUser, forget } = createAuth({ db, issuer: config.issuer, jwksUrl: config.jwksUrl, ...(opts.keySet ? { keySet: opts.keySet } : {}) });
 
   const app = Fastify({
@@ -156,20 +178,18 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
       preHandler: requireUser,
       schema: {
         tags: ['listings'],
-        summary: "Save your listing's description and subscription price; sale and rent prices are read from the chain (set them through ALT Core first)",
+        summary: "Save your listing's description; its sale, rent and subscription prices are read from the chain (set them through ALT Core first)",
         params: AiId,
         body: z.object({
           pitch: z.string().trim().max(280).nullable().optional(),
           terms: z.string().trim().max(2000).nullable().optional(),
-          subscriptionPrice: Pol.nullable().optional(),
         }),
       },
     },
     async (req, reply) => {
       const { tokenId, offer } = await onChain(req.caller!.userId, req.params.aiId);
       const b = req.body;
-      const current = (await db.query<ListingRow>('SELECT * FROM altar.listings WHERE ai_id = $1', [req.params.aiId])).rows[0];
-      const subscription = b.subscriptionPrice !== undefined ? b.subscriptionPrice : current?.subscription_price_wei ? BigInt(current.subscription_price_wei) : null;
+      const subscription = offer.subscription?.pricePerMonthWei ?? null;
       if (!offer.sale && !offer.rent && !subscription) {
         // Nothing left on offer: the listing goes away.
         await db.query('DELETE FROM altar.listings WHERE ai_id = $1', [req.params.aiId]);
@@ -210,8 +230,8 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
     async (req) => {
       const { offer } = await onChain(req.caller!.userId, req.params.aiId);
       const { rows } = await db.query<ListingRow>(
-        `UPDATE altar.listings SET sale_price_wei = $2, rent_price_per_day_wei = $3, rent_max_days = $4, synced_at = now() WHERE ai_id = $1 RETURNING *`,
-        [req.params.aiId, offer.sale?.priceWei.toString() ?? null, offer.rent?.pricePerDayWei.toString() ?? null, offer.rent?.maxDays ?? null],
+        `UPDATE altar.listings SET sale_price_wei = $2, rent_price_per_day_wei = $3, rent_max_days = $4, subscription_price_wei = $5, synced_at = now() WHERE ai_id = $1 RETURNING *`,
+        [req.params.aiId, offer.sale?.priceWei.toString() ?? null, offer.rent?.pricePerDayWei.toString() ?? null, offer.rent?.maxDays ?? null, offer.subscription?.pricePerMonthWei.toString() ?? null],
       );
       return { listing: rows[0] ? view(rows[0]) : null };
     },
@@ -239,7 +259,7 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
                       LEFT JOIN core.users tu ON tu.id = t.to_user_id`;
   const activityOut = (t: Record<string, unknown>, me?: string) => ({
     id: String(t.id),
-    kind: t.kind as 'sale' | 'rental',
+    kind: t.kind as 'sale' | 'rental' | 'subscription',
     ai: t.ai_id ? { id: t.ai_id as string, handle: t.ai_handle as string, name: t.ai_name as string } : null,
     tokenId: String(t.token_id),
     from: { address: t.from_address as string, handle: (t.from_handle as string | null) ?? null, name: (t.from_name as string | null) ?? null },
@@ -248,6 +268,7 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
     royalty: pol(t.royalty_wei as string)!,
     fee: pol(t.fee_wei as string)!,
     days: (t.days as number | null) ?? null,
+    months: (t.months as number | null) ?? null,
     expiresAt: t.expires_at ? (t.expires_at as Date).toISOString() : null,
     txHash: t.tx_hash as string,
     occurredAt: (t.occurred_at as Date).toISOString(),
@@ -256,9 +277,9 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
       ? {
           role:
             t.to_user_id === me
-              ? t.kind === 'sale' ? 'bought' : 'rented'
+              ? ({ sale: 'bought', rental: 'rented', subscription: 'subscribed' } as const)[t.kind as 'sale']
               : t.from_user_id === me
-                ? t.kind === 'sale' ? 'sold' : 'rented_out'
+                ? ({ sale: 'sold', rental: 'rented_out', subscription: 'subscribed_out' } as const)[t.kind as 'sale']
                 : 'royalty',
         }
       : {}),
@@ -279,9 +300,114 @@ export async function buildApp(config: Config, opts: { keySet?: JWTVerifyGetKey;
     return rows.map((t) => activityOut(t, me));
   });
 
-  r.get('/me/rentals', { preHandler: requireUser, schema: { tags: ['activity'], summary: 'AIs you are renting right now' } }, async (req) => {
-    const { rows } = await db.query(`${ACTIVITY} WHERE t.kind = 'rental' AND t.to_user_id = $1 AND t.expires_at > now() ORDER BY t.expires_at`, [req.caller!.userId]);
-    return rows.map((t) => activityOut(t, req.caller!.userId));
+  r.get('/me/rentals', { preHandler: requireUser, schema: { tags: ['activity'], summary: 'AIs you are renting or subscribed to right now (the latest payment for each)' } }, async (req) => {
+    const { rows } = await db.query(
+      `SELECT DISTINCT ON (t.ai_id, t.kind) x.* FROM (${ACTIVITY}) x JOIN altar.transactions t ON t.id = x.id
+        WHERE t.kind IN ('rental', 'subscription') AND t.to_user_id = $1 AND t.expires_at > now()
+        ORDER BY t.ai_id, t.kind, t.expires_at DESC`,
+      [req.caller!.userId],
+    );
+    return rows.map((t) => activityOut(t, req.caller!.userId)).sort((a, b) => String(a.expiresAt).localeCompare(String(b.expiresAt)));
+  });
+
+  r.get('/me/royalties', { preHandler: requireUser, schema: { tags: ['activity'], summary: 'Royalties you earned as a creator, per AI' } }, async (req) => {
+    const { rows } = await db.query<{ ai_id: string; handle: string; name: string; total: string; payments: string; last_at: Date }>(
+      `SELECT t.ai_id, a.handle, a.name, sum(t.royalty_wei)::text AS total, count(*)::text AS payments, max(t.occurred_at) AS last_at
+         FROM altar.transactions t JOIN core.personal_ais a ON a.id = t.ai_id
+        WHERE t.royalty_user_id = $1 AND t.royalty_wei > 0
+        GROUP BY t.ai_id, a.handle, a.name ORDER BY sum(t.royalty_wei) DESC`,
+      [req.caller!.userId],
+    );
+    const total = rows.reduce((s, r) => s + BigInt(r.total), 0n);
+    return {
+      total: pol(total)!,
+      ais: rows.map((r) => ({ aiId: r.ai_id, handle: r.handle, name: r.name, total: pol(r.total)!, payments: Number(r.payments), lastAt: r.last_at.toISOString() })),
+    };
+  });
+
+  // ---------------------------------------------------------------- reviews (only from real buyers, renters and subscribers)
+
+  const reviewOut = (r: Record<string, unknown>) => ({
+    aiId: r.ai_id as string,
+    rating: Number(r.rating),
+    body: (r.body as string | null) ?? null,
+    basis: r.basis as string,
+    reviewer: { id: r.reviewer_id as string, handle: r.handle as string, name: r.display_name as string, avatarUrl: (r.avatar_url as string | null) ?? null },
+    createdAt: (r.created_at as Date).toISOString(),
+    updatedAt: (r.updated_at as Date).toISOString(),
+  });
+  const REVIEWS = `SELECT r.*, u.handle, u.display_name, COALESCE(pa.avatar_url, u.avatar_url) AS avatar_url
+                     FROM altar.reviews r JOIN core.users u ON u.id = r.reviewer_id
+                     LEFT JOIN core.platform_avatars pa ON pa.user_id = u.id AND pa.platform = 'altar'`;
+
+  /** How the caller used the AI, from the chain's record ('bought' beats 'subscribed' beats 'rented'), or null. */
+  async function basisFor(userId: string, aiId: string) {
+    const { rows } = await db.query<{ kind: string }>(`SELECT DISTINCT kind FROM altar.transactions WHERE ai_id = $1 AND to_user_id = $2`, [aiId, userId]);
+    const kinds = new Set(rows.map((r) => r.kind));
+    return kinds.has('sale') ? 'bought' : kinds.has('subscription') ? 'subscribed' : kinds.has('rental') ? 'rented' : null;
+  }
+
+  r.get(
+    '/reviews',
+    { schema: { tags: ['reviews'], summary: "An AI's reviews and average rating", querystring: z.object({ aiId: z.uuid() }) } },
+    async (req) => {
+      const { rows } = await db.query(`${REVIEWS} WHERE r.ai_id = $1 ORDER BY r.updated_at DESC LIMIT 100`, [req.query.aiId]);
+      const reviews = rows.map(reviewOut);
+      const average = reviews.length ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10 : null;
+      return { average, count: reviews.length, reviews };
+    },
+  );
+
+  r.get('/ratings', { schema: { tags: ['reviews'], summary: 'Average rating and number of reviews for every reviewed AI' } }, async () => {
+    const { rows } = await db.query<{ ai_id: string; average: string; count: string }>(
+      'SELECT ai_id, round(avg(rating)::numeric, 1)::text AS average, count(*)::text AS count FROM altar.reviews GROUP BY ai_id',
+    );
+    return rows.map((r) => ({ aiId: r.ai_id, average: Number(r.average), count: Number(r.count) }));
+  });
+
+  r.get(
+    '/me/reviews/:aiId',
+    { preHandler: requireUser, schema: { tags: ['reviews'], summary: 'May I review this AI, and my review if I wrote one', params: AiId } },
+    async (req) => {
+      const basis = await basisFor(req.caller!.userId, req.params.aiId);
+      const { rows } = await db.query(`${REVIEWS} WHERE r.ai_id = $1 AND r.reviewer_id = $2`, [req.params.aiId, req.caller!.userId]);
+      return { canReview: Boolean(basis), basis, review: rows[0] ? reviewOut(rows[0]) : null };
+    },
+  );
+
+  r.put(
+    '/reviews/:aiId',
+    {
+      preHandler: requireUser,
+      schema: {
+        tags: ['reviews'],
+        summary: 'Write or change your review (you must have bought, rented or subscribed to the AI)',
+        params: AiId,
+        body: z.object({ rating: z.number().int().min(1).max(5), body: z.string().trim().max(1000).nullable().optional() }),
+      },
+    },
+    async (req) => {
+      const me = req.caller!.userId;
+      const { rows: ai } = await db.query<{ owner_id: string; creator_id: string }>('SELECT owner_id, creator_id FROM core.personal_ais WHERE id = $1 AND deleted_at IS NULL', [req.params.aiId]);
+      if (!ai[0]) throw notFound('AI');
+      if (ai[0].owner_id === me || ai[0].creator_id === me) throw conflict('OWN_AI', "You can't review your own AI.");
+      const basis = await basisFor(me, req.params.aiId);
+      if (!basis) throw new AltarError(403, 'NOT_A_CUSTOMER', 'Only people who bought, rented or subscribed to this AI can review it.');
+      const text = req.body.body || null;
+      if (text && (await moderate(text)).flagged) throw new AltarError(422, 'REVIEW_REJECTED', "That review breaks ALT's content rules. Please rephrase it.");
+      await db.query(
+        `INSERT INTO altar.reviews (ai_id, reviewer_id, rating, body, basis) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (ai_id, reviewer_id) DO UPDATE SET rating = EXCLUDED.rating, body = EXCLUDED.body, basis = EXCLUDED.basis, updated_at = now()`,
+        [req.params.aiId, me, req.body.rating, text, basis],
+      );
+      const { rows } = await db.query(`${REVIEWS} WHERE r.ai_id = $1 AND r.reviewer_id = $2`, [req.params.aiId, me]);
+      return reviewOut(rows[0]!);
+    },
+  );
+
+  r.delete('/reviews/:aiId', { preHandler: requireUser, schema: { tags: ['reviews'], summary: 'Remove your review', params: AiId } }, async (req, reply) => {
+    await db.query('DELETE FROM altar.reviews WHERE ai_id = $1 AND reviewer_id = $2', [req.params.aiId, req.caller!.userId]);
+    return reply.status(204).send();
   });
 
   // ---------------------------------------------------------------- saved AIs

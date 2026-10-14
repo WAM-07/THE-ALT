@@ -338,6 +338,7 @@ if (demo) {
 \x1b[1m  Demo accounts\x1b[0m (password for all: "${DEMO_PASSWORD}")
 ${rows}
     ${DEMO_ADMIN_EMAIL.padEnd(20)} Admin (sent the welcome announcement)
+    bilal, zainab, omar  @demo.alt: creators of the AIs listed on ALTAR
   The walkthrough is in Documentations/60_DEMO_SCRIPT.md.
 `);
   } catch (err) {

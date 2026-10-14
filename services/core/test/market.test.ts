@@ -115,6 +115,45 @@ describe('buying, reselling and renting an AI', () => {
     expect((await call('GET', `/ais/${ai.id}/conversations/${convo.id}/messages`, d.accessToken)).json()).toHaveLength(2);
   });
 
+  it('lets many people subscribe by the month, renew, talk until it ends, and picks up subscriptions made elsewhere', async () => {
+    const [owner, sub1, sub2, outsider] = [await signUp(t), await funded(), await funded(), await funded()];
+    const ai = await verifiedAi(owner);
+    const tokenId = BigInt(ai.token.tokenId);
+
+    // Adding a subscription price leaves sale and rent alone; leaving it out keeps it.
+    const listed = await call('PUT', `/ais/${ai.id}/market`, owner.accessToken, { sale: null, rent: null, subscription: { pricePerMonth: '0.5' }, ...pw(owner) });
+    expect(listed.json()).toMatchObject({ subscription: { pricePerMonth: { pol: '0.5' } }, sale: null, rent: null });
+    expect(listed.json().txs.map((x: { action: string }) => x.action)).toEqual(['list_for_subscription']);
+    expect((await call('PUT', `/ais/${ai.id}/market`, owner.accessToken, { sale: null, rent: null, ...pw(owner) })).json().subscription.pricePerMonth.pol).toBe('0.5');
+
+    expect((await call('POST', `/ais/${ai.id}/market/subscribe`, sub1.accessToken, { months: 13, ...pw(sub1) })).statusCode).toBe(400);
+    const one = await call('POST', `/ais/${ai.id}/market/subscribe`, sub1.accessToken, { months: 1, ...pw(sub1), expectedPricePerMonth: '0.5' });
+    expect(one.statusCode).toBe(200);
+    expect((await call('POST', `/ais/${ai.id}/market/subscribe`, sub2.accessToken, { months: 2, ...pw(sub2) })).statusCode).toBe(200);
+
+    // Both may talk at once; the owner keeps the AI.
+    for (const s of [sub1, sub2]) expect((await call('GET', `/ais/${ai.id}/access`, s.accessToken)).json().role).toBe('subscriber');
+    expect((await call('GET', `/ais/${ai.id}`, owner.accessToken)).statusCode).toBe(200);
+    const convo = (await call('POST', `/ais/${ai.id}/conversations`, sub1.accessToken)).json();
+    expect((await call('POST', `/ais/${ai.id}/conversations/${convo.id}/messages`, sub1.accessToken, { content: 'Hello' })).json().reply.content).toContain('reply to: Hello');
+    expect(JSON.stringify((await call('GET', '/notifications', owner.accessToken)).json())).toContain('New subscriber');
+
+    // Renewing adds a month to the time left.
+    const firstUntil = new Date(one.json().until).getTime();
+    const renewed = await call('POST', `/ais/${ai.id}/market/subscribe`, sub1.accessToken, { months: 1, ...pw(sub1) });
+    expect(new Date(renewed.json().until).getTime() - firstUntil).toBe(30 * 86_400_000);
+
+    // When the time is up, talking stops.
+    await t.app.ctx.db.query(`UPDATE core.ai_subscriptions SET expires_at = now() - interval '1 minute' WHERE user_id = $1`, [sub2.user.id]);
+    expect((await call('GET', `/ais/${ai.id}/access`, sub2.accessToken)).json().role).toBeNull();
+
+    // A subscription paid directly on the contract (not through ALTAR) still counts.
+    const { rows } = await t.app.ctx.db.query(`SELECT private_key_enc FROM core.wallets WHERE user_id = $1 AND kind = 'custodial'`, [outsider.user.id]);
+    await t.app.ctx.chain!.custodial(decrypt(t.config.encryptionKey, rows[0].private_key_enc) as Hex).call('market', 'subscribe', [tokenId, 1], 'subscribe', 500_000_000_000_000_000n);
+    await indexRegistry(t.app.ctx);
+    expect((await call('GET', `/ais/${ai.id}/access`, outsider.accessToken)).json().role).toBe('subscriber');
+  });
+
   it('follows the token when it moves outside ALTAR', async () => {
     const [owner, friend] = [await signUp(t), await signUp(t)];
     const ai = await verifiedAi(owner);

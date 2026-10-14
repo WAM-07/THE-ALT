@@ -278,3 +278,71 @@ describe("ALTMarketplace: guards", () => {
     assert.equal(await registry.read.ownerOf([2n]), getAddress(dave.account.address));
   });
 });
+
+describe("ALTMarketplace: subscriptions", () => {
+  const MONTH = 30 * DAY;
+
+  it("many people subscribe at once; each pays the owner (minus fee) and may use it for the months paid", async () => {
+    const { market, registry, alice, carol, dave, treasury } = await fixture();
+    await market.write.listForSubscription([1n, parseEther("0.3")], as(alice));
+    await market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.3") });
+    await market.write.subscribe([1n, 2], { ...as(dave), value: parseEther("0.6") });
+    assert.equal(await market.read.isSubscribed([1n, carol.account.address]), true);
+    assert.equal(await market.read.isSubscribed([1n, dave.account.address]), true);
+    // Ownership never moves, and nobody becomes the ERC-4907 user.
+    assert.equal(await registry.read.ownerOf([1n]), getAddress(alice.account.address));
+    assert.equal(await registry.read.userOf([1n]), zeroAddress);
+    // The creator is the owner here, so no royalty: fee to the treasury, the rest to Alice.
+    const total = parseEther("0.9");
+    assert.equal(await market.read.balances([treasury.account.address]), (total * FEE_BPS) / 10_000n);
+    assert.equal(await market.read.balances([alice.account.address]), total - (total * FEE_BPS) / 10_000n);
+
+    await networkHelpers.time.increase(MONTH + 1);
+    assert.equal(await market.read.isSubscribed([1n, carol.account.address]), false);
+    assert.equal(await market.read.isSubscribed([1n, dave.account.address]), true);
+  });
+
+  it("renewing adds to the time left instead of starting again", async () => {
+    const { market, alice, carol } = await fixture();
+    await market.write.listForSubscription([1n, parseEther("0.1")], as(alice));
+    await market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") });
+    const first = await market.read.subscriptionExpires([1n, carol.account.address]);
+    await market.write.subscribe([1n, 2], { ...as(carol), value: parseEther("0.2") });
+    assert.equal(await market.read.subscriptionExpires([1n, carol.account.address]), first + BigInt(2 * MONTH));
+  });
+
+  it("pays the creator a royalty when someone else's subscribers pay", async () => {
+    const { market, alice, bob, carol } = await fixture();
+    await market.write.listForSale([1n, parseEther("1")], as(alice));
+    await market.write.buy([1n], { ...as(bob), value: parseEther("1") });
+    const aliceBefore = await market.read.balances([alice.account.address]);
+    await market.write.listForSubscription([1n, parseEther("0.2")], as(bob));
+    await market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.2") });
+    assert.equal(await market.read.balances([alice.account.address]), aliceBefore + (parseEther("0.2") * ROYALTY_BPS) / 10_000n);
+  });
+
+  it("validates offers, months and payment, and refuses your own AI", async () => {
+    const { market, alice, carol } = await fixture();
+    await viem.assertions.revertWithCustomError(market.write.listForSubscription([1n, parseEther("0.1")], as(carol)), market, "NotTokenOwner");
+    await viem.assertions.revertWithCustomError(market.write.listForSubscription([1n, 0n], as(alice)), market, "InvalidPrice");
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") }), market, "NotListed");
+    await market.write.listForSubscription([1n, parseEther("0.1")], as(alice));
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 0], { ...as(carol), value: 0n }), market, "InvalidDuration");
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 13], { ...as(carol), value: parseEther("1.3") }), market, "InvalidDuration");
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 2], { ...as(carol), value: parseEther("0.1") }), market, "WrongPayment");
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 1], { ...as(alice), value: parseEther("0.1") }), market, "CannotBuyOwnToken");
+    await viem.assertions.revertWithCustomError(market.write.cancelSubscriptionOffer([1n], as(carol)), market, "NotTokenOwner");
+    await market.write.cancelSubscriptionOffer([1n], as(alice));
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") }), market, "NotListed");
+  });
+
+  it("a sale clears the seller's price, but subscribers keep the time they paid for", async () => {
+    const { market, alice, bob, carol } = await fixture();
+    await market.write.listForSubscription([1n, parseEther("0.1")], as(alice));
+    await market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") });
+    await market.write.listForSale([1n, parseEther("1")], as(alice));
+    await market.write.buy([1n], { ...as(bob), value: parseEther("1") });
+    assert.deepEqual(await market.read.subscriptionOffers([1n]), [zeroAddress, 0n]);
+    assert.equal(await market.read.isSubscribed([1n, carol.account.address]), true);
+  });
+});

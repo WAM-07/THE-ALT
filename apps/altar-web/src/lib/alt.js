@@ -160,10 +160,11 @@ export const wallet = {
   send: (to, amount, confirm) => api("/core/me/wallet/send", { method: "POST", body: { to, amount, confirm } }),
   /** An AI's sale and rental terms as the marketplace contract has them. */
   market: (aiId) => api(`/core/ais/${aiId}/market`),
-  setMarket: (aiId, { sale, rent }, confirm) => api(`/core/ais/${aiId}/market`, { method: "PUT", body: { sale, rent, confirm } }),
+  setMarket: (aiId, { sale, rent, subscription }, confirm) => api(`/core/ais/${aiId}/market`, { method: "PUT", body: { sale, rent, subscription, confirm } }),
   /** Buys a listed AI; `expectedPrice` (POL) makes sure the price didn't change at checkout. */
   buy: (aiId, confirm, expectedPrice) => api(`/core/ais/${aiId}/market/buy`, { method: "POST", body: { confirm, expectedPrice } }),
   rent: (aiId, days, confirm, expectedPricePerDay) => api(`/core/ais/${aiId}/market/rent`, { method: "POST", body: { days, confirm, expectedPricePerDay } }),
+  subscribe: (aiId, months, confirm, expectedPricePerMonth) => api(`/core/ais/${aiId}/market/subscribe`, { method: "POST", body: { months, confirm, expectedPricePerMonth } }),
 };
 
 /** Talking to an AI on ALTAR: its owner always, a renter until the rental ends. */
@@ -185,6 +186,13 @@ export const altar = {
   activity: (aiId) => publicApi(`/altar/activity?aiId=${aiId}`),
   myActivity: () => api("/altar/me/activity"),
   myRentals: () => api("/altar/me/rentals"),
+  myRoyalties: () => api("/altar/me/royalties"),
+  /** Reviews come only from people who bought, rented or subscribed (checked against the chain's record). */
+  reviews: (aiId) => publicApi(`/altar/reviews?aiId=${aiId}`),
+  ratings: () => publicApi("/altar/ratings"),
+  myReview: (aiId) => api(`/altar/me/reviews/${aiId}`),
+  saveReview: (aiId, rating, body) => api(`/altar/reviews/${aiId}`, { method: "PUT", body: { rating, body } }),
+  deleteReview: (aiId) => api(`/altar/reviews/${aiId}`, { method: "DELETE" }),
   saved: () => api("/altar/wishlist"),
   save: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "PUT" }),
   unsave: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "DELETE" }),

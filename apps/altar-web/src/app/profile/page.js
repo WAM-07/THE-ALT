@@ -159,7 +159,7 @@ function Profile() {
           {[
             ["owned", "My AIs", ais?.length],
             ["saved", "Saved", wishlist.length],
-            ["rented", "Rented", rentals?.length],
+            ["rented", "Rented & subscribed", rentals?.length],
           ].map(([id, label, count]) => (
             <button
               key={id}
@@ -203,22 +203,24 @@ function Profile() {
             rentals === null ? (
               <Spinner />
             ) : rentals.length === 0 ? (
-              <Empty title="Not renting anything" action={<Button href="/#explore">Find an AI to rent</Button>}>
-                Rent an AI for a few days to talk to it on ALTAR. The owner keeps it; you get it to yourself.
+              <Empty title="Not renting or subscribed to anything" action={<Button href="/#explore">Find an AI</Button>}>
+                Rent an AI for a few days to have it to yourself, or subscribe by the month. Either way you talk to it on ALTAR; the owner keeps it.
               </Empty>
             ) : (
               <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                 {rentals.map((r) => {
                   const model = aiModels?.find((m) => m.id === r.ai?.id);
                   return (
-                    <Link key={r.id} href={`/chat/${r.ai?.handle}`} className="group overflow-hidden rounded-3xl border border-line bg-surface transition hover:-translate-y-1 hover:shadow-card">
+                    <Link key={`${r.id}-${r.kind}`} href={`/chat/${r.ai?.handle}`} className="group overflow-hidden rounded-3xl border border-line bg-surface transition hover:-translate-y-1 hover:shadow-card">
                       <div className="relative h-28">
                         <AitArt seed={model?.artSeed ?? r.ai?.handle} />
                         <Avatar src={model?.image} name={r.ai?.name} size={52} className="absolute -bottom-6 left-4 ring-4 ring-surface" />
                       </div>
                       <div className="p-4 pt-8">
                         <p className="truncate font-display text-lg font-bold">{r.ai?.name}</p>
-                        <p className="text-sm text-ink-3">Until {new Date(r.expiresAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</p>
+                        <p className="text-sm text-ink-3">
+                          {r.kind === "subscription" ? "Subscribed" : "Rented"} until {new Date(r.expiresAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                        </p>
                         <p className="mt-3 text-sm font-semibold text-accent-text">Chat now →</p>
                       </div>
                     </Link>

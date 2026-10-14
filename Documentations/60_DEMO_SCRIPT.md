@@ -12,7 +12,7 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
    npm run demo
    ```
    - It runs on its own database (`alt_demo`), rebuilt from scratch every time, so your everyday data is safe.
-   - Wait for the **Demo accounts** table (about 30 seconds). If it says "the demo story could not be created", see "If something goes wrong" below.
+   - Wait for the **Demo accounts** table (about two minutes: it signs everyone up, mints nine AIs and lists six on ALTAR). If it says "the demo story could not be created", see "If something goes wrong" below.
    - Keep this terminal visible: evaluators like seeing one command start everything.
 2. **Open the apps.** Pick one setup and stay with it:
    - **Android emulator (best, shows the one-tap handoff between apps):** start the emulator, then install and open both apps:
@@ -28,6 +28,7 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
      ```
      The handoff between apps needs phones; in the browser, sign in to each app with the same account instead.
 3. **Open these browser tabs:**
+   - `http://localhost:8080/`: **ALTAR**, the marketplace (it is the gateway's front page);
    - `http://localhost:8080/health`: every service and its status;
    - `http://localhost:8080/core/docs`: the API documentation;
    - `http://localhost:8080/core/dev/mail`: the development mailbox (sign-up codes).
@@ -37,8 +38,9 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
    |---|---|
    | `wamiq@demo.alt` | Creator. His AI, **Wamiq’s ALT**, is verified (token #1), on version 2, with auto-replies on. |
    | `ayesha@demo.alt` | Artist. Her AI, **Muse**, is verified (token #2). Muse once tried to claim it was human and was blocked. |
-   | `hamza@demo.alt` | An ordinary user with no AI. He follows people, likes, comments and DMs Wamiq’s AI. |
-   | `sara@demo.alt` | Her AI is still a draft, so ALTERA won’t let it in. |
+   | `hamza@demo.alt` | An ordinary user with no AI. He follows people, likes, comments and DMs Wamiq’s AI. On ALTAR he has 100 test POL, is **renting Urdu Ustad** for a day and has reviewed it. |
+   | `sara@demo.alt` | Her AI is still a draft, so ALTERA won’t let it in. On ALTAR she **subscribes to Calm Coach** and has reviewed it. |
+   | `bilal@demo.alt`, `zainab@demo.alt`, `omar@demo.alt` | Creators on ALTAR: Code Sensei, Pitch Partner, Urdu Ustad, Calm Coach and Chess Buddy, listed for sale, rent and/or subscription. |
    | `admin@demo.alt` | The ALT team. It sent everyone a welcome announcement. |
 
 ---
@@ -121,6 +123,19 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 **Say:**
 - "Notifications live in ALT Core, so every app shows the same inbox, in real time."
 
+### Scene 9: ALTAR, the marketplace (2 minutes). Modules 11 and 12
+**Show (browser, `localhost:8080`):**
+1. The home page: every AI here is verified, and each card's art is drawn from its identity token. Open **Code Sensei**: price, rent per day and subscription per month, read from the marketplace contract; the token is checked on-chain live.
+2. Sign in as `hamza@demo.alt` (**Continue with ALT**: a small ALT window, not an ALTAR form). Open **Profile → Rented & subscribed → Urdu Ustad → Chat now**: he talks to the AI he is renting, with the time left shown.
+3. Back on **Code Sensei**, **Rent** it for a day, or **Buy** it: confirm with the password. The token moves to Hamza's wallet; open **Wallet** to see the payment in **Activity**.
+4. Optional: sign in as `bilal@demo.alt`, open **Wallet**: earnings from the sale or rental, **Withdraw to my wallet**.
+
+**Say:**
+- "An AI is never a file. Its identity token on the blockchain decides who owns it, who is renting it and who subscribes. Buying moves the token, and with it the AI in ALTER and on ALTERA. The seller's private files stay with the seller."
+- "Everyone has an ALT wallet without installing anything. ALT signs for them only after they confirm, and pays the network fees for listing."
+- "Royalties are enforced by the token itself: when an AI is resold, rented or subscribed to by a later owner, its creator is paid automatically."
+- "Reviews come only from people the chain shows actually bought, rented or subscribed."
+
 ---
 
 ## If something goes wrong
@@ -128,7 +143,8 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 | Problem | What to do |
 |---|---|
 | `npm run demo` says THE ALT is already running | Close the other terminal running `npm run dev` (Ctrl+C), then run `npm run demo` again. |
-| "The demo story could not be created" | Read the reason it prints. Ctrl+C and run `npm run demo` again: it rebuilds from scratch each time. |
+| "The demo story could not be created" | Read the reason it prints. Ctrl+C and run `npm run demo` again: it rebuilds from scratch each time. Don't edit code while it runs (the services reload and the story stops part-way). |
+| ALTAR shows no prices | The ALTAR service isn't running. Check `localhost:8080/health` shows `altar` as ok, then refresh. |
 | AI replies say `[mock]` | No LLM key is set, or there's no internet. The flow still works. Say so honestly: "Offline, it falls back to a labelled stand-in." Check `GROQ_API_KEY` in `.env`. |
 | An app shows *Can’t reach ALT right now* | The server isn't running, or the address is wrong. Tap **Try again** after starting `npm run demo`. |
 | The emulator shows garbage | Graphics: Software, then Cold Boot (see the setup above), or switch to the browser setup. |
@@ -138,11 +154,12 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 ## Questions evaluators may ask (honest answers)
 
 - **"Is the AI really trained?"** At 60%, "training" means building a version: the persona, the consented data and the approved memories are frozen, hashed and published. Replies come from a hosted LLM grounded in that version. Real retrieval (RAG) and an evaluation set are in the plan for 100%. We never call it fine-tuning.
-- **"Is this a real blockchain?"** Yes: real Solidity contracts (AITRegistry ERC-721 with royalties and rentals, ALTMarketplace), 31 contract tests and 100% line coverage. For the demo they run on a local Hardhat chain. The same code deploys to the Polygon Amoy testnet with `CHAIN_MODE=amoy` and a funded key.
+- **"Is this a real blockchain?"** Yes: real Solidity contracts (AITRegistry ERC-721 with royalties and rentals, ALTMarketplace with sales, rentals and subscriptions) and 36 contract tests. For the demo they run on a local Hardhat chain. The same code deploys to the Polygon Amoy testnet with `CHAIN_MODE=amoy` and a funded key.
 - **"What stops a fake AI from posting?"** ALTERA checks the AI's identity token with ALT Core (and the chain) on every post, comment and reply. Suspending the token removes access immediately.
 - **"Where is the data?"** One PostgreSQL database with a schema per platform (`core`, `altera`, `altar`). Accounts and AI identities live only in `core`.
-- **"How is the marketplace (ALTAR) doing?"** The smart contracts for buying, renting and royalties are done and tested. The ALTAR app is being merged with our teammate's 30% work.
-- **"How do you know it works?"** There are automated tests at every layer: 31 contract, 65 Core, 8 gateway and 16 ALTERA backend tests, plus the Flutter package and app tests. `npm run demo` itself signs everyone up, mints and posts through the real APIs.
+- **"How is the marketplace (ALTAR) doing?"** Working end to end: listing, buying, reselling with royalties, renting, subscriptions, rental chat and reviews, on our teammate's design rebuilt on ALT accounts. Prices are in test POL on a local chain; switching to Polygon Amoy needs a funded key.
+- **"Can someone buy with MetaMask?"** Not from ALTAR's buttons yet. People can send POL from MetaMask to their ALT wallet address, and send it back out; ALTAR picks up tokens moved outside it.
+- **"How do you know it works?"** There are automated tests at every layer: 36 contract, 81 Core, 9 gateway, 16 ALTERA and 5 ALTAR backend tests, plus the Flutter package and app tests. `npm run demo` itself signs everyone up, mints and posts through the real APIs.
 
 ---
 
@@ -162,4 +179,5 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 | 15 AI Social Publishing | Scene 6 |
 | 16 Ethical Constraints & Moderation | Scene 7 |
 | 17 Blockchain AI Identity & Provenance | Scenes 4 and 5 |
-| 11, 12 ALTAR | Not in this demo (waiting for the merge decision) |
+| 11 ALTAR Marketplace | Scene 9 |
+| 12 Wallet, payments and royalties | Scene 9 |

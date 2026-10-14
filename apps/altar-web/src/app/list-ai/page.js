@@ -131,8 +131,8 @@ function ListingForm({ ai }) {
         rentOn: Boolean(market.rent),
         rentPrice: market.rent?.pricePerDay.pol ?? "",
         rentDays: String(market.rent?.maxDays ?? 7),
-        subOn: Boolean(listing?.subscription),
-        subPrice: listing?.subscription?.pricePerMonth.pol ?? "",
+        subOn: Boolean(market.subscription),
+        subPrice: market.subscription?.pricePerMonth.pol ?? "",
         pitch: listing?.pitch ?? "",
         terms: listing?.terms ?? "",
       });
@@ -157,9 +157,14 @@ function ListingForm({ ai }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
   const sale = form.sellOn ? { price: form.salePrice.trim() } : null;
   const rent = form.rentOn ? { pricePerDay: form.rentPrice.trim(), maxDays: Number(form.rentDays) } : null;
+  const subscription = form.subOn ? { pricePerMonth: form.subPrice.trim() } : null;
   // Compared as numbers, so "2.50" and "2.5" count as the same price.
   const same = (a, b) => (a == null ? b == null : b != null && Number(a) === Number(b));
-  const chainChanged = !same(sale?.price, chain.sale?.price.pol) || !same(rent?.pricePerDay, chain.rent?.pricePerDay.pol) || !same(rent?.maxDays, chain.rent?.maxDays);
+  const chainChanged =
+    !same(sale?.price, chain.sale?.price.pol) ||
+    !same(rent?.pricePerDay, chain.rent?.pricePerDay.pol) ||
+    !same(rent?.maxDays, chain.rent?.maxDays) ||
+    !same(subscription?.pricePerMonth, chain.subscription?.pricePerMonth.pol);
   const fee = (p) => (Number(p) * chain.platformFeeBps) / 10_000;
 
   const problems = [
@@ -170,7 +175,7 @@ function ListingForm({ ai }) {
   ].filter(Boolean);
 
   const saveDetails = () =>
-    altar.saveListing(ai.id, { pitch: form.pitch, terms: form.terms, subscriptionPrice: form.subOn ? form.subPrice.trim() : null });
+    altar.saveListing(ai.id, { pitch: form.pitch, terms: form.terms });
 
   const finish = async (txs = []) => {
     const { listing } = await saveDetails();
@@ -215,9 +220,9 @@ function ListingForm({ ai }) {
           </div>
         </Offer>
 
-        <Offer title="Offer a subscription" on={form.subOn} onToggle={set("subOn")} note="Many people use it each month." badge={<Chip tone="soon">Opens soon</Chip>}>
+        <Offer title="Offer a subscription" on={form.subOn} onToggle={set("subOn")} note="Any number of people use it, a month (30 days) at a time. You keep the token.">
           <Amount label="Price per month" value={form.subPrice} onChange={set("subPrice")} />
-          <p className="mt-2 text-sm text-ink-3">Your price is saved and shown now; people can subscribe once the marketplace contract supports it.</p>
+          <p className="mt-2 text-sm text-ink-3">Subscribers can renew; each renewal adds to their time. If you sell the AI, they keep the time they paid for.</p>
         </Offer>
 
         <Card className="p-6">
@@ -261,7 +266,7 @@ function ListingForm({ ai }) {
             <Button size="lg" className="mt-5 w-full" onClick={save} disabled={saving}>
               {saving ? "Saving…" : chainChanged ? "Save and sign on-chain" : "Save"}
             </Button>
-            <p className="mt-3 text-xs text-ink-3">{chainChanged ? "Changing a sale or rent price needs your password; ALT signs with your wallet and pays the network fee." : "Pitch, terms and subscription price save without signing."}</p>
+            <p className="mt-3 text-xs text-ink-3">{chainChanged ? "Changing a price needs your password; ALT signs with your wallet and pays the network fee." : "The pitch and terms save without signing."}</p>
           </div>
         </Card>
       </div>
@@ -272,11 +277,15 @@ function ListingForm({ ai }) {
           action="Sign and list"
           onClose={() => setConfirming(false)}
           onConfirm={async (confirm) => {
-            const r = await wallet.setMarket(ai.id, { sale, rent }, confirm);
+            const r = await wallet.setMarket(ai.id, { sale, rent, subscription }, confirm);
             await finish(r.txs);
           }}
         >
-          ALT will write {[sale && `a sale price of ${polText(sale.price)}`, rent && `a rent of ${polText(rent.pricePerDay)} a day`].filter(Boolean).join(" and ") || "the removal of your offers"} to the blockchain for {ai.name}.
+          ALT will write{" "}
+          {[sale && `a sale price of ${polText(sale.price)}`, rent && `a rent of ${polText(rent.pricePerDay)} a day`, subscription && `a subscription of ${polText(subscription.pricePerMonth)} a month`]
+            .filter(Boolean)
+            .join(", ") || "the removal of your offers"}{" "}
+          to the blockchain for {ai.name}.
         </ConfirmSpend>
       )}
     </div>

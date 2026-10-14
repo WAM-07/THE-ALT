@@ -233,9 +233,10 @@ export class ChainService {
   async marketState(tokenId: bigint) {
     const market = this.requireMarket();
     try {
-      const [sale, offer, renter, renterUntil] = await Promise.all([
+      const [sale, offer, subscription, renter, renterUntil] = await Promise.all([
         this.publicClient.readContract({ address: market, abi: altMarketplaceAbi, functionName: 'sales', args: [tokenId] }),
         this.publicClient.readContract({ address: market, abi: altMarketplaceAbi, functionName: 'rentalOffers', args: [tokenId] }),
+        this.publicClient.readContract({ address: market, abi: altMarketplaceAbi, functionName: 'subscriptionOffers', args: [tokenId] }),
         this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'userOf', args: [tokenId] }),
         this.publicClient.readContract({ address: this.registryAddress, abi: aitRegistryAbi, functionName: 'userExpires', args: [tokenId] }),
       ]);
@@ -245,6 +246,7 @@ export class ChainService {
       return {
         sale: price > 0n ? { seller: seller.toLowerCase(), priceWei: price } : null,
         rent: pricePerDay > 0n ? { owner: owner.toLowerCase(), pricePerDayWei: pricePerDay, maxDays: Number(maxDays) } : null,
+        subscription: subscription[1] > 0n ? { owner: subscription[0].toLowerCase(), pricePerMonthWei: subscription[1] } : null,
         rentedTo: renter !== none ? { address: renter.toLowerCase(), until: new Date(Number(renterUntil) * 1000) } : null,
       };
     } catch (err) {
@@ -354,18 +356,37 @@ export class ChainService {
   }
 
   /**
-   * Tokens whose holder or renter changed between two blocks (Transfer and UpdateUser events), for
-   * Core's indexer. New mints are left out: the mint job records those itself.
+   * What changed between two blocks, for Core's indexer: tokens whose holder or renter changed
+   * (Transfer, UpdateUser; new mints are left out, the mint job records those) and new or renewed
+   * subscriptions (Subscribed).
    */
   async registryChanges(fromBlock: bigint, toBlock: bigint) {
-    const logs = await this.publicClient.getLogs({ address: this.registryAddress, fromBlock, toBlock });
-    const events = parseEventLogs({ abi: aitRegistryAbi, logs, eventName: ['Transfer', 'UpdateUser'] });
+    const addresses = this.marketplaceAddress ? [this.registryAddress, this.marketplaceAddress] : [this.registryAddress];
+    const logs = await this.publicClient.getLogs({ address: addresses, fromBlock, toBlock });
+    const registryLogs = logs.filter((l) => l.address.toLowerCase() === this.registryAddress.toLowerCase());
+    const marketLogs = logs.filter((l) => l.address.toLowerCase() !== this.registryAddress.toLowerCase());
     const tokens = new Map<bigint, string>();
-    for (const e of events) {
+    for (const e of parseEventLogs({ abi: aitRegistryAbi, logs: registryLogs, eventName: ['Transfer', 'UpdateUser'] })) {
       if (e.eventName === 'Transfer' && /^0x0{40}$/i.test(e.args.from)) continue;
       tokens.set(e.args.tokenId, e.transactionHash);
     }
-    return [...tokens].map(([tokenId, txHash]) => ({ tokenId, txHash }));
+    const subscriptions = parseEventLogs({ abi: altMarketplaceAbi, logs: marketLogs, eventName: 'Subscribed' }).map((e) => ({
+      tokenId: e.args.tokenId,
+      subscriber: e.args.subscriber.toLowerCase(),
+      txHash: e.transactionHash,
+    }));
+    return { holders: [...tokens].map(([tokenId, txHash]) => ({ tokenId, txHash })), subscriptions };
+  }
+
+  /** Until when `subscriber` may use the AI (null: not subscribed now). */
+  async subscriptionOf(tokenId: bigint, subscriber: string) {
+    const expires = await this.publicClient.readContract({
+      address: this.requireMarket(),
+      abi: altMarketplaceAbi,
+      functionName: 'subscriptionExpires',
+      args: [tokenId, getAddress(subscriber)],
+    });
+    return expires > 0n ? new Date(Number(expires) * 1000) : null;
   }
 
   /** True when no identity token has ever been minted on this registry (token ids start at 1). */

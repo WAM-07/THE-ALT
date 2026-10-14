@@ -94,7 +94,7 @@ export default function ChatPage() {
   }
 
   const { role, until } = state.access;
-  const left = role === "renter" ? timeLeft(until, now) : null;
+  const left = role === "renter" || role === "subscriber" ? timeLeft(until, now) : null;
   const canTalk = role === "owner" || Boolean(left);
 
   const send = async (e) => {
@@ -161,7 +161,7 @@ export default function ChatPage() {
               </Link>
               <VerifiedTick />
             </p>
-            <p className="text-sm text-ink-2">{role === "owner" ? "You own this AI" : left ? `Rented · ${left} left` : "Rental ended"}</p>
+            <p className="text-sm text-ink-2">{role === "owner" ? "You own this AI" : left ? `${role === "subscriber" ? "Subscribed" : "Rented"} · ${left} left` : "Your time has ended"}</p>
           </div>
         </header>
 
@@ -209,9 +209,9 @@ export default function ChatPage() {
           </form>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4">
-            <p className="text-sm text-ink-2">{role === "renter" || until ? "Your rental has ended. Your conversations stay here to read." : `Rent ${ai.name} to talk to it.`}</p>
+            <p className="text-sm text-ink-2">{state.conversations.length ? "Your rental or subscription has ended. Your conversations stay here to read." : `Rent or subscribe to ${ai.name} to talk to it.`}</p>
             <Button href={`/details/${ai.handle}`} size="sm">
-              Rent again
+              See options
             </Button>
           </div>
         )}

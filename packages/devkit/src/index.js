@@ -23,6 +23,10 @@ export async function startPostgres({ dataDir, port = 54320, user = 'alt', passw
     persistent: true,
     // Without this, initdb on Windows picks the system code page (e.g. WIN1252) and emoji or Urdu text fail.
     initdbFlags: ['--encoding=UTF8', '--locale=C'],
+    // PostgreSQL 18 does disk I/O in separate worker processes by default. On Windows those can
+    // outlive a server stopped in a hurry (a test run shutting down) and keep its port busy, so the
+    // next run can't start. Doing I/O in the server itself avoids that and is plenty for development.
+    postgresFlags: ['-c', 'io_method=sync'],
     onLog: quiet ? () => {} : console.log,
     onError: (e) => console.error('[postgres]', e?.toString?.() ?? e),
   });
