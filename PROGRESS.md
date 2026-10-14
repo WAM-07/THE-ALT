@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 85 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 88 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -470,7 +470,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **To demo on a phone:** `npm run demo`, connect the phone by USB, `adb reverse tcp:8080 tcp:8080`, install the debug APKs built with `--dart-define=ALT_API_URL=http://127.0.0.1:8080`.
 - **In progress (owner's go, 2026-10-15): group C.** Commit each, tick it here:
   - [x] C2. "Connect MetaMask" on ALTAR: link an outside wallet to the ALT account by signing a message (no password, no key leaves MetaMask). Wallet page → **Your wallets**: Connect MetaMask (or Install MetaMask), linked wallets with Remove. Uses Core's existing SIWE linking (`/me/wallets/nonce`, `/me/wallets/link`); the message is built in `lib/metamask.js`. Linked wallets are not offered as primary on purpose (ALT signs listings and purchases with the ALT wallet). Checked in Chrome with a stand-in wallet that signs like MetaMask.
-  - [ ] C4. Smarter training: the AI reads uploaded PDFs and notes (text extraction, chunks and retrieval) when it answers.
+  - [x] C4. Smarter training: the AI reads uploaded PDFs and notes when it answers. PDF text is extracted at upload (`unpdf`, MIT), kept encrypted beside the file (`<id>.txt.enc`) and readable in ALTER's Studio (`/content?as=text`); retrieval is BM25 over overlapping passages with light stemming (`retrieve` in `modules/ai/repo.ts`). **Fixed on the way:** building a version marked images and documents as processed, so their raw bytes could reach the AI's prompt; now only items with real text (`text_chars > 0`) are read. Tests: `knowledge.test.ts` (Core 88).
   - Waiting on the owner: C1 Polygon Amoy (RPC URL + faucet-funded key), C3 push notifications (a Firebase project: `google-services.json` and a server key).
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
@@ -490,7 +490,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **The ALT sign-in card:** "Continue with ALTER/ALTERA" can't show the other app's account name before you tap it (apps can't read each other's data); it says which app, and that app shows the account when it asks you to confirm. Remembered accounts are per app (name, handle, email, picture in encrypted storage). The apps target Android only (owner, 2026-10-15); iOS is out of scope.
 - **No push notifications when the app is closed.** The ALT inbox is live while an app is open; Firebase push comes after 60%.
-- **"Training" means building a version:** persona, consented data and approved memories, frozen and hashed. RAG with embeddings and evaluation come after 60%. PDFs, images and voice notes are stored but not read yet.
+- **"Training" means building a version:** persona, consented data and approved memories, frozen and hashed. Text files and PDFs are read, with BM25 retrieval over passages; embeddings and evaluation come later. Images, voice notes and scanned PDFs (no text layer) are stored but not read yet. PDFs uploaded before 2026-10-15 need uploading again to be read.
 - **The local chain resets on every `npm run dev`.** Core re-mints the tokens recorded in the database onto it, so verified AIs stay verified. Token transfers and rentals on the old chain are not replayed. Use `npm run dev -- --reset-db` for a clean slate, or `CHAIN_MODE=amoy` for a persistent chain.
 - **Google sign-in** works in Core but the apps hide the button until `GOOGLE_CLIENT_IDS` (Core) and `GOOGLE_SERVER_CLIENT_ID` (app) are configured and the `google_sign_in` plugin is added.
 - **Biometric unlock** (planned under M1 FE-4) is not built yet.

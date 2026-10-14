@@ -123,13 +123,30 @@ export async function readDatasetFile(ctx: Ctx, id: string) {
 
 export async function removeDatasetFile(ctx: Ctx, id: string) {
   await rm(datasetPath(ctx, id), { force: true });
+  await rm(datasetTextPath(ctx, id), { force: true });
 }
 
-/** Text of processed dataset items (only text-like kinds are readable by the persona engine today). */
+// The text extracted from a document (a PDF), encrypted at rest next to the file.
+const datasetTextPath = (ctx: Ctx, id: string) => path.resolve(ctx.config.storageDir, 'datasets', `${id}.txt.enc`);
+
+export async function writeDatasetText(ctx: Ctx, id: string, text: string) {
+  await mkdir(path.dirname(datasetTextPath(ctx, id)), { recursive: true });
+  await writeFile(datasetTextPath(ctx, id), encrypt(ctx.config.encryptionKey, Buffer.from(text, 'utf8').toString('base64')));
+}
+
+export async function readDatasetText(ctx: Ctx, id: string) {
+  return Buffer.from(decrypt(ctx.config.encryptionKey, await readFile(datasetTextPath(ctx, id), 'utf8')), 'base64').toString('utf8');
+}
+
+/**
+ * The readable text of the AI's items: text files as written, and documents (PDFs) through the text
+ * extracted when they were uploaded. Images, voice notes and documents without text are skipped, so
+ * raw bytes never reach the AI.
+ */
 export async function datasetTexts(ctx: Ctx, q: Q, aiId: string, ids?: string[]) {
-  const { rows } = await q.query<{ id: string; title: string }>(
-    `SELECT id, title FROM core.datasets
-      WHERE ai_id = $1 AND deleted_at IS NULL AND included AND is_processed
+  const { rows } = await q.query<{ id: string; title: string; kind: string }>(
+    `SELECT id, title, kind FROM core.datasets
+      WHERE ai_id = $1 AND deleted_at IS NULL AND included AND text_chars > 0
         AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[]))
       ORDER BY created_at`,
     [aiId, ids ?? null],
@@ -137,7 +154,8 @@ export async function datasetTexts(ctx: Ctx, q: Q, aiId: string, ids?: string[])
   const out: { id: string; title: string; text: string }[] = [];
   for (const r of rows) {
     try {
-      out.push({ id: r.id, title: r.title, text: (await readDatasetFile(ctx, r.id)).toString('utf8') });
+      const text = r.kind === 'text' ? (await readDatasetFile(ctx, r.id)).toString('utf8') : await readDatasetText(ctx, r.id);
+      out.push({ id: r.id, title: r.title, text });
     } catch {
       // A missing file must not break the AI; the item is simply skipped.
     }
@@ -145,39 +163,104 @@ export async function datasetTexts(ctx: Ctx, q: Q, aiId: string, ids?: string[])
   return out;
 }
 
-const WORD = /[\p{L}\p{N}]{3,}/gu;
-const words = (s: string) => new Set((s.toLowerCase().match(WORD) ?? []).filter((w) => !STOP.has(w)));
-const STOP = new Set(['the', 'and', 'you', 'your', 'are', 'for', 'with', 'that', 'this', 'what', 'have', 'was', 'not', 'but', 'can', 'how', 'about']);
+/** Text pulled out of a document at upload (PDF), or null when there is none to read. */
+export async function extractDocumentText(bytes: Buffer, mimeType: string | null): Promise<string | null> {
+  if (mimeType !== 'application/pdf') return null;
+  try {
+    const { extractText, getDocumentProxy } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(bytes));
+    const { text } = await extractText(pdf, { mergePages: true });
+    const clean = (Array.isArray(text) ? text.join('\n\n') : text).replace(/[ \t]+\n/g, '\n').trim();
+    return clean.length ? clean : null;
+  } catch {
+    // A damaged or scanned PDF is kept, just not read.
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------- retrieval (BM25)
+
+const STOP = new Set([
+  'the', 'and', 'you', 'your', 'are', 'for', 'with', 'that', 'this', 'what', 'have', 'was', 'not', 'but', 'can', 'how', 'about',
+  'from', 'they', 'their', 'there', 'them', 'will', 'would', 'should', 'could', 'into', 'than', 'then', 'also', 'just', 'like',
+  'when', 'where', 'which', 'who', 'why', 'all', 'any', 'one', 'our', 'out', 'has', 'had', 'his', 'her', 'she', 'him', 'its',
+]);
+
+/** Words of a text, lower-cased and lightly stemmed ("studying", "studies" and "study" meet). */
+export function terms(s: string) {
+  const out: string[] = [];
+  for (const raw of s.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []) {
+    if (STOP.has(raw)) continue;
+    let w = raw;
+    if (w.length > 5 && w.endsWith('ing')) w = w.slice(0, -3);
+    else if (w.length > 4 && w.endsWith('ies')) w = `${w.slice(0, -3)}y`;
+    else if (w.length > 4 && w.endsWith('ed')) w = w.slice(0, -2);
+    else if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) w = w.slice(0, -1);
+    out.push(w);
+  }
+  return out;
+}
+
+/** Splits a document into overlapping passages of about `size` characters, on sentence ends. */
+export function chunk(text: string, size = 600, overlap = 120) {
+  const sentences = text.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/);
+  const chunks: string[] = [];
+  let current = '';
+  for (const s of sentences) {
+    if (current && current.length + s.length + 1 > size) {
+      chunks.push(current.trim());
+      current = current.slice(-overlap);
+    }
+    current += (current ? ' ' : '') + s;
+    while (current.length > size * 1.5) {
+      chunks.push(current.slice(0, size).trim());
+      current = current.slice(size - overlap);
+    }
+  }
+  if (current.trim().length >= 20) chunks.push(current.trim());
+  return chunks;
+}
 
 /**
- * Picks the passages of the owner's documents most related to the question (simple keyword overlap;
- * Module 9's RAG pipeline replaces this with embeddings after the 60% evaluation).
+ * Picks the passages of the owner's documents most related to the question, ranked with BM25 (the
+ * scoring search engines use: rare words count more, long passages are not favoured). Everything
+ * is sent when it fits, since a question may share no word with the answer ("What do I enjoy?" vs
+ * "I love Flutter"). Embeddings could replace the scoring later without changing callers.
  */
 export function retrieve(docs: { title: string; text: string }[], query: string, maxChars = 2400) {
-  // Small enough to fit? Then the AI sees everything; keyword matching would only lose context
-  // ("What do I enjoy?" shares no word with "I love Flutter").
   const whole = docs.map((d) => `${d.title}: ${d.text.trim()}`);
   if (whole.reduce((n, t) => n + t.length, 0) <= maxChars) return whole;
 
-  const q = words(query);
-  const chunks: { text: string; score: number }[] = [];
-  for (const d of docs) {
-    for (const para of d.text.split(/\n\s*\n|(?<=[.!?])\s+(?=[A-Z])/)) {
-      const t = para.trim();
-      if (t.length < 20) continue;
-      const w = words(t);
+  const passages = docs.flatMap((d) => chunk(d.text).map((text) => ({ text: `${d.title}: ${text}`, terms: terms(`${d.title} ${text}`) })));
+  const q = [...new Set(terms(query))];
+  if (!passages.length || !q.length) return [];
+  const N = passages.length;
+  const avgLen = passages.reduce((n, p) => n + p.terms.length, 0) / N;
+  const df = new Map<string, number>();
+  for (const p of passages) for (const t of new Set(p.terms)) df.set(t, (df.get(t) ?? 0) + 1);
+  const k1 = 1.2;
+  const b = 0.75;
+  const scored = passages
+    .map((p) => {
+      const tf = new Map<string, number>();
+      for (const t of p.terms) tf.set(t, (tf.get(t) ?? 0) + 1);
       let score = 0;
-      for (const x of q) if (w.has(x)) score++;
-      if (score > 0) chunks.push({ text: `${d.title}: ${t.slice(0, 600)}`, score });
-    }
-  }
-  chunks.sort((a, b) => b.score - a.score);
+      for (const t of q) {
+        const f = tf.get(t);
+        if (!f) continue;
+        const idf = Math.log(1 + (N - (df.get(t) ?? 0) + 0.5) / ((df.get(t) ?? 0) + 0.5));
+        score += (idf * f * (k1 + 1)) / (f + k1 * (1 - b + (b * p.terms.length) / avgLen));
+      }
+      return { text: p.text, score };
+    })
+    .filter((p) => p.score > 0)
+    .sort((x, y) => y.score - x.score);
   const picked: string[] = [];
   let used = 0;
-  for (const c of chunks) {
-    if (used + c.text.length > maxChars) break;
-    picked.push(c.text);
-    used += c.text.length;
+  for (const p of scored) {
+    if (used + p.text.length > maxChars) break;
+    picked.push(p.text);
+    used += p.text.length;
   }
   return picked;
 }

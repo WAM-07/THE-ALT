@@ -226,7 +226,7 @@ class AiApi {
   }
 
   Future<String> datasetText(String id, String datasetId) async {
-    final res = await altAccount.authorizedSend('GET', Uri.parse('${altAccount.coreUrl}/ais/$id/datasets/$datasetId/content'));
+    final res = await altAccount.authorizedSend('GET', Uri.parse('${altAccount.coreUrl}/ais/$id/datasets/$datasetId/content?as=text'));
     if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, null);
     return utf8.decode(res.bodyBytes, allowMalformed: true);
   }

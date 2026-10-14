@@ -19,12 +19,15 @@ import {
   CONSENT_TEXT,
   consentState,
   latestVersion,
+  extractDocumentText,
   loadAi,
   readDatasetFile,
+  readDatasetText,
   removeDatasetFile,
   requireConsent,
   requireOwnedAi,
   writeDatasetFile,
+  writeDatasetText,
   type AiRow,
 } from '../../modules/ai/repo.js';
 import { requireService, requireUser } from '../auth-guard.js';
@@ -392,12 +395,15 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
   ) {
     const id = crypto.randomUUID();
     const storageKey = await writeDatasetFile(ctx, id, item.bytes);
-    const textChars = item.isText ? item.bytes.toString('utf8').length : 0;
+    // Documents (PDFs) are read now: their text is extracted once and kept, encrypted, beside them.
+    const extracted = item.isText ? null : await extractDocumentText(item.bytes, item.mimeType);
+    if (extracted) await writeDatasetText(ctx, id, extracted);
+    const textChars = item.isText ? item.bytes.toString('utf8').length : (extracted?.length ?? 0);
     const { rows } = await tx(ctx.db, async (client) => {
       const res = await client.query(
         `INSERT INTO core.datasets (id, ai_id, owner_id, kind, title, file_name, mime_type, size_bytes, storage_key, sha256, training_category, is_processed, text_chars)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-        [id, ai.id, userId, item.kind, item.title, item.fileName, item.mimeType, item.bytes.length, storageKey, sha256(item.bytes), item.category, item.isText, textChars],
+        [id, ai.id, userId, item.kind, item.title, item.fileName, item.mimeType, item.bytes.length, storageKey, sha256(item.bytes), item.category, item.isText || Boolean(extracted), textChars],
       );
       await audit(client, { action: 'dataset.added', actorUserId: userId, entityType: 'ai', entityId: ai.id, data: { datasetId: id, kind: item.kind, bytes: item.bytes.length } });
       return res;
@@ -439,7 +445,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.post(
     '/ais/:id/datasets/upload',
-    { preHandler: authed, schema: { tags: ['datasets'], summary: 'Upload a file (text files are used now; documents, images and voice are stored for later training)', params: AiId, consumes: ['multipart/form-data'] } },
+    { preHandler: authed, schema: { tags: ['datasets'], summary: 'Upload a file (text files and PDFs are read; images and voice notes are stored for later training)', params: AiId, consumes: ['multipart/form-data'] } },
     async (req, reply) => {
       const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
       assertMutable(ai);
@@ -467,11 +473,24 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.get(
     '/ais/:id/datasets/:datasetId/content',
-    { preHandler: authed, schema: { tags: ['datasets'], summary: 'Read back what you added (owner only)', params: z.object({ id: z.uuid(), datasetId: z.uuid() }) } },
+    {
+      preHandler: authed,
+      schema: {
+        tags: ['datasets'],
+        summary: 'Read back what you added (owner only); ?as=text gives the text the AI reads (for a PDF, the text extracted from it)',
+        params: z.object({ id: z.uuid(), datasetId: z.uuid() }),
+        querystring: z.object({ as: z.enum(['file', 'text']).default('file') }),
+      },
+    },
     async (req, reply) => {
       const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
-      const { rows } = await ctx.db.query('SELECT mime_type, file_name FROM core.datasets WHERE id = $1 AND ai_id = $2 AND owner_id = $3 AND deleted_at IS NULL', [req.params.datasetId, ai.id, req.auth!.userId]);
+      const { rows } = await ctx.db.query('SELECT mime_type, file_name, kind, text_chars FROM core.datasets WHERE id = $1 AND ai_id = $2 AND owner_id = $3 AND deleted_at IS NULL', [req.params.datasetId, ai.id, req.auth!.userId]);
       if (!rows[0]) throw notFound('Item');
+      if (req.query.as === 'text' && rows[0].kind !== 'text') {
+        if (!rows[0].text_chars) throw notFound('Text');
+        reply.header('cache-control', 'private, no-store').type('text/plain; charset=utf-8');
+        return reply.send(await readDatasetText(ctx, req.params.datasetId));
+      }
       reply.header('cache-control', 'private, no-store').type(rows[0].mime_type ?? 'application/octet-stream');
       return reply.send(await readDatasetFile(ctx, req.params.datasetId));
     },
