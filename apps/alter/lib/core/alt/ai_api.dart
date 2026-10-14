@@ -160,6 +160,10 @@ class AiApi {
   Future<List<AccountAi>> accountAis() async =>
       (await _call('GET', '/me/ais') as List).map((e) => AccountAi(Map<String, dynamic>.from(e as Map))).toList();
 
+  /// A verified AI's public profile (about, traits, owner and creator), as every ALT app shows it.
+  Future<Map<String, dynamic>> publicProfile(String handle) async =>
+      Map<String, dynamic>.from(await _call('GET', '/public/ais/${Uri.encodeComponent(handle)}?platform=alter') as Map);
+
   Future<List<AltAi>> myAis() async => (await _call('GET', '/ais') as List).map((e) => AltAi(Map<String, dynamic>.from(e as Map))).toList();
 
   Future<AltAi> get(String id) async => AltAi(Map<String, dynamic>.from(await _call('GET', '/ais/$id') as Map));

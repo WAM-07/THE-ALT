@@ -14,6 +14,7 @@ import '../../features/persona_interface/screens/chat_screen.dart';
 import '../../features/persona_interface/screens/home_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/training_manager/screens/training_screen.dart';
+import '../../features/your_ais/account_ai_screen.dart';
 import '../../features/your_ais/talk_screen.dart';
 import '../../features/your_ais/your_ais_screen.dart';
 import '../ui/ui.dart';
@@ -37,7 +38,7 @@ String? _guard(BuildContext context, GoRouterState state) {
       // Without an AI of their own, someone may still rent or subscribe to one: show those first.
       if ((accountAis.value ?? const []).isNotEmpty) {
         const open = {'/yours', '/onboarding', '/account', '/inbox'};
-        return open.contains(loc) || loc.startsWith('/talk/') ? null : '/yours';
+        return open.contains(loc) || loc.startsWith('/talk/') || loc.startsWith('/held/') ? null : '/yours';
       }
       return loc == '/onboarding' || loc == '/account' ? null : '/onboarding';
     case AiPhase.exists:
@@ -90,6 +91,7 @@ final goRouter = GoRouter(
     ),
     // Every AI on the ALT account, and talking to the ones the person rents or subscribes to.
     GoRoute(path: '/yours', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const YourAisScreen()),
+    GoRoute(path: '/held/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => AccountAiScreen(aiId: state.pathParameters['id']!)),
     GoRoute(path: '/talk/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => TalkScreen(aiId: state.pathParameters['id']!)),
     // The ALT inbox, shared by every ALT app (Module 2).
     GoRoute(

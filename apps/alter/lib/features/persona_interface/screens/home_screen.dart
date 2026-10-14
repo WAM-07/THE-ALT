@@ -219,7 +219,7 @@ class _AccountStrip extends StatelessWidget {
 
   Future<void> _open(BuildContext context, AccountAi ai) async {
     if (!ai.owned) {
-      context.push('/talk/${ai.id}');
+      context.push('/held/${ai.id}');
       return;
     }
     if (ai.id == currentAi.value?.id) return;

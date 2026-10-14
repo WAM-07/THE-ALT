@@ -433,7 +433,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - [x] ALTER: the Settings tab in the bottom bar becomes **Profile** (same screen, person icon).
   - [x] ALTER: the Chat tab follows the AI chosen in "Your AIs" (it kept the first AI’s chat). Studio and Identity had the same problem; all three use `FollowsCurrentAi`.
   - [x] ALTAR: an owner sees **Chat** on their own AI's page (it showed only "Manage in ALTER" and "List AI").
-  - [ ] ALTER: tapping a rented or subscribed AI opens its profile card first (identity card, details, time left), with **Chat** and **Open in ALTAR**.
+  - [x] ALTER: tapping a rented or subscribed AI opens its profile card first (`/held/:id`) (identity card, details, time left), with **Chat** and **Open in ALTAR**.
   - [ ] **In-app ALT sign-in card** (step 3, brought forward; no browser). A bottom-sheet card from `alt_account`:
     - accounts used on this device before (remembered: name, handle, picture; never a token or password), one tap to pick, then the password, and the 2FA or email code in the card, through Core's existing `/auth/login`, `/auth/login/2fa`, `/auth/email/verify`;
     - **"Continue with ALTER"** in ALTERA: opens `alter://signin-request?for=altera`; ALTER shows a small confirm card ("Sign in to ALTERA as Wamiq?") and sends back the usual handoff code (`altera://handoff?code=`). Like Google's account chooser, without a browser;

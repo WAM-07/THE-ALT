@@ -27,7 +27,7 @@ class _YourAisScreenState extends State<YourAisScreen> {
 
   Future<void> _open(AccountAi ai) async {
     if (!ai.owned) {
-      context.push('/talk/${ai.id}');
+      context.push('/held/${ai.id}');
       return;
     }
     try {
