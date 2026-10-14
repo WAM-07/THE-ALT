@@ -1,16 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { confirmInAltWindow } from "../lib/alt";
 import { Button } from "./ui";
 
 /**
- * "Confirm it's you" before ALT signs with your wallet: your ALT password, or a code from your
- * authenticator app. It goes straight to ALT Core with the request and is never stored. (Moving
- * this step into the ALT Account window, like sign-in, is planned.)
+ * "Confirm it's you" before ALT signs with your wallet. With `intent` (what is being paid, see
+ * confirmInAltWindow) the person confirms in the ALT Account window, which returns a one-time
+ * approval, so ALTAR never sees the password. If popups are blocked, the password or 2FA code can
+ * be typed here instead; it goes straight to ALT Core with the request and is never stored.
  *
  * onConfirm(confirm) does the action and may throw; the error is shown here.
  */
-export default function ConfirmSpend({ title, children, action = "Confirm", onConfirm, onClose, onDone }) {
+export default function ConfirmSpend({ title, children, action = "Confirm", intent, onConfirm, onClose, onDone }) {
   const { user } = useAuth();
   const canPassword = Boolean(user?.hasPassword);
   const canCode = Boolean(user?.twoFactorEnabled);
@@ -18,6 +20,8 @@ export default function ConfirmSpend({ title, children, action = "Confirm", onCo
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // Typing the password here is only the fallback when the ALT window can't open.
+  const [onPage, setOnPage] = useState(!intent);
 
   useEffect(() => {
     const esc = (e) => e.key === "Escape" && !busy && onClose();
@@ -25,15 +29,38 @@ export default function ConfirmSpend({ title, children, action = "Confirm", onCo
     return () => document.removeEventListener("keydown", esc);
   }, [busy, onClose]);
 
+  const run = async (confirm) => {
+    const result = await onConfirm(confirm);
+    onDone?.(result);
+    onClose();
+  };
+
+  const inAltWindow = async () => {
+    setBusy(true);
+    setError(null);
+    const answer = await confirmInAltWindow(intent);
+    if (answer === undefined) {
+      setBusy(false);
+      setOnPage(true);
+      return setError("Your browser blocked the ALT window. Allow pop-ups for ALTAR, or confirm here.");
+    }
+    if (!answer) return setBusy(false);
+    try {
+      await run({ approval: answer.approval });
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    if (!onPage) return inAltWindow();
     if (!secret.trim()) return setError(mode === "password" ? "Please enter your password." : "Please enter the code.");
     setBusy(true);
     setError(null);
     try {
-      const result = await onConfirm(mode === "password" ? { password: secret } : { code: secret.trim() });
-      onDone?.(result);
-      onClose();
+      await run(mode === "password" ? { password: secret } : { code: secret.trim() });
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -49,7 +76,11 @@ export default function ConfirmSpend({ title, children, action = "Confirm", onCo
         </h2>
         <div className="mt-3 text-[15px] leading-relaxed text-ink-2">{children}</div>
 
-        {!canPassword && !canCode ? (
+        {!onPage ? (
+          <p className="mt-5 rounded-2xl bg-sunken/70 px-4 py-3 text-sm text-ink-2">
+            You confirm in the <b className="text-ink">ALT Account</b> window with your password or two-step code. ALTAR never sees it.
+          </p>
+        ) : !canPassword && !canCode ? (
           <p className="mt-5 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm text-ink-2">
             To spend from your wallet, first set a password or turn on two-step verification in the ALT Account Center (in ALTER or ALTERA).
           </p>
@@ -67,7 +98,7 @@ export default function ConfirmSpend({ title, children, action = "Confirm", onCo
             />
           </label>
         )}
-        {canPassword && canCode && (
+        {onPage && canPassword && canCode && (
           <button
             type="button"
             onClick={() => {
@@ -87,10 +118,12 @@ export default function ConfirmSpend({ title, children, action = "Confirm", onCo
             Cancel
           </Button>
           <Button type="submit" disabled={busy || (!canPassword && !canCode)}>
-            {busy ? "Signing on-chain…" : action}
+            {busy ? (onPage ? "Signing on-chain…" : "Waiting for ALT…") : onPage ? action : `${action} in ALT`}
           </Button>
         </div>
-        <p className="mt-4 text-xs text-ink-3">ALT signs this with your ALT wallet. Your password is sent straight to ALT to unlock it and is never stored.</p>
+        <p className="mt-4 text-xs text-ink-3">
+          {onPage ? "ALT signs this with your ALT wallet. Your password is sent straight to ALT to unlock it and is never stored." : "ALT signs this with your ALT wallet and pays the network fee."}
+        </p>
       </form>
     </div>
   );

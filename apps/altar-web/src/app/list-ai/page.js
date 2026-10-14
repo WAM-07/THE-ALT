@@ -275,6 +275,16 @@ function ListingForm({ ai }) {
         <ConfirmSpend
           title="Confirm your listing"
           action="Sign and list"
+          intent={{
+            action: "list",
+            ai: { id: ai.id, handle: ai.handle },
+            params: {
+              salePrice: sale ? sale.price : "off",
+              rentPricePerDay: rent ? rent.pricePerDay : "off",
+              rentMaxDays: rent ? rent.maxDays : "off",
+              subscriptionPricePerMonth: subscription ? subscription.pricePerMonth : "off",
+            },
+          }}
           onClose={() => setConfirming(false)}
           onConfirm={async (confirm) => {
             const r = await wallet.setMarket(ai.id, { sale, rent, subscription }, confirm);

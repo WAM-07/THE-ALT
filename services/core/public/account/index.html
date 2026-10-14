@@ -95,6 +95,21 @@
           <button class="primary" type="submit">Save password</button>
         </form>
 
+        <!-- Confirm a spend (ALTAR): the password or 2FA code is typed here, never on the platform -->
+        <form class="view" id="confirm" novalidate hidden>
+          <h1 id="confirm-title">Confirm</h1>
+          <p class="lead" id="confirm-lead">From your ALT wallet. ALT signs it and pays the network fee.</p>
+          <div class="who" id="confirm-ai" hidden><img alt="" /><span></span></div>
+          <dl class="summary" id="confirm-summary"></dl>
+          <label id="confirm-label">Your ALT password
+            <span class="pw"><input name="secret" type="password" autocomplete="current-password" required /><button type="button" class="reveal" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
+          </label>
+          <button type="button" class="link small" id="confirm-switch">Use a code from your authenticator app</button>
+          <p class="error" hidden></p>
+          <button class="primary" type="submit" id="confirm-go">Confirm</button>
+          <p class="switch"><button type="button" class="link" id="confirm-cancel">Cancel</button></p>
+        </form>
+
         <!-- Done -->
         <div class="view done" id="done" hidden>
           <span class="tick" aria-hidden="true">✓</span>

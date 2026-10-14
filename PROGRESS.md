@@ -463,7 +463,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - [x] A3. ALTER themes: onboarding and sign-in follow the active theme. The old colour, gradient and heading names (`colors.dart`, `gradients.dart`, `typography.dart`) now read `Ds`, so onboarding, memories, versions and the status badge follow every theme (headings in the theme's face, Fraunces in Sapphire). Checked on the phone in Sapphire: sign-in and onboarding.
 - **In progress (owner's go, 2026-10-15): group B.** Commit each, tick it here:
   - [x] B1. Picture picker in ALTER and ALTERA (`showAltPicturePicker` in `alt_account`): ready-made sets with their credits, "Upload a photo" (the app's own gallery picker), **Everywhere** or **Only in this app**, and "Use my main picture here". Opened from the Account Center picture, ALTER's Profile picture and ALTERA's Edit Profile. `AltUser.platformAvatars` / `avatarFor(app)`. Checked on the phone: an ALTERA-only picture leaves the main one unchanged.
-  - [ ] B2. Spending confirmed in the ALT Account window (password or 2FA there, not on ALTAR's page).
+  - [x] B2. Spending confirmed in the ALT Account window (password or 2FA there, not on ALTAR's page). ALTAR's confirm dialog says "… in ALT" and opens `/core/account/?mode=confirm` (what is paid, the AI looked up by the window itself); Core's `POST /me/spend-approvals` returns a one-time approval (2 minutes) bound to the person, action, AI and amounts, which ALTAR sends as `confirm.approval`. ALTAR lends the window its session by a same-origin message; typing the password on ALTAR's page is only the fallback when pop-ups are blocked. Market test; checked in Chrome: Hamza subscribed to Calm Coach through the window.
   - [ ] B3. A seller keeps their old chats with a sold AI, read-only.
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
 - **Fixed in A1 (found by the owner, 2026-10-15):** on ALTERA's Profile, switching personal → AI persona → personal shows a red error screen: "_ProfileScreenState is a SingleTickerProviderStateMixin but multiple tickers were created" (`screens/profile/profile_screen.dart`: a new `TabController` per switch; use `TickerProviderStateMixin` and dispose the old one). Also `MessagingNotifier.loadConversations` updates a disposed widget during the switch. The owner also asked for a recommendation on the switch itself; see the answer of 2026-10-15 (proposed: replace the app-wide switch with "Post as" in the composer and a Manage page per owned AI).
@@ -473,7 +473,6 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
   - **ALTER themes:** which one stays the default after trying them (Sapphire for now).
 - **Smaller follow-ups:**
-  - Confirm spending in the ALT Account window instead of on ALTAR's page.
   - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
@@ -486,7 +485,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.
   - Rentals are not replayed when the local dev chain restarts.
   - "Connect MetaMask" isn't built: sending POL to a MetaMask address works.
-  - The spending password is typed on ALTAR's page and goes straight to Core, never stored. Moving it into the ALT Account window, like sign-in, is a planned improvement.
+  - Spend approvals are remembered as used in Core's memory (fine for one Core instance; several instances would need a shared store). When the browser blocks pop-ups, ALTAR falls back to asking for the password on its own page (sent straight to Core, never stored).
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **The ALT sign-in card:** "Continue with ALTER/ALTERA" can't show the other app's account name before you tap it (apps can't read each other's data); it says which app, and that app shows the account when it asks you to confirm. Remembered accounts are per app (name, handle, email, picture in encrypted storage). The apps target Android only (owner, 2026-10-15); iOS is out of scope.

@@ -288,7 +288,7 @@ export default function WalletPage() {
       </Card>
 
       {dialog === "withdraw" && (
-        <ConfirmSpend title={`Withdraw ${polText(w.earnings)}`} action="Withdraw" onClose={() => setDialog(null)} onConfirm={(confirm) => altWallet.withdraw(confirm)} onDone={(r) => (setNotice(`${polText(r.amount)} moved into your wallet.`), load())}>
+        <ConfirmSpend title={`Withdraw ${polText(w.earnings)}`} action="Withdraw" intent={{ action: "withdraw" }} onClose={() => setDialog(null)} onConfirm={(confirm) => altWallet.withdraw(confirm)} onDone={(r) => (setNotice(`${polText(r.amount)} moved into your wallet.`), load())}>
           Your earnings move from the marketplace contract into your ALT wallet.
         </ConfirmSpend>
       )}
@@ -296,6 +296,7 @@ export default function WalletPage() {
         <ConfirmSpend
           title="Send POL"
           action="Send"
+          intent={{ action: "send", params: { to: send.to.trim(), amount: send.amount.trim() } }}
           onClose={() => setDialog(null)}
           onConfirm={(confirm) => altWallet.send(send.to.trim(), send.amount.trim(), confirm)}
           onDone={(r) => (setNotice(`${polText(r.amount)} sent to ${shortAddress(send.to.trim())}.`), setSend({ to: "", amount: "" }), load())}

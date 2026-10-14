@@ -6,6 +6,10 @@
 //   return=app    : open the app's own link (alter://handoff?code=… / altera://…);
 //   return=redirect (default): go to the platform's handoff page.
 // The platform redeems the code for its own session, so it never sees the password.
+//
+// mode=confirm (ALTAR, return=popup): confirms one spend from the ALT wallet. The opener lends its
+// session (a same-origin message), the person types their password or 2FA code here, and Core
+// returns a one-time approval bound to exactly what is shown, which goes back to the opener.
 (() => {
   'use strict';
 
@@ -203,6 +207,112 @@
       if (r.ok) for (const el of document.querySelectorAll('.devmail')) el.hidden = false;
     })
     .catch(() => {});
+
+  // ---------------------------------------------------------------- confirming a spend
+  const LABELS = {
+    price: 'Price', days: 'Days', pricePerDay: 'Per day', months: 'Months', pricePerMonth: 'Per month', amount: 'Amount', to: 'To',
+    salePrice: 'For sale at', rentPricePerDay: 'Rent per day', rentMaxDays: 'Longest rental', subscriptionPricePerMonth: 'Subscription per month',
+  };
+  const POL = new Set(['price', 'pricePerDay', 'pricePerMonth', 'amount', 'salePrice', 'rentPricePerDay', 'subscriptionPricePerMonth']);
+  const TITLES = { buy: 'Buy', rent: 'Rent', subscribe: 'Subscribe to', list: 'List', withdraw: 'Withdraw your earnings', send: 'Send POL' };
+
+  function startConfirm() {
+    const action = q.get('action');
+    if (!TITLES[action] || returnMode !== 'popup' || !window.opener) {
+      show('done');
+      $('.tick').hidden = true;
+      $('#done-title').textContent = 'Nothing to confirm';
+      $('#done-text').textContent = 'Open this from ALTAR when you buy, rent, subscribe, list or send.';
+      return;
+    }
+    const aiId = q.get('ai') || undefined;
+    const reserved = new Set(['mode', 'platform', 'return', 'state', 'action', 'ai', 'handle']);
+    const params = {};
+    for (const [k, v] of q) if (!reserved.has(k) && LABELS[k]) params[k] = v.slice(0, 200);
+    const form = $('#confirm');
+    let token = null;
+    let useCode = false;
+
+    // What is being confirmed, exactly as Core will bind it.
+    const rows = [];
+    const show2 = (k, v) => (v === 'off' ? 'Not offered' : v === 'keep' ? 'Unchanged' : POL.has(k) ? `${v} POL` : v);
+    for (const [k, v] of Object.entries(params)) rows.push([LABELS[k], show2(k, v)]);
+    const n = Number(params.days || params.months);
+    const each = Number(params.pricePerDay || params.pricePerMonth);
+    if (n && each) rows.push(['Total', `${+(n * each).toFixed(6)} POL`, true]);
+    const dl = $('#confirm-summary');
+    dl.replaceChildren();
+    for (const [k, v, total] of rows) {
+      const dt = document.createElement('dt');
+      const dd = document.createElement('dd');
+      dt.textContent = k;
+      dd.textContent = v;
+      if (total) dt.className = dd.className = 'total';
+      dl.append(dt, dd);
+    }
+    dl.hidden = rows.length === 0;
+    $('#confirm-title').textContent = TITLES[action];
+    $('#confirm-go').textContent = action === 'list' ? 'Confirm listing' : action === 'withdraw' ? 'Withdraw' : 'Confirm payment';
+
+    // The AI by its public profile, so the name shown is ALT's own, not the page's.
+    const handle = q.get('handle');
+    if (aiId && handle) {
+      fetch(`${API}/public/ais/${encodeURIComponent(handle)}`, { credentials: 'omit' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((ai) => {
+          if (!ai || ai.id !== aiId) return fail(form, 'This request does not match that AI. Close this window and try again.');
+          $('#confirm-title').textContent = `${TITLES[action]} ${ai.name}`;
+          const who = $('#confirm-ai');
+          who.querySelector('span').textContent = `@${ai.handle}`;
+          if (ai.avatarUrl) who.querySelector('img').src = ai.avatarUrl;
+          who.hidden = false;
+        })
+        .catch(() => {});
+    }
+
+    // Borrow the opener's session for this one request (same origin only).
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin || e.source !== window.opener) return;
+      if (e.data?.type === 'alt:token' && e.data.state === state) token = e.data.token;
+    });
+    window.opener.postMessage({ type: 'alt:confirm-ready', state }, location.origin);
+
+    $('#confirm-switch').addEventListener('click', () => {
+      useCode = !useCode;
+      const input = form.querySelector('input[name=secret]');
+      input.value = '';
+      input.type = useCode ? 'text' : 'password';
+      input.autocomplete = useCode ? 'one-time-code' : 'current-password';
+      $('#confirm-label').firstChild.textContent = useCode ? 'Code from your authenticator app' : 'Your ALT password';
+      $('#confirm-switch').textContent = useCode ? 'Use your password instead' : 'Use a code from your authenticator app';
+      input.focus();
+    });
+    $('#confirm-cancel').addEventListener('click', () => {
+      window.opener.postMessage({ type: 'alt:approval-cancelled', state }, location.origin);
+      window.close();
+    });
+
+    guard(form, async (f) => {
+      if (!token) throw new Error('ALTAR did not answer. Close this window and try again.');
+      const secret = String(f.get('secret'));
+      const { approval } = await call('/me/spend-approvals', {
+        token,
+        body: { action, aiId, params, confirm: useCode ? { code: secret.trim() } : { password: secret } },
+      });
+      window.opener.postMessage({ type: 'alt:approval', state, approval }, location.origin);
+      show('done');
+      $('#done-title').textContent = 'Confirmed';
+      $('#done-text').textContent = 'Returning to ALTAR…';
+      setTimeout(() => window.close(), 400);
+    });
+    show('confirm');
+  }
+
+  if (q.get('mode') === 'confirm' && platform === 'altar') {
+    document.title = 'ALT Account · Confirm';
+    startConfirm();
+    return;
+  }
 
   if (!platform) {
     show('done');

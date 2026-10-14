@@ -66,6 +66,12 @@ body {
 .chip.alter { background: var(--ink); color: var(--card); }
 
 h1 { font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; font-weight: 800; }
+.summary { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0 0 20px; padding: 14px 16px; border-radius: 14px; background: var(--field); font-size: 14px; }
+.summary dt { color: var(--muted); }
+.summary dd { margin: 0; text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+.summary .total { font-weight: 800; }
+.who { display: flex; align-items: center; gap: 10px; margin: -8px 0 16px; font-weight: 700; }
+.who img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--field); }
 .lead { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
 .lead code { font-size: 12.5px; background: var(--field); padding: 1px 5px; border-radius: 5px; }
 

@@ -267,6 +267,52 @@ export function continueWithAlt(mode = "signin", next = null) {
   });
 }
 
+/**
+ * Confirms one spend in the ALT Account window instead of on ALTAR's page: the window shows what is
+ * being paid, takes the password or 2FA code itself and returns a one-time approval bound to exactly
+ * that (Core's /me/spend-approvals). ALTAR lends the window its session through a same-origin message
+ * and never sees the password. `intent` = { action, ai?: { id, handle }, params } with amounts in POL,
+ * the same values the spend request sends. Resolves to { approval }, null if the person closed the
+ * window, or undefined if popups are blocked (the caller can then ask on the page).
+ */
+export function confirmInAltWindow({ action, ai, params = {} }) {
+  const state = crypto.randomUUID();
+  const q = new URLSearchParams({ platform: "altar", mode: "confirm", return: "popup", state, action });
+  if (ai) {
+    q.set("ai", ai.id);
+    q.set("handle", ai.handle);
+  }
+  for (const [k, v] of Object.entries(params)) q.set(k, String(v));
+  const w = 440;
+  const h = 640;
+  const left = Math.max(0, window.screenX + (window.outerWidth - w) / 2);
+  const top = Math.max(0, window.screenY + (window.outerHeight - h) / 2);
+  const popup = window.open(`/core/account/?${q}`, "alt-confirm", `popup=yes,width=${w},height=${h},left=${left},top=${top}`);
+  if (!popup) return Promise.resolve(undefined);
+  popup.focus();
+  return new Promise((resolve) => {
+    const done = (value) => {
+      window.removeEventListener("message", onMessage);
+      clearInterval(watch);
+      resolve(value);
+    };
+    const onMessage = async (e) => {
+      // Only the window we opened, on our own origin, about this request.
+      if (e.origin !== window.location.origin || e.source !== popup || e.data?.state !== state) return;
+      if (e.data.type === "alt:confirm-ready") {
+        if (!accessToken) await refresh().catch(() => {});
+        popup.postMessage({ type: "alt:token", state, token: accessToken }, window.location.origin);
+      } else if (e.data.type === "alt:approval") {
+        done({ approval: e.data.approval });
+      } else if (e.data.type === "alt:approval-cancelled") {
+        done(null);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    const watch = setInterval(() => popup.closed && done(null), 500);
+  });
+}
+
 /** Where /handoff should go after a full-page sign-in (set by continueWithAlt). */
 export function takeNextPath(fallback = "/profile") {
   try {

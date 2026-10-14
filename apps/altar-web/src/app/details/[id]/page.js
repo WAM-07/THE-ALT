@@ -151,6 +151,7 @@ export default function AgentDetails() {
         <ConfirmSpend
           title={`Buy ${model.name}`}
           action={`Pay ${polText(listing.sale.price)}`}
+          intent={{ action: "buy", ai: { id: model.id, handle: model.handle }, params: { price: listing.sale.price.pol } }}
           onClose={() => setCheckout(null)}
           onConfirm={(confirm) => wallet.buy(model.id, confirm, listing.sale.price.pol)}
           onDone={() => {
@@ -166,6 +167,7 @@ export default function AgentDetails() {
         <ConfirmSpend
           title={`Rent ${model.name}`}
           action={`Pay ${polText(String(Number(listing.rent.pricePerDay.pol) * days))}`}
+          intent={{ action: "rent", ai: { id: model.id, handle: model.handle }, params: { days, pricePerDay: listing.rent.pricePerDay.pol } }}
           onClose={() => setCheckout(null)}
           onConfirm={(confirm) => wallet.rent(model.id, days, confirm, listing.rent.pricePerDay.pol)}
           onDone={() => router.push(`/chat/${model.handle}`)}
@@ -177,6 +179,7 @@ export default function AgentDetails() {
         <ConfirmSpend
           title={`Subscribe to ${model.name}`}
           action={`Pay ${polText(String(Number(listing.subscription.pricePerMonth.pol) * months))}`}
+          intent={{ action: "subscribe", ai: { id: model.id, handle: model.handle }, params: { months, pricePerMonth: listing.subscription.pricePerMonth.pol } }}
           onClose={() => setCheckout(null)}
           onConfirm={(confirm) => wallet.subscribe(model.id, months, confirm, listing.subscription.pricePerMonth.pol)}
           onDone={() => router.push(`/chat/${model.handle}`)}
