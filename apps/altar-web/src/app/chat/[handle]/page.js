@@ -1,12 +1,12 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Spinner, VerifiedTick } from "../../../components/ui";
 import { useAuth } from "../../../contexts/AuthContext";
-import { toModel, useAI } from "../../../contexts/AIContext";
-import { altar, api, continueWithAlt, conversations, publicApi } from "../../../lib/alt";
+import { toModel } from "../../../contexts/AIContext";
+import { api, continueWithAlt, conversations, publicApi } from "../../../lib/alt";
 
 /** "2 days 3 h", "45 min": how long a rental or subscription still runs. */
 function timeLeft(until, now) {
@@ -29,33 +29,33 @@ const merge = (list, more) => {
 };
 
 /**
- * The AIs this person can talk to on ALTAR: the ones they own, rent or subscribe to, with how long
- * each lasts. Shown as picture bubbles to switch between conversations.
+ * The AIs on this person's ALT account (the same list ALTER and ALTERA show): the verified ones they
+ * own, rent or subscribe to, with how long each lasts, and ended ones whose conversations stay
+ * readable. Shown as picture bubbles to switch between conversations.
  */
 function useMyAis(user) {
-  const { aiModels } = useAI();
-  const [owned, setOwned] = useState(null);
-  const [using, setUsing] = useState(null);
+  const [items, setItems] = useState(null);
   useEffect(() => {
     if (!user) return;
-    api("/core/ais")
-      .then((list) => setOwned(list.filter((a) => a.verified).map(toModel)))
-      .catch(() => setOwned([]));
-    altar
-      .myRentals()
-      .then(setUsing)
-      .catch(() => setUsing([]));
+    api("/core/me/ais")
+      .then((list) =>
+        setItems(
+          list
+            .filter((a) => a.verified)
+            .map((a) => ({
+              id: a.id,
+              handle: a.handle,
+              name: a.name,
+              image: toModel(a).image,
+              role: a.access.role === "owner" ? (a.created ? "Yours" : "Bought") : a.access.role === "subscriber" ? "Subscribed" : "Rented",
+              until: a.access.active ? a.access.until : null,
+              ended: !a.access.active,
+            })),
+        ),
+      )
+      .catch(() => setItems([]));
   }, [user]);
-  return useMemo(() => {
-    if (!owned || !using) return null;
-    const picture = (id) => aiModels?.find((m) => m.id === id)?.image ?? null;
-    const items = owned.map((a) => ({ id: a.id, handle: a.handle, name: a.name, image: a.image, role: "Owned", until: null }));
-    for (const u of using) {
-      if (!u.ai || items.some((i) => i.id === u.ai.id)) continue;
-      items.push({ id: u.ai.id, handle: u.ai.handle, name: u.ai.name, image: picture(u.ai.id), role: u.kind === "subscription" ? "Subscribed" : "Rented", until: u.expiresAt });
-    }
-    return items;
-  }, [owned, using, aiModels]);
+  return items;
 }
 
 // One chat per AI: switching AIs starts the page afresh, so nothing from the last one lingers.
@@ -209,11 +209,11 @@ function Chat({ handle }) {
               return (
                 <Link key={a.id} href={`/chat/${a.handle}`} className={`flex items-center gap-3 rounded-2xl p-2 transition ${on ? "bg-sunken" : "hover:bg-sunken/60"}`} aria-current={on ? "page" : undefined}>
                   <span className={`flex shrink-0 rounded-full p-1 ${on ? "bg-accent" : ""}`}>
-                    <Avatar src={a.image} name={a.name} size={40} className="ring-2 ring-surface" />
+                    <Avatar src={a.image} name={a.name} size={40} className={`ring-2 ring-surface ${a.ended ? "opacity-50" : ""}`} />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{a.name}</span>
-                    <span className="block truncate text-xs text-ink-3">{a.role === "Owned" ? "Yours" : rest ? `${a.role} · ${rest} left` : `${a.role} · ended`}</span>
+                    <span className="block truncate text-xs text-ink-3">{a.ended ? `${a.role} · ended` : rest ? `${a.role} · ${rest} left` : a.role}</span>
                   </span>
                 </Link>
               );
