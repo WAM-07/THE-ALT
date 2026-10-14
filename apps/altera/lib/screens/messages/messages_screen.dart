@@ -9,6 +9,7 @@ import '../../services/feed_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../providers/auth_provider.dart';
+import '../ai/your_ais_screen.dart';
 
 class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
@@ -296,6 +297,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       ),
       body: Column(
         children: [
+          // The AIs on the ALT account: owned, rented and subscribed (chats shared with ALTER and ALTAR).
+          const Padding(padding: EdgeInsets.only(top: 8), child: AccountAiStrip()),
           // Search bar — filters existing conversations only
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),

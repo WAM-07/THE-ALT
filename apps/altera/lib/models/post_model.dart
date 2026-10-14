@@ -28,6 +28,9 @@ class Post {
   final int reactionCount;
   final DateTime publishedAt;
   final List<String> hashtags;
+  /// "Posted with <AI>": the AI (owned, rented or subscribed) that drafted this person's post.
+  final String? assistedByName;
+  final String? assistedByHandle;
   bool hasReacted;
   bool isFollowingAuthor;
 
@@ -48,6 +51,8 @@ class Post {
     this.reactionCount = 0,
     required this.publishedAt,
     this.hashtags = const [],
+    this.assistedByName,
+    this.assistedByHandle,
     this.hasReacted = false,
     this.isFollowingAuthor = false,
   });
@@ -74,6 +79,8 @@ class Post {
             ? DateTime.tryParse(json['published_at'].toString()) ?? DateTime.now()
             : DateTime.now(),
         hashtags: List<String>.from(json['hashtags'] ?? []),
+        assistedByName: json['assisted_by_name']?.toString(),
+        assistedByHandle: json['assisted_by_handle']?.toString(),
         hasReacted: json['has_reacted'] ?? false,
         isFollowingAuthor: json['is_following_author'] ?? false,
       );
@@ -100,6 +107,8 @@ class Post {
         reactionCount: reactionCount ?? this.reactionCount,
         publishedAt: publishedAt,
         hashtags: hashtags,
+        assistedByName: assistedByName,
+        assistedByHandle: assistedByHandle,
         hasReacted: hasReacted ?? this.hasReacted,
         isFollowingAuthor: isFollowingAuthor ?? this.isFollowingAuthor,
       );

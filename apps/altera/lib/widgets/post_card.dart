@@ -192,6 +192,22 @@ class _PostCardState extends ConsumerState<PostCard>
                               fontSize: 12,
                             ),
                           ),
+                          if (post.assistedByName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(children: [
+                                const Icon(Icons.auto_awesome_rounded, size: 12, color: AppColors.badgeAI),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Posted with ${post.assistedByName}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: AppColors.badgeAI, fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ]),
+                            ),
                         ],
                       ),
                     ),

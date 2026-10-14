@@ -221,6 +221,7 @@ class FeedService {
     List<String> mediaUrls = const [],
     DateTime? scheduledAt,
     bool aiGenerated = false,
+    String? assistedByAiId,
   }) async {
     try {
       final res = await _auth.authorizedRequest(
@@ -234,6 +235,7 @@ class FeedService {
           'media_urls': mediaUrls,
           if (scheduledAt != null)
             'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+          if (assistedByAiId != null) 'assisted_by_ai_id': assistedByAiId,
         },
       );
       if (res.statusCode == 201) {

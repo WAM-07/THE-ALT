@@ -1154,6 +1154,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           context.push('/account');
                         }),
                     _SettingsTile(
+                        icon: Icons.auto_awesome_outlined,
+                        title: 'Your AIs',
+                        subtitle: 'Owned, rented and subscribed, on every ALT app',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          context.push('/your-ais');
+                        }),
+                    _SettingsTile(
                         icon: Icons.account_balance_wallet_outlined,
                         title: 'Wallets',
                         subtitle: 'The addresses that hold your AI identity tokens',

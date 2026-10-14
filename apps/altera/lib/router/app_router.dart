@@ -20,6 +20,8 @@ import '../screens/profile/create_ai_screen.dart';
 import '../screens/profile/pending_approvals_screen.dart';
 import '../screens/profile/moderation_screen.dart';
 import '../screens/profile/visiting_profile_screen.dart';
+import '../screens/ai/ai_chat_screen.dart';
+import '../screens/ai/your_ais_screen.dart';
 
 import '../providers/auth_provider.dart';
 
@@ -87,6 +89,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/create-ai',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const BringAiScreen(),
+      ),
+      // The AIs on the ALT account (owned, rented, subscribed) and chatting with them.
+      GoRoute(
+        path: '/your-ais',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const YourAisScreen(),
+      ),
+      GoRoute(
+        path: '/ai-chat/:aiId',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => AiChatScreen(aiId: state.pathParameters['aiId']!),
       ),
       GoRoute(
         path: '/pending-approvals',

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/feed_provider.dart';
+import '../../services/account_ai_service.dart';
 import '../../services/ai_service.dart';
 import '../../widgets/avatar_widget.dart';
 import 'dart:io';
@@ -28,6 +29,12 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
   bool _isPosting = false;
   bool _isAIGenerating = false;
   bool _hasAIGeneratedContent = false;
+  // An AI on the ALT account (owned, rented or subscribed) that drafted this post: "posted with".
+  AccountAi? _assistedBy;
+  bool get _postingAsAi {
+    final auth = ref.read(authStateProvider);
+    return auth.activeProfileId != auth.user?.humanProfile?.id;
+  }
   int get _charCount => _contentCtrl.text.length;
   static const int _maxChars = 5000;
 
@@ -151,6 +158,7 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
         mediaUrls: _mediaUrls,
         scheduledAt: _isScheduled ? _scheduledAt : null,
         aiGenerated: isAI && _hasAIGeneratedContent,
+        assistedByAiId: isAI ? null : _assistedBy?.id,
       );
 
       if (post != null && post.success) {
@@ -190,6 +198,104 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
     setState(() => _isPosting = false);
   }
 
+
+  /// "Write with your AI": an AI the person owns, rents or subscribes to drafts the post for their
+  /// own profile. They can edit it; it is published "posted with" that AI.
+  Future<void> _writeWithAccountAi() async {
+    final service = ref.read(accountAiServiceProvider);
+    List<AccountAi> ais;
+    try {
+      ais = (await service.accountAis()).where((a) => a.active).toList();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach ALT. Try again.')));
+      return;
+    }
+    if (!mounted) return;
+    if (ais.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No AIs on your account yet. Make one in ALTER, or rent or subscribe on ALTAR.')));
+      return;
+    }
+    var chosen = _assistedBy != null && ais.any((a) => a.id == _assistedBy!.id) ? ais.firstWhere((a) => a.id == _assistedBy!.id) : ais.first;
+    final brief = TextEditingController();
+    final go = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('Write with your AI', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text('It drafts a post for your profile. You can edit it before posting; it shows “posted with” the AI.',
+                style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.6))),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 92,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: ais.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (_, i) {
+                  final a = ais[i];
+                  final on = a.id == chosen.id;
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => set(() => chosen = a),
+                    child: SizedBox(
+                      width: 70,
+                      child: Column(children: [
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? AppColors.primary : Colors.transparent, width: 2)),
+                          child: AvatarWidget(avatarUrl: a.avatarUrl, displayName: a.name, radius: 24, isAI: true),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: on ? FontWeight.w700 : FontWeight.w500)),
+                        Text(a.owned ? 'Yours' : a.role == 'subscriber' ? 'Subscribed' : 'Rented', style: const TextStyle(fontSize: 10.5, color: AppColors.textTertiary)),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: brief,
+              autofocus: true,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'What should the post be about?',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: const Text('Draft it'),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+          ]),
+        ),
+      ),
+    );
+    if (go != true || brief.text.trim().length < 3 || !mounted) return;
+    setState(() => _isAIGenerating = true);
+    try {
+      final text = await service.draftWith(chosen.id, brief.text.trim());
+      setState(() {
+        _contentCtrl.text = text;
+        _assistedBy = chosen;
+      });
+      _contentCtrl.selection = TextSelection.fromPosition(TextPosition(offset: text.length));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: AppColors.error));
+      }
+    }
+    if (mounted) setState(() => _isAIGenerating = false);
+  }
 
   Future<void> _generateWithAI() async {
     final promptCtrl = TextEditingController();
@@ -324,6 +430,19 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
         children: [
           if (_isAIGenerating)
             LinearProgressIndicator(backgroundColor: AppColors.badgeAI.withOpacity(0.1), color: AppColors.badgeAI),
+          if (_assistedBy != null && !_postingAsAi)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: InputChip(
+                  avatar: const Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.badgeAI),
+                  label: Text('Posted with ${_assistedBy!.name}'),
+                  tooltip: 'Remove to post without the AI tag',
+                  onDeleted: () => setState(() => _assistedBy = null),
+                ),
+              ),
+            ),
           
           Expanded(
             child: SingleChildScrollView(
@@ -428,6 +547,8 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
               children: [
                 IconButton(icon: const Icon(Icons.image_outlined, color: AppColors.primary), onPressed: _addMedia),
                 IconButton(icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.badgeAI), onPressed: _generateWithAI),
+                if (!_postingAsAi)
+                  IconButton(tooltip: 'Write with your AI', icon: const Icon(Icons.smart_toy_outlined, color: AppColors.primary), onPressed: _writeWithAccountAi),
                 IconButton(icon: Icon(Icons.schedule_rounded, color: _isScheduled ? AppColors.secondary : AppColors.textTertiary), onPressed: _selectSchedule),
                 const Spacer(),
                 SizedBox(
