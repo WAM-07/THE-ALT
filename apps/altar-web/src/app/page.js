@@ -437,7 +437,7 @@ function Creators({ creators }) {
       <SectionHead eyebrow="The people behind them" title="Creators" />
       <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4">
         {creators.map(({ person, ais }) => (
-          <Link key={person.id} href={`/details/${ais[0].handle}`} className="group overflow-hidden rounded-3xl border border-line bg-surface transition hover:-translate-y-1 hover:shadow-card">
+          <Link key={person.id} href={`/creator/${person.handle}`} className="group overflow-hidden rounded-3xl border border-line bg-surface transition hover:-translate-y-1 hover:shadow-card">
             <div className="flex h-20">
               {ais.slice(0, 3).map((m) => (
                 <AitArt key={m.id} seed={m.artSeed} grain={false} className="h-full flex-1" />

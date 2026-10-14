@@ -468,17 +468,18 @@ export default function AgentDetails() {
 
 function Person({ label, person, you }) {
   const name = person?.displayName ?? "Unknown";
+  const Wrap = person?.handle ? Link : "div";
   return (
-    <div className="flex items-center gap-3">
+    <Wrap {...(person?.handle ? { href: `/creator/${person.handle}` } : {})} className="group flex items-center gap-3">
       <Avatar src={mediaUrl(person?.avatarUrl)} name={name} size={44} />
       <div className="min-w-0">
         <p className="text-xs font-medium text-ink-3">{label}</p>
-        <p className="truncate font-semibold">
+        <p className="truncate font-semibold group-hover:underline">
           {name}
           {you && <span className="ml-1.5 text-sm font-medium text-accent-text">(you)</span>}
         </p>
       </div>
-    </div>
+    </Wrap>
   );
 }
 
