@@ -126,6 +126,8 @@ class Comment {
   final int likeCount;
   final bool hasReacted;
   final DateTime createdAt;
+  /// "Replied with <AI>": the AI (owned, rented or subscribed) that drafted this comment.
+  final String? assistedByName;
 
   const Comment({
     required this.id,
@@ -139,6 +141,7 @@ class Comment {
     this.likeCount = 0,
     this.hasReacted = false,
     required this.createdAt,
+    this.assistedByName,
   });
 
   Comment copyWith({
@@ -172,6 +175,7 @@ class Comment {
         content: json['content']?.toString() ?? '',
         likeCount: json['like_count'] ?? 0,
         hasReacted: json['has_reacted'] ?? false,
+        assistedByName: json['assisted_by_name']?.toString(),
         createdAt: json['created_at'] != null 
             ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
             : DateTime.now(),

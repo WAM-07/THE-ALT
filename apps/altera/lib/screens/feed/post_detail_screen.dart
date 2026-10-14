@@ -1,3 +1,5 @@
+import '../../services/account_ai_service.dart';
+import '../../widgets/write_with_ai_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,6 +30,35 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   bool _isSubmitting = false;
   String? _error;
   final _commentCtrl = TextEditingController();
+  // An AI on the ALT account that drafted this comment ("replied with"); removed if you clear it.
+  AccountAi? _assistedBy;
+  bool _drafting = false;
+
+  Future<void> _replyWithAi() async {
+    final picked = await pickAiToWriteWith(
+      context,
+      ref,
+      title: 'Reply with your AI',
+      subtitle: 'It drafts a comment for you under this post. You can edit it; it shows “replied with” the AI.',
+      hint: 'What do you want to say? (optional)',
+      briefRequired: false,
+      initialAiId: _assistedBy?.id,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _drafting = true);
+    try {
+      final text = await ref.read(accountAiServiceProvider).draftWith(picked.ai.id, picked.brief, commentOnPostId: widget.postId);
+      if (!mounted) return;
+      setState(() {
+        _commentCtrl.text = text.length > 500 ? text.substring(0, 500) : text;
+        _assistedBy = picked.ai;
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    } finally {
+      if (mounted) setState(() => _drafting = false);
+    }
+  }
   final _scrollCtrl = ScrollController();
   final _focusNode = FocusNode();
 
@@ -149,33 +180,21 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             content: text,
             authorId: authorId,
             authorType: authorType,
+            assistedByAiId: authorType == 'human' ? _assistedBy?.id : null,
           );
 
       if (newComment != null && mounted) {
         _commentCtrl.clear();
+        _assistedBy = null;
         setState(() {
-          _comments.add(newComment);
-          if (_post != null) {
-            // Increment local comment count
-            _post = Post(
-              id: _post!.id,
-              authorId: _post!.authorId,
-              authorUserId: _post!.authorUserId,
-              authorType: _post!.authorType,
-              authorUsername: _post!.authorUsername,
-              authorDisplayName: _post!.authorDisplayName,
-              authorAvatar: _post!.authorAvatar,
-              authorIsVerified: _post!.authorIsVerified,
-              content: _post!.content,
-              mediaUrls: _post!.mediaUrls,
-              isAutonomous: _post!.isAutonomous,
-              commentCount: _post!.commentCount + 1,
-              reactionCount: _post!.reactionCount,
-              publishedAt: _post!.publishedAt,
-              hashtags: _post!.hashtags,
-              hasReacted: _post!.hasReacted,
-              isFollowingAuthor: _post!.isFollowingAuthor,
-            );
+          // The live update (comment:new) may have added it already.
+          if (!_comments.any((c) => c.id == newComment.id)) {
+            _comments.add(newComment);
+            if (_post != null) {
+              final newCount = _post!.commentCount + 1;
+              _post = _post!.copyWith(commentCount: newCount);
+              ref.read(feedProvider.notifier).syncCommentCount(widget.postId, newCount);
+            }
           }
         });
         // Scroll to bottom
@@ -600,7 +619,14 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
               minLines: 1,
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText: 'Add a comment...',
+                hintText: _drafting ? 'Your AI is writing…' : 'Add a comment...',
+                prefixIcon: _assistedBy == null
+                    ? null
+                    : IconButton(
+                        tooltip: 'Replied with ${_assistedBy!.name}. Tap to remove the tag.',
+                        icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.badgeAI, size: 18),
+                        onPressed: () => setState(() => _assistedBy = null),
+                      ),
                 hintStyle: TextStyle(
                   color: isDark
                       ? AppColors.textSecondaryDark
@@ -630,7 +656,13 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
               onChanged: (_) => setState(() {}),
             ),
           ),
-          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Reply with your AI',
+            onPressed: _drafting ? null : _replyWithAi,
+            icon: _drafting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.smart_toy_outlined, color: AppColors.primary),
+          ),
           GestureDetector(
             onTap: _commentCtrl.text.trim().isEmpty || _isSubmitting
                 ? null
@@ -765,6 +797,18 @@ class _CommentTile extends StatelessWidget {
                             ],
                           ],
                         ),
+                        if (comment.assistedByName != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Row(children: [
+                              const Icon(Icons.auto_awesome_rounded, size: 11, color: AppColors.badgeAI),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text('Replied with ${comment.assistedByName}',
+                                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.badgeAI, fontSize: 11, fontWeight: FontWeight.w600)),
+                              ),
+                            ]),
+                          ),
                         const SizedBox(height: 4),
                         Text(
                           comment.content,

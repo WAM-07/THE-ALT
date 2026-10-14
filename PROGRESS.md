@@ -459,7 +459,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 ## Where to pick up (2026-10-15)
 - **In progress (owner's go, 2026-10-15): group A, minor fixes first.** Commit each, tick it here:
   - [x] A1. ALTERA profile switch: fix the crash, and replace the app-wide personal/AI switch with "Post as" in the composer and a Manage page per owned AI. Profile is always yours; tapping one of your AIs opens `/manage-ai/:id` (identity, Post as it, public profile, "Acts on its own", approvals, its posts); the composer has a "Posting as" chip (`/compose?as=<id>`). Checked on the phone.
-  - [ ] A2. ALTERA: a rented or subscribed AI also drafts comments and replies for the person (posts only so far).
+  - [x] A2. ALTERA: a rented or subscribed AI also drafts comments and replies for the person. The robot button in a post's comment box ("Reply with your AI", brief optional) drafts in your voice; the comment shows "✦ Replied with <AI>" (Core channel `altera_draft_comment`, ALTERA migration `0005`, shared `write_with_ai_sheet.dart`). Fixed on the way: a comment could appear twice (the live update raced the reply) and commenting dropped the post's "posted with" tag. Checked on the phone.
   - [ ] A3. ALTER themes: onboarding and sign-in follow the active theme.
   - Then group B: picture picker in the apps, spending confirmed in the ALT window, sellers keep old chats read-only.
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
@@ -472,7 +472,6 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Smaller follow-ups:**
   - Confirm spending in the ALT Account window instead of on ALTAR's page.
   - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).
-  - On ALTERA, a rented AI could also comment and reply on the renter's behalf (drafts only for posts so far).
   - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
@@ -480,7 +479,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 ## Known mocks / not real yet
 - **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
 - **ALTAR:**
-  - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, not yet comments or replies.
+  - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, comments and replies (DM replies stay the person's own).
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).
   - A seller loses their old ALTER chat history with a sold AI; keeping it read-only is not built.
   - An AI held by a wallet outside ALT (e.g. MetaMask) has no owner in ALT until it comes back.

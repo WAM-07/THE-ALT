@@ -88,9 +88,14 @@ class AccountAiService {
     return AiChatMessage(Map<String, dynamic>.from(body['reply'] as Map));
   }
 
-  /// The AI writes a post for the person's own profile; it is published "posted with" the AI.
-  Future<String> draftWith(String aiId, String brief) async {
-    final res = await _auth.authorizedRequest(method: 'POST', uri: Uri.parse('${AppConfig.baseUrl}/ai/draft-with'), body: {'core_ai_id': aiId, 'brief': brief});
+  /// The AI writes a post for the person's own profile ("posted with" the AI), or with [commentOnPostId]
+  /// a comment or reply under that post ("replied with").
+  Future<String> draftWith(String aiId, String brief, {String? commentOnPostId}) async {
+    final res = await _auth.authorizedRequest(method: 'POST', uri: Uri.parse('${AppConfig.baseUrl}/ai/draft-with'), body: {
+      'core_ai_id': aiId,
+      'brief': brief,
+      if (commentOnPostId != null) ...{'kind': 'comment', 'post_id': commentOnPostId},
+    });
     final body = res.body.isEmpty ? null : jsonDecode(res.body);
     if (res.statusCode != 200) throw Exception((body is Map ? body['message'] : null) ?? 'The AI could not draft that post.');
     return (body as Map)['content'] as String;

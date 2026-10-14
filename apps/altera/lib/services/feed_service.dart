@@ -376,6 +376,7 @@ class FeedService {
     required String content,
     required String authorId,
     required String authorType,
+    String? assistedByAiId,
   }) async {
     try {
       final res = await _auth.authorizedRequest(
@@ -385,6 +386,7 @@ class FeedService {
           'content': content,
           'author_id': authorId,
           'author_type': authorType,
+          if (assistedByAiId != null) 'assisted_by_ai_id': assistedByAiId,
         },
       );
       if (res.statusCode == 201) {
