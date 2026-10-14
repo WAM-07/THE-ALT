@@ -202,11 +202,13 @@ export async function notificationRoutes(app: FastifyInstance, ctx: Ctx) {
     },
   );
 
-  r.delete(
-    '/me/push-devices',
-    { preHandler: authed, schema: { tags: ['notifications'], summary: 'Stop push notifications on this phone (on sign-out)', body: PushDevice.pick({ token: true }) } },
+  // On sign-out the app no longer has a session, so the phone's own Firebase token (a long secret
+  // only that install has) is what proves it may stop its pushes.
+  r.post(
+    '/push-devices/forget',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } }, schema: { tags: ['notifications'], summary: 'Stop push notifications on this phone (after signing out)', body: PushDevice.pick({ token: true }) } },
     async (req) => {
-      await ctx.db.query('DELETE FROM core.push_devices WHERE token = $1 AND user_id = $2', [req.body.token, req.auth!.userId]);
+      await ctx.db.query('DELETE FROM core.push_devices WHERE token = $1', [req.body.token]);
       return { removed: true };
     },
   );

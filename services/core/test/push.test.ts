@@ -61,11 +61,12 @@ describe('push notifications (Firebase Cloud Messaging)', () => {
     await push.sendNotification(id);
     expect(google.oauthCalls()).toBe(1);
 
-    // Signing out on a phone stops its pushes; nobody else can remove someone's phone.
+    // Someone else signing in on the same phone takes the token over.
     const other = await signUp(t);
-    await t.app.inject({ method: 'DELETE', url: '/me/push-devices', headers: auth(other.accessToken), payload: { token: live } });
-    expect((await t.app.ctx.db.query('SELECT 1 FROM core.push_devices WHERE token = $1', [live])).rowCount).toBe(1);
-    await t.app.inject({ method: 'DELETE', url: '/me/push-devices', headers: auth(u.accessToken), payload: { token: live } });
+    await t.app.inject({ method: 'PUT', url: '/me/push-devices', headers: auth(other.accessToken), payload: { token: live, platform: 'alter' } });
+    expect((await t.app.ctx.db.query('SELECT user_id FROM core.push_devices WHERE token = $1', [live])).rows[0].user_id).toBe(other.user.id);
+    // Signing out stops the phone's pushes with the phone's own token (there is no session any more).
+    expect((await t.app.inject({ method: 'POST', url: '/push-devices/forget', payload: { token: live } })).json()).toEqual({ removed: true });
     expect((await t.app.ctx.db.query('SELECT 1 FROM core.push_devices WHERE token = $1', [live])).rowCount).toBe(0);
   });
 
