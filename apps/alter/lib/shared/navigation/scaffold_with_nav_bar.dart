@@ -31,14 +31,16 @@ class ScaffoldWithNavBar extends StatelessWidget {
       body: Stack(children: [
         navigationShell,
         // Content fades out under the floating dock instead of showing through its edges.
-        const Positioned(
+        Positioned(
           left: 0,
           right: 0,
           bottom: 0,
           height: 120,
           child: IgnorePointer(
             child: DecoratedBox(
-              decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x0007070B), Color(0xE607070B), Color(0xFF07070B)], stops: [0, 0.45, 1])),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Ds.bg.withValues(alpha: 0), Ds.bg.withValues(alpha: 0.9), Ds.bg], stops: const [0, 0.45, 1]),
+              ),
             ),
           ),
         ),
@@ -55,9 +57,10 @@ class ScaffoldWithNavBar extends StatelessWidget {
                 height: 66,
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xB3121219),
+                  color: Ds.isObsidian ? const Color(0xB3121219) : Ds.bgRaised.withValues(alpha: Ds.isLight ? 0.92 : 0.82),
                   borderRadius: BorderRadius.circular(Ds.r4),
                   border: Border.all(color: Ds.hairline),
+                  boxShadow: Ds.lift,
                 ),
                 child: Row(children: [
                   for (var i = 0; i < _tabs.length; i++)

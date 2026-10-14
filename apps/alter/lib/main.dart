@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/alt/alt_session.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/palettes.dart';
 import 'shared/navigation/app_router.dart';
 import 'core/storage/hive_setup.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await HiveSetup.init();
+  // The theme chosen on this phone (Profile → Advanced → Theme), before the first frame.
+  await AlterThemeController.load();
   // Loads the person's AI whenever someone signs in (and forgets it on sign-out).
   watchAltSession();
   runApp(const ProviderScope(child: AlterApp()));
@@ -26,9 +29,31 @@ class AlterApp extends StatefulWidget {
 class _AlterAppState extends State<AlterApp> {
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
+  /// A new theme: every screen reads its colours from `Ds`, so rebuild the whole tree (const widgets
+  /// included), the way a hot reload does.
+  void _retheme() {
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      void mark(Element e) {
+        e.markNeedsBuild();
+        e.visitChildren(mark);
+      }
+
+      (context as Element).visitChildren(mark);
+    });
+  }
+
+  @override
+  void dispose() {
+    AlterThemeController.current.removeListener(_retheme);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    AlterThemeController.current.addListener(_retheme);
     // Opened from ALTERA or ALTAR with "Open in ALTER": sign in as the same ALT account.
     altHandoff.listen(
       onSignedIn: (user) {

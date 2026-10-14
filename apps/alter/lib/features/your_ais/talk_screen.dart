@@ -156,7 +156,7 @@ class _TalkScreenState extends State<TalkScreen> {
                   ListRow(
                     title: c.title,
                     subtitle: _day(c.updatedAt),
-                    trailing: c.id == _active ? const Icon(Icons.check_rounded, color: Ds.iris) : null,
+                    trailing: c.id == _active ? Icon(Icons.check_rounded, color: Ds.iris) : null,
                     onTap: () => Navigator.pop(ctx, c.id),
                   ),
               ]),
@@ -232,7 +232,7 @@ class _TalkScreenState extends State<TalkScreen> {
 
   Widget _header(AccountAi ai) => Container(
         padding: const EdgeInsets.fromLTRB(Ds.gutter, 0, Ds.gutter, 12),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ds.hairline))),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Ds.hairline))),
         child: Row(children: [
           AiAvatar(ai: ai, size: 40),
           const SizedBox(width: 12),
@@ -321,7 +321,7 @@ class _TalkScreenState extends State<TalkScreen> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(shape: BoxShape.circle, gradient: ready ? Ds.aurora : null, color: ready ? null : Ds.glassStrong),
-                child: Icon(Icons.arrow_upward_rounded, color: ready ? Colors.white : Ds.textTertiary, size: 22),
+                child: Icon(Icons.arrow_upward_rounded, color: ready ? Ds.onAccent : Ds.textTertiary, size: 22),
               ),
             ),
           ),

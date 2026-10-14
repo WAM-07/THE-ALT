@@ -216,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> with FollowsCurrentAi {
 
   Widget _header(AltAi ai) => Container(
         padding: const EdgeInsets.fromLTRB(Ds.gutter, 10, 14, 12),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Ds.hairline))),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Ds.hairline))),
         child: Row(children: [
           AiAvatar(ai: ai, size: 40),
           const SizedBox(width: 12),
@@ -229,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> with FollowsCurrentAi {
                 Align(alignment: Alignment.centerLeft, child: _Segmented(live: _live, liveVersion: ai.currentVersion, onChanged: (v) => setState(() => _live = v)))
               else
                 Row(children: [
-                  Container(width: 7, height: 7, decoration: const BoxDecoration(shape: BoxShape.circle, color: Ds.iris)),
+                  Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: Ds.iris)),
                   const SizedBox(width: 6),
                   Flexible(child: Text('Draft · your latest edits', style: Ds.caption, maxLines: 1, overflow: TextOverflow.ellipsis)),
                 ]),
@@ -290,7 +290,7 @@ class _ChatScreenState extends State<ChatScreen> with FollowsCurrentAi {
       padding: EdgeInsets.fromLTRB(14, 6, 14, MediaQuery.of(context).padding.bottom + 10),
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 4, 6, 4),
-        decoration: BoxDecoration(color: const Color(0xFF15151D), borderRadius: BorderRadius.circular(Ds.r4), border: Border.all(color: Ds.hairlineStrong)),
+        decoration: BoxDecoration(color: Ds.isObsidian ? const Color(0xFF15151D) : Color.alphaBlend(Ds.glassStrong, Ds.bgRaised), borderRadius: BorderRadius.circular(Ds.r4), border: Border.all(color: Ds.hairlineStrong)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
             child: TextField(
@@ -321,7 +321,7 @@ class _ChatScreenState extends State<ChatScreen> with FollowsCurrentAi {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(shape: BoxShape.circle, gradient: ready ? Ds.aurora : null, color: ready ? null : Ds.glassStrong),
-                child: Icon(Icons.arrow_upward_rounded, color: ready ? Colors.white : Ds.textTertiary, size: 22),
+                child: Icon(Icons.arrow_upward_rounded, color: ready ? Ds.onAccent : Ds.textTertiary, size: 22),
               ),
             ),
           ),
@@ -383,7 +383,7 @@ class _Bubble extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (msg.flagged) ...[
           Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.shield_outlined, size: 14, color: Ds.amber),
+            Icon(Icons.shield_outlined, size: 14, color: Ds.amber),
             const SizedBox(width: 5),
             Text('Held back by ALT’s safety rules', style: Ds.caption.copyWith(color: Ds.amber, fontSize: 11.5)),
           ]),
@@ -427,7 +427,7 @@ class _Typing extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 2.5),
                   width: 7,
                   height: 7,
-                  decoration: const BoxDecoration(color: Ds.textSecondary, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: Ds.textSecondary, shape: BoxShape.circle),
                 ).animate(onPlay: (c) => c.repeat()).fadeIn(delay: (i * 160).ms, duration: 300.ms).then().fadeOut(duration: 300.ms),
             ]),
           ),

@@ -54,3 +54,6 @@ flutter:
     - family: Sora
       fonts:
         - asset: assets/fonts/Sora.ttf
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces.ttf

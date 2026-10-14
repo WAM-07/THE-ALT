@@ -136,7 +136,7 @@ class _AiProfileScreenState extends State<AiProfileScreen> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(shape: BoxShape.circle, color: Ds.text, border: Border.all(color: Ds.bg, width: 3)),
-                      child: const Icon(Icons.photo_camera_rounded, size: 18, color: Ds.bg),
+                      child: Icon(Icons.photo_camera_rounded, size: 18, color: Ds.bg),
                     ),
                   ),
                 ),

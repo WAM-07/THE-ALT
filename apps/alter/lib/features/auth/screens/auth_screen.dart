@@ -218,7 +218,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   ],
                   const SizedBox(height: 28),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.lock_outline_rounded, size: 13, color: Ds.textTertiary),
+                    Icon(Icons.lock_outline_rounded, size: 13, color: Ds.textTertiary),
                     const SizedBox(width: 6),
                     Flexible(child: Text('One account · ALTER · ALTERA · ALTAR', textAlign: TextAlign.center, style: Ds.caption.copyWith(color: Ds.textTertiary))),
                   ]),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
 import '../../../core/theme/ds.dart';
+import '../../../shared/ui/theme_picker.dart';
 import '../../../shared/ui/ui.dart';
 import '../../consent_engine/screens/consent_screen.dart';
 
@@ -64,12 +65,12 @@ class SettingsScreen extends StatelessWidget {
                   Text('@${user?.handle ?? ''}${user?.email != null ? ' · ${user!.email}' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.caption),
                   const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
-                    if (user?.twoFactorEnabled ?? false) const Pill('2FA on', color: Ds.mint, icon: Icons.lock_rounded) else const Pill('2FA off', color: Ds.amber, icon: Icons.lock_open_rounded),
+                    if (user?.twoFactorEnabled ?? false) Pill('2FA on', color: Ds.mint, icon: Icons.lock_rounded) else Pill('2FA off', color: Ds.amber, icon: Icons.lock_open_rounded),
                     if (user?.primaryWallet != null) Pill(user!.primaryWallet!.short, color: Ds.sky, icon: Icons.account_balance_wallet_outlined),
                   ]),
                 ]),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
+              Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
             ]),
           );
         },
@@ -93,7 +94,7 @@ class SettingsScreen extends StatelessWidget {
             valueListenable: altInbox.unread,
             builder: (context, n, _) => Row(mainAxisSize: MainAxisSize.min, children: [
               if (n > 0) Pill('$n new', color: Ds.rose),
-              const Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
+              Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
             ]),
           ),
           onTap: () => context.push('/inbox'),
@@ -109,6 +110,10 @@ class SettingsScreen extends StatelessWidget {
       Group(children: [
         ListRow(icon: Icons.forum_outlined, color: Ds.sky, title: 'Open ALTERA', subtitle: 'Signed in automatically', onTap: () => _open(context, AltPlatform.altera)),
         ListRow(icon: Icons.storefront_outlined, color: Ds.amber, title: 'Open ALTAR', subtitle: 'Signed in automatically', onTap: () => _open(context, AltPlatform.altar)),
+      ]),
+      const SectionLabel('Advanced'),
+      Group(children: [
+        ListRow(icon: Icons.palette_outlined, color: Ds.iris, title: 'Theme', subtitle: Ds.palette.name, onTap: () => showThemePicker(context)),
       ]),
       const SizedBox(height: 24),
       Group(children: [ListRow(icon: Icons.logout_rounded, title: 'Sign out', danger: true, onTap: () => _signOut(context))]),

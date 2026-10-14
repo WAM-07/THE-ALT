@@ -290,7 +290,7 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
 
   Widget _copy(String value, String label) => IconButton(
         tooltip: 'Copy',
-        icon: const Icon(Icons.copy_rounded, size: 18, color: Ds.textTertiary),
+        icon: Icon(Icons.copy_rounded, size: 18, color: Ds.textTertiary),
         onPressed: () {
           Clipboard.setData(ClipboardData(text: value));
           toast(context, '$label copied');

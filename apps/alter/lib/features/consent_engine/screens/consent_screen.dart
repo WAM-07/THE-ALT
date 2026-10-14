@@ -32,7 +32,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
     }
   }
 
-  static const _titles = {
+  static Map<String, (String, IconData, Color)> get _titles => {
     'persona_training': ('Learn from my data', Icons.auto_awesome_outlined, Ds.iris),
     'third_party_processing': ('Use an AI provider', Icons.cloud_outlined, Ds.sky),
     'public_deployment': ('Appear on ALTERA and ALTAR', Icons.public_rounded, Ds.mint),

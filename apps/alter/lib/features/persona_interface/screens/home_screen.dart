@@ -176,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: _colorFor(n.category),
                 title: n.title,
                 subtitle: '${n.platform.toUpperCase()} · ${_ago(n.createdAt)}',
-                trailing: n.read ? null : Container(width: 8, height: 8, decoration: const BoxDecoration(color: Ds.iris, shape: BoxShape.circle)),
+                trailing: n.read ? null : Container(width: 8, height: 8, decoration: BoxDecoration(color: Ds.iris, shape: BoxShape.circle)),
                 onTap: () => context.push('/inbox'),
               ),
           ]),

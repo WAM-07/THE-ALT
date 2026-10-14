@@ -302,7 +302,7 @@ class _DatasetScreenState extends State<DatasetScreen> with FollowsCurrentAi {
                         color: item.included ? (item.usableAsText ? Ds.mint : Ds.sky) : Ds.amber,
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
+                      Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
                     ]),
                     onTap: () => _openItem(item),
                   ),
@@ -312,7 +312,7 @@ class _DatasetScreenState extends State<DatasetScreen> with FollowsCurrentAi {
               Glass(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    const IconBadge(Icons.lightbulb_outline_rounded, color: Ds.amber, size: 34),
+                    IconBadge(Icons.lightbulb_outline_rounded, color: Ds.amber, size: 34),
                     const SizedBox(width: 12),
                     Expanded(child: Text('The more it knows, the more it sounds like you', style: Ds.bodyStrong)),
                   ]),

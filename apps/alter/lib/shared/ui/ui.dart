@@ -47,19 +47,29 @@ class _BackdropState extends State<Backdrop> with SingleTickerProviderStateMixin
           animation: _t,
           builder: (context, _) {
             final a = _t.value * 2 * math.pi;
+            if (Ds.isObsidian) {
+              return Stack(fit: StackFit.expand, children: [
+                _glow(Alignment(-0.9 + 0.25 * math.sin(a), -1.0 + 0.15 * math.cos(a)), Ds.iris, 0.22 * k, 1.1),
+                _glow(Alignment(1.0 + 0.2 * math.cos(a * 0.7), -0.35 + 0.2 * math.sin(a * 0.7)), Ds.sky, 0.13 * k, 0.9),
+                _glow(Alignment(0.2 + 0.3 * math.sin(a * 0.5), 1.15), Ds.mint, 0.07 * k, 1.0),
+              ]);
+            }
+            // Other themes: two broad, quiet pools of their own light.
+            final glow = Ds.palette.glow;
+            final strength = Ds.isLight ? 0.9 : 0.55;
             return Stack(fit: StackFit.expand, children: [
-              _glow(Alignment(-0.9 + 0.25 * math.sin(a), -1.0 + 0.15 * math.cos(a)), Ds.iris, 0.22 * k, 1.1),
-              _glow(Alignment(1.0 + 0.2 * math.cos(a * 0.7), -0.35 + 0.2 * math.sin(a * 0.7)), Ds.sky, 0.13 * k, 0.9),
-              _glow(Alignment(0.2 + 0.3 * math.sin(a * 0.5), 1.15), Ds.mint, 0.07 * k, 1.0),
+              _glow(Alignment(-0.9 + 0.25 * math.sin(a), -1.0 + 0.15 * math.cos(a)), glow[0], strength * k, 1.25),
+              _glow(Alignment(1.0 + 0.2 * math.cos(a * 0.7), 0.9 + 0.15 * math.sin(a * 0.7)), glow[1], strength * 0.7 * k, 1.1),
             ]);
           },
         ),
-        // A soft vignette keeps the edges deep.
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00000000), Color(0x66000000)], stops: [0.55, 1]),
+        // A soft vignette keeps the edges deep (dark themes only).
+        if (!Ds.isLight)
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00000000), Color(0x66000000)], stops: [0.55, 1]),
+            ),
           ),
-        ),
         widget.child,
       ]),
     );
@@ -130,15 +140,20 @@ class Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shape = BorderRadius.circular(radius);
+    // Obsidian: white frost. Other dark themes: their own tinted glass. Light themes: paper and a shadow.
+    final List<Color> fill = tint != null
+        ? [tint!.withValues(alpha: Ds.isLight ? 0.12 : 0.16), tint!.withValues(alpha: Ds.isLight ? 0.05 : 0.06)]
+        : Ds.isObsidian
+            ? const [Color(0x12FFFFFF), Color(0x08FFFFFF)]
+            : Ds.isLight
+                ? [Ds.glass, Ds.glass]
+                : [Color.alphaBlend(const Color(0x0AFFFFFF), Ds.glass), Ds.glass];
     final body = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: shape,
         border: Border.all(color: border ?? Ds.hairline),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: tint == null ? const [Color(0x12FFFFFF), Color(0x08FFFFFF)] : [tint!.withValues(alpha: 0.16), tint!.withValues(alpha: 0.06)],
-        ),
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: fill),
+        boxShadow: tint == null ? Ds.lift : null,
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -199,10 +214,10 @@ class Btn extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = onTap != null && !loading;
     final (Color fg, Color? bg, Gradient? gradient, Color? border) = switch (kind) {
-      BtnKind.primary => (Ds.bg, Ds.text, null, null),
+      BtnKind.primary => (Ds.onFill, Ds.fill, null, null),
       BtnKind.secondary => (Ds.text, Ds.glassStrong, null, Ds.hairlineStrong),
       BtnKind.ghost => (Ds.iris, null, null, null),
-      BtnKind.aurora => (Colors.white, null, Ds.aurora, null),
+      BtnKind.aurora => (Ds.onAccent, null, Ds.aurora, null),
       BtnKind.danger => (Ds.rose, Ds.rose.withValues(alpha: 0.12), null, Ds.rose.withValues(alpha: 0.35)),
     };
     final h = compact ? 40.0 : 54.0;
@@ -310,9 +325,10 @@ class SectionLabel extends StatelessWidget {
 
 /// A small status capsule.
 class Pill extends StatelessWidget {
-  const Pill(this.text, {super.key, this.color = Ds.textSecondary, this.icon, this.dot = false});
+  const Pill(this.text, {super.key, Color? color, this.icon, this.dot = false}) : _color = color;
   final String text;
-  final Color color;
+  final Color? _color;
+  Color get color => _color ?? Ds.textSecondary;
   final IconData? icon;
   final bool dot;
 
@@ -346,9 +362,10 @@ class AuroraText extends StatelessWidget {
 
 /// A rounded-square icon with a tinted background.
 class IconBadge extends StatelessWidget {
-  const IconBadge(this.icon, {super.key, this.color = Ds.iris, this.size = 40});
+  const IconBadge(this.icon, {super.key, Color? color, this.size = 40}) : _color = color;
   final IconData icon;
-  final Color color;
+  final Color? _color;
+  Color get color => _color ?? Ds.iris;
   final double size;
 
   @override
@@ -362,11 +379,12 @@ class IconBadge extends StatelessWidget {
 
 /// One row inside a [Group]: icon badge, title, subtitle, trailing (chevron by default).
 class ListRow extends StatelessWidget {
-  const ListRow({super.key, required this.title, this.subtitle, this.icon, this.color = Ds.iris, this.trailing, this.onTap, this.danger = false});
+  const ListRow({super.key, required this.title, this.subtitle, this.icon, Color? color, this.trailing, this.onTap, this.danger = false}) : _color = color;
   final String title;
   final String? subtitle;
   final IconData? icon;
-  final Color color;
+  final Color? _color;
+  Color get color => _color ?? Ds.iris;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool danger;
@@ -384,7 +402,7 @@ class ListRow extends StatelessWidget {
           ]),
         ),
         const SizedBox(width: 8),
-        trailing ?? (onTap != null ? const Icon(Icons.chevron_right_rounded, color: Ds.textTertiary) : const SizedBox.shrink()),
+        trailing ?? (onTap != null ? Icon(Icons.chevron_right_rounded, color: Ds.textTertiary) : const SizedBox.shrink()),
       ]),
     );
     return onTap == null ? row : Pressable(onTap: onTap, scale: 0.985, child: row);
@@ -432,16 +450,16 @@ class AiAvatar extends StatelessWidget {
     if (!ring || !ai.verified) return face;
     return Container(
       padding: EdgeInsets.all(size * 0.05),
-      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: Ds.aurora),
-      child: Container(padding: EdgeInsets.all(size * 0.035), decoration: const BoxDecoration(shape: BoxShape.circle, color: Ds.bg), child: face),
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: Ds.aurora),
+      child: Container(padding: EdgeInsets.all(size * 0.035), decoration: BoxDecoration(shape: BoxShape.circle, color: Ds.bg), child: face),
     );
   }
 
   Widget _initial() => DecoratedBox(
-        decoration: const BoxDecoration(gradient: Ds.aurora),
+        decoration: BoxDecoration(gradient: Ds.aurora),
         child: Center(
           child: Text(ai.name.isEmpty ? '?' : ai.name.characters.first.toUpperCase(),
-              style: Ds.title2.copyWith(fontSize: size * 0.42, color: Colors.white)),
+              style: Ds.title2.copyWith(fontSize: size * 0.42, color: Ds.onAccent)),
         ),
       );
 }
@@ -457,6 +475,8 @@ class AiIdentityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final verified = ai.verified;
     final token = ai.token;
+    final p = Ds.palette;
+    final ink = p.cardInk;
     final status = switch (ai.status) {
       'verified' => ('Verified', Ds.mint),
       'minting' => ('Minting…', Ds.amber),
@@ -469,12 +489,12 @@ class AiIdentityCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Ds.r3 + 4),
         child: Stack(fit: StackFit.expand, children: [
-          // Base: deep ink, then aurora light pooling from the corners.
-          const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF15122A), Color(0xFF0B0B14)]))),
+          // Base: the theme's card material, then its light pooling from the corners.
+          DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: p.cardBase))),
           if (verified) ...[
-            const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment(-1.1, -1.2), radius: 1.3, colors: [Color(0x998E7DFF), Color(0x008E7DFF)]))),
-            const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment(1.2, 1.3), radius: 1.2, colors: [Color(0x8841E2BE), Color(0x0041E2BE)]))),
-            const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment(1.1, -0.9), radius: 0.9, colors: [Color(0x665AA9FF), Color(0x005AA9FF)]))),
+            DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(-1.1, -1.2), radius: 1.3, colors: [p.cardGlows[0], p.cardGlows[0].withValues(alpha: 0)]))),
+            DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(1.2, 1.3), radius: 1.2, colors: [p.cardGlows[1], p.cardGlows[1].withValues(alpha: 0)]))),
+            DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(1.1, -0.9), radius: 0.9, colors: [p.cardGlows[2], p.cardGlows[2].withValues(alpha: 0)]))),
           ] else
             const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment(-1.1, -1.2), radius: 1.3, colors: [Color(0x40FFFFFF), Color(0x00FFFFFF)]))),
           // Fine diagonal sheen, as on metal cards.
@@ -483,12 +503,12 @@ class AiIdentityCard extends StatelessWidget {
               gradient: LinearGradient(begin: Alignment(-1, -0.4), end: Alignment(1, 0.4), colors: [Color(0x00FFFFFF), Color(0x14FFFFFF), Color(0x00FFFFFF)], stops: [0.35, 0.5, 0.65]),
             ),
           ),
-          DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(Ds.r3 + 4), border: Border.all(color: Ds.hairlineStrong))),
+          DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(Ds.r3 + 4), border: Border.all(color: Ds.isObsidian ? Ds.hairlineStrong : p.cardEdge))),
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text('ALT IDENTITY', style: Ds.overline.copyWith(color: Colors.white.withValues(alpha: 0.7))),
+                Text('ALT IDENTITY', style: Ds.overline.copyWith(color: ink.withValues(alpha: 0.7))),
                 const Spacer(),
                 Pill(status.$1, color: status.$2, dot: true),
               ]),
@@ -498,19 +518,19 @@ class AiIdentityCard extends StatelessWidget {
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(ai.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.title2.copyWith(color: Colors.white)),
+                    Text(ai.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Ds.title2.copyWith(color: ink)),
                     const SizedBox(height: 2),
-                    Text('@${ai.handle}', style: Ds.caption.copyWith(color: Colors.white.withValues(alpha: 0.65))),
+                    Text('@${ai.handle}', style: Ds.caption.copyWith(color: ink.withValues(alpha: 0.65))),
                   ]),
                 ),
               ]),
               const SizedBox(height: 18),
               Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                _field('TOKEN', token != null ? '#${token.tokenId}' : '—'),
+                _field('TOKEN', token != null ? '#${token.tokenId}' : '—', ink),
                 const SizedBox(width: 26),
-                _field('VERSION', ai.currentVersion != null ? 'v${ai.currentVersion}' : (ai.latestVersion != null ? 'v${ai.latestVersion!['version']}' : '—')),
+                _field('VERSION', ai.currentVersion != null ? 'v${ai.currentVersion}' : (ai.latestVersion != null ? 'v${ai.latestVersion!['version']}' : '—'), ink),
                 const Spacer(),
-                Icon(verified ? Icons.verified_rounded : Icons.hexagon_outlined, color: Colors.white.withValues(alpha: verified ? 0.9 : 0.4), size: 26),
+                Icon(verified ? Icons.verified_rounded : Icons.hexagon_outlined, color: (verified && !Ds.isObsidian ? p.signature.first : ink).withValues(alpha: verified ? 0.95 : 0.4), size: 26),
               ]),
             ]),
           ),
@@ -520,10 +540,10 @@ class AiIdentityCard extends StatelessWidget {
     return onTap == null ? card : Pressable(onTap: onTap, scale: 0.985, child: card);
   }
 
-  static Widget _field(String k, String v) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(k, style: Ds.overline.copyWith(fontSize: 9.5, color: Colors.white.withValues(alpha: 0.55))),
+  static Widget _field(String k, String v, Color ink) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(k, style: Ds.overline.copyWith(fontSize: 9.5, color: ink.withValues(alpha: 0.55))),
         const SizedBox(height: 3),
-        Text(v, style: Ds.headline.copyWith(color: Colors.white, fontFeatures: const [FontFeature.tabularFigures()])),
+        Text(v, style: Ds.headline.copyWith(color: ink, fontFeatures: const [FontFeature.tabularFigures()])),
       ]);
 }
 
@@ -561,7 +581,7 @@ class Loading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: EdgeInsets.all(padding),
-        child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: Ds.iris))),
+        child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: Ds.iris))),
       );
 }
 
@@ -588,13 +608,13 @@ class AlterMark extends StatelessWidget {
         ),
         padding: EdgeInsets.all(size * 0.12),
         child: Container(
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: Ds.bg),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: Ds.bg),
           padding: EdgeInsets.all(size * 0.2),
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(begin: Alignment.bottomLeft, end: Alignment.topRight, colors: [Color(0xFF8E7DFF), Color(0xFF41E2BE)]),
-              boxShadow: [BoxShadow(color: Ds.mint.withValues(alpha: 0.5), blurRadius: size * 0.25)],
+              gradient: LinearGradient(begin: Alignment.bottomLeft, end: Alignment.topRight, colors: [Ds.palette.signature.first, Ds.palette.signature.last]),
+              boxShadow: [BoxShadow(color: Ds.palette.signature.last.withValues(alpha: 0.5), blurRadius: size * 0.25)],
             ),
           ),
         ),

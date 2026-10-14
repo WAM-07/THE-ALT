@@ -141,7 +141,7 @@ class _AiRow extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 8),
-          selected ? const Pill('In ALTER', color: Ds.iris) : const Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
+          selected ? Pill('In ALTER', color: Ds.iris) : Icon(Icons.chevron_right_rounded, color: Ds.textTertiary),
         ]),
       ),
     );
