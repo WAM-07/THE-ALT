@@ -1,14 +1,14 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Spinner, VerifiedTick } from "../../../components/ui";
 import { useAuth } from "../../../contexts/AuthContext";
-import { toModel } from "../../../contexts/AIContext";
-import { continueWithAlt, conversations, publicApi } from "../../../lib/alt";
+import { toModel, useAI } from "../../../contexts/AIContext";
+import { altar, api, continueWithAlt, conversations, publicApi } from "../../../lib/alt";
 
-/** "2 days 3 h", "45 min": how long a rental still runs. */
+/** "2 days 3 h", "45 min": how long a rental or subscription still runs. */
 function timeLeft(until, now) {
   const ms = new Date(until).getTime() - now;
   if (ms <= 0) return null;
@@ -19,11 +19,57 @@ function timeLeft(until, now) {
   return `${Math.floor(h / 24)} days ${h % 24} h`;
 }
 
-// Talking to an AI on ALTAR: a renter until the rental ends, or the owner any time. Every reply comes
-// from ALT Core's persona engine, using the AI's published version. Past conversations stay readable.
+/** Shows **bold** in an AI's reply as bold text (and nothing else: replies are never treated as HTML). */
+const withBold = (text) => text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
+
+/** Adds messages to a list without repeating any (by id), oldest first. */
+const merge = (list, more) => {
+  const seen = new Set(list.map((m) => String(m.id)));
+  return [...list, ...more.filter((m) => !seen.has(String(m.id)))];
+};
+
+/**
+ * The AIs this person can talk to on ALTAR: the ones they own, rent or subscribe to, with how long
+ * each lasts. Shown as picture bubbles to switch between conversations.
+ */
+function useMyAis(user) {
+  const { aiModels } = useAI();
+  const [owned, setOwned] = useState(null);
+  const [using, setUsing] = useState(null);
+  useEffect(() => {
+    if (!user) return;
+    api("/core/ais")
+      .then((list) => setOwned(list.filter((a) => a.verified).map(toModel)))
+      .catch(() => setOwned([]));
+    altar
+      .myRentals()
+      .then(setUsing)
+      .catch(() => setUsing([]));
+  }, [user]);
+  return useMemo(() => {
+    if (!owned || !using) return null;
+    const picture = (id) => aiModels?.find((m) => m.id === id)?.image ?? null;
+    const items = owned.map((a) => ({ id: a.id, handle: a.handle, name: a.name, image: a.image, role: "Owned", until: null }));
+    for (const u of using) {
+      if (!u.ai || items.some((i) => i.id === u.ai.id)) continue;
+      items.push({ id: u.ai.id, handle: u.ai.handle, name: u.ai.name, image: picture(u.ai.id), role: u.kind === "subscription" ? "Subscribed" : "Rented", until: u.expiresAt });
+    }
+    return items;
+  }, [owned, using, aiModels]);
+}
+
+// One chat per AI: switching AIs starts the page afresh, so nothing from the last one lingers.
 export default function ChatPage() {
   const { handle } = useParams();
+  return <Chat key={handle} handle={handle} />;
+}
+
+// Talking to an AI on ALTAR: its owner any time, a renter or subscriber until their time ends. Every
+// reply comes from ALT Core's persona engine, using the AI's published version. Past conversations
+// stay readable.
+function Chat({ handle }) {
   const { user } = useAuth();
+  const myAis = useMyAis(user);
   const [ai, setAi] = useState(null);
   const [state, setState] = useState(null); // { access, conversations }
   const [active, setActive] = useState(null);
@@ -33,6 +79,8 @@ export default function ChatPage() {
   const [error, setError] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const bottom = useRef(null);
+  // A conversation this page just started: its messages arrive with the reply, so don't fetch them too.
+  const justStarted = useRef(null);
 
   useEffect(() => {
     publicApi(`/core/public/ais/${encodeURIComponent(handle)}?platform=altar`)
@@ -57,13 +105,21 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!ai || !active) return;
+    if (justStarted.current === active) {
+      justStarted.current = null;
+      return;
+    }
+    let live = true;
     conversations
       .messages(ai.id, active)
-      .then(setMessages)
-      .catch((err) => setError(err.message));
+      .then((list) => live && setMessages(list))
+      .catch((err) => live && setError(err.message));
+    return () => {
+      live = false;
+    };
   }, [ai, active]);
 
-  // The clock for "time left", and the moment the rental ends.
+  // The clock for "time left", and the moment it ends.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
@@ -103,20 +159,22 @@ export default function ChatPage() {
     if (!content || busy) return;
     setBusy(true);
     setError(null);
+    const pending = { id: `pending-${Date.now()}`, role: "user", content };
     try {
       let id = active;
       if (!id) {
         id = (await conversations.start(ai.id)).id;
+        justStarted.current = id;
         setActive(id);
       }
-      setMessages((m) => [...m, { id: `pending-${Date.now()}`, role: "user", content }]);
+      setMessages((m) => [...m, pending]);
       setDraft("");
       const r = await conversations.say(ai.id, id, content);
-      setMessages((m) => [...m.filter((x) => !String(x.id).startsWith("pending-")), r.message, r.reply]);
+      setMessages((m) => merge(m.filter((x) => x.id !== pending.id), [r.message, r.reply]));
       if (!state.conversations.some((c) => c.id === id)) load();
     } catch (err) {
       setError(err.message);
-      setMessages((m) => m.filter((x) => !String(x.id).startsWith("pending-")));
+      setMessages((m) => m.filter((x) => x.id !== pending.id));
       setDraft(content);
       if (err.code === "NO_ACCESS") load();
     } finally {
@@ -124,33 +182,79 @@ export default function ChatPage() {
     }
   };
 
+  const newConversation = () => {
+    setActive(null);
+    setMessages([]);
+  };
+
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-[1100px] gap-5 px-4 py-5 sm:px-6">
-      {/* Conversations */}
-      <aside className="hidden w-64 shrink-0 flex-col rounded-3xl border border-line bg-surface p-3 md:flex">
-        <Button
-          kind="outline"
-          size="sm"
-          disabled={!canTalk}
-          onClick={() => {
-            setActive(null);
-            setMessages([]);
-          }}
-        >
-          New conversation
-        </Button>
-        <div className="mt-3 space-y-1 overflow-y-auto">
-          {state.conversations.map((c) => (
-            <button key={c.id} onClick={() => setActive(c.id)} className={`block w-full truncate rounded-xl px-3 py-2 text-left text-sm ${c.id === active ? "bg-sunken font-semibold" : "text-ink-2 hover:bg-sunken/60"}`}>
-              {c.title ?? "New conversation"}
+    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-[1320px] gap-4 px-4 py-4 sm:px-6 sm:py-5">
+      {/* Your AIs and this AI's conversations */}
+      <aside className="hidden w-72 shrink-0 flex-col gap-4 md:flex">
+        <div className="flex min-h-0 flex-1 flex-col rounded-3xl border border-line bg-surface p-3">
+          <p className="px-2 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-ink-3">Your AIs</p>
+          <div className="min-h-0 space-y-1 overflow-y-auto">
+            {myAis === null && <Spinner className="m-3 h-6 w-6" />}
+            {myAis?.length === 0 && (
+              <p className="px-2 py-2 text-sm text-ink-3">
+                Rent or subscribe to an AI to chat with it here.{" "}
+                <Link href="/#explore" className="font-semibold text-ink underline underline-offset-4">
+                  Explore
+                </Link>
+              </p>
+            )}
+            {myAis?.map((a) => {
+              const on = a.handle === ai.handle;
+              const rest = a.until ? timeLeft(a.until, now) : null;
+              return (
+                <Link key={a.id} href={`/chat/${a.handle}`} className={`flex items-center gap-3 rounded-2xl p-2 transition ${on ? "bg-sunken" : "hover:bg-sunken/60"}`} aria-current={on ? "page" : undefined}>
+                  <span className={`flex shrink-0 rounded-full p-1 ${on ? "bg-accent" : ""}`}>
+                    <Avatar src={a.image} name={a.name} size={40} className="ring-2 ring-surface" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{a.name}</span>
+                    <span className="block truncate text-xs text-ink-3">{a.role === "Owned" ? "Yours" : rest ? `${a.role} · ${rest} left` : `${a.role} · ended`}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex max-h-[45%] min-h-0 flex-col rounded-3xl border border-line bg-surface p-3">
+          <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">Conversations</p>
+            <button onClick={newConversation} disabled={!canTalk} className="text-sm font-semibold text-accent-text hover:underline disabled:opacity-40">
+              + New
             </button>
-          ))}
-          {state.conversations.length === 0 && <p className="px-3 py-2 text-sm text-ink-3">No conversations yet.</p>}
+          </div>
+          <div className="min-h-0 space-y-1 overflow-y-auto">
+            {state.conversations.map((c) => (
+              <button key={c.id} onClick={() => setActive(c.id)} className={`block w-full truncate rounded-xl px-3 py-2 text-left text-sm ${c.id === active ? "bg-sunken font-semibold" : "text-ink-2 hover:bg-sunken/60"}`}>
+                {c.title ?? "New conversation"}
+              </button>
+            ))}
+            {state.conversations.length === 0 && <p className="px-2 py-2 text-sm text-ink-3">No conversations yet.</p>}
+          </div>
         </div>
       </aside>
 
       {/* The conversation */}
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-line bg-surface">
+        {/* Phones: the AIs as a strip of bubbles */}
+        {myAis?.length > 1 && (
+          <div className="no-scrollbar flex gap-3 overflow-x-auto border-b border-line px-4 py-3 md:hidden">
+            {myAis.map((a) => (
+              <Link key={a.id} href={`/chat/${a.handle}`} className="flex w-14 shrink-0 flex-col items-center gap-1">
+                <span className={`flex rounded-full p-1 ${a.handle === ai.handle ? "bg-accent" : ""}`}>
+                  <Avatar src={a.image} name={a.name} size={44} className="ring-2 ring-surface" />
+                </span>
+                <span className="w-full truncate text-center text-[11px] text-ink-2">{a.name}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+
         <header className="relative flex items-center gap-3 overflow-hidden border-b border-line p-4">
           <AitArt seed={ai.artSeed} className="absolute inset-0 opacity-20" grain={false} />
           <Avatar src={ai.image} name={ai.name} size={44} className="relative" />
@@ -163,6 +267,9 @@ export default function ChatPage() {
             </p>
             <p className="text-sm text-ink-2">{role === "owner" ? "You own this AI" : left ? `${role === "subscriber" ? "Subscribed" : "Rented"} · ${left} left` : "Your time has ended"}</p>
           </div>
+          <button onClick={newConversation} disabled={!canTalk} className="relative rounded-full border border-line bg-surface px-3 py-1.5 text-sm font-semibold disabled:opacity-40 md:hidden">
+            + New
+          </button>
         </header>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
@@ -175,7 +282,7 @@ export default function ChatPage() {
           )}
           {messages.map((m) => (
             <div key={m.id} className={`animate-page-in flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <p className={`max-w-[80%] whitespace-pre-line rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${m.role === "user" ? "rounded-br-lg bg-pop text-pop-ink" : "rounded-bl-lg bg-sunken text-ink"}`}>{m.content}</p>
+              <p className={`max-w-[80%] whitespace-pre-line rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${m.role === "user" ? "rounded-br-lg bg-pop text-pop-ink" : "rounded-bl-lg bg-sunken text-ink"}`}>{m.role === "user" ? m.content : withBold(m.content)}</p>
             </div>
           ))}
           {busy && (
