@@ -20,7 +20,8 @@ const EnvSchema = z.object({
   ALTAR_WEB_URL: z.url().optional(),
   CORS_ORIGINS: z.string().optional(),
   GATEWAY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(600),
-  UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  // Long enough for an AI reply, including Core falling back from one LLM provider to the next.
+  UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
 });
 
 export type GatewayConfig = ReturnType<typeof loadGatewayConfig>;

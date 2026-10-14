@@ -34,7 +34,8 @@ export function openAiCompatible(name: string, baseUrl: string, apiKey: string, 
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens }),
-        signal: AbortSignal.timeout(45_000),
+        // Short enough that a stalled provider leaves time for the next one before the gateway gives up.
+        signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
         const detail = (await res.text().catch(() => '')).slice(0, 200);
