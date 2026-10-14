@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/ds.dart';
 
 /// The floating glass dock. Five places: Home, Chat, Studio (what your AI learns), Identity (its
-/// versions and on-chain token) and Settings.
+/// versions and on-chain token) and Profile (the person's account and settings).
 class ScaffoldWithNavBar extends StatelessWidget {
   const ScaffoldWithNavBar({super.key, required this.navigationShell});
   final StatefulNavigationShell navigationShell;
@@ -15,7 +15,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
     (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chat'),
     (Icons.auto_awesome_outlined, Icons.auto_awesome, 'Studio'),
     (Icons.fingerprint_rounded, Icons.fingerprint_rounded, 'Identity'),
-    (Icons.tune_rounded, Icons.tune_rounded, 'Settings'),
+    (Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
   ];
 
   void _go(int index) {

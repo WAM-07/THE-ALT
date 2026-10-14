@@ -39,7 +39,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AltPage(children: [
-      const PageHeader(eyebrow: 'Settings', title: 'You and your AI'),
+      const PageHeader(eyebrow: 'Profile', title: 'You and your AI'),
       ValueListenableBuilder<AltUser?>(
         valueListenable: altAccount.currentUser,
         builder: (context, user, _) {
