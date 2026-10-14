@@ -8,14 +8,18 @@ import '../errors.dart';
 import '../handoff.dart';
 import '../models.dart';
 import 'code_dialog.dart';
+import 'picture_picker.dart';
 
 /// The ALT Account Center: one place, in every ALT app, to manage the account that works across
 /// ALTER, ALTAR and ALTERA (profile, password, two-factor, devices, wallets and connected apps).
 class AltAccountCenterScreen extends StatefulWidget {
-  const AltAccountCenterScreen({super.key, required this.client, required this.handoff, this.onSignedOut});
+  const AltAccountCenterScreen({super.key, required this.client, required this.handoff, this.onSignedOut, this.pickPhoto});
 
   final AltAccountClient client;
   final AltHandoff handoff;
+
+  /// The app's own photo picker, so the picture picker can offer "Upload a photo".
+  final Future<AltPickedPhoto?> Function()? pickPhoto;
 
   /// Called after the person signs out from here; navigate to the app's sign-in screen.
   final VoidCallback? onSignedOut;
@@ -257,12 +261,24 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                   _Group([
                     ListTile(
                       contentPadding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-                      leading: CircleAvatar(
-                        radius: 28,
-                        // ALT's file links name the server's public address; make them reachable from this device.
-                        backgroundImage: user.avatarUrl != null ? NetworkImage(altMediaUrl(user.avatarUrl!, _client.apiUrl)) : null,
-                      child: user.avatarUrl == null ? Text(user.displayName.characters.first.toUpperCase()) : null,
-                    ),
+                      // Tap the picture to change it, everywhere or only in this app.
+                      leading: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => showAltPicturePicker(context, client: _client, pickPhoto: widget.pickPhoto),
+                        child: Stack(clipBehavior: Clip.none, children: [
+                          CircleAvatar(
+                            radius: 28,
+                            // ALT's file links name the server's public address; make them reachable from this device.
+                            backgroundImage: user.avatarFor(_client.platform) != null ? NetworkImage(altMediaUrl(user.avatarFor(_client.platform)!, _client.apiUrl)) : null,
+                            child: user.avatarFor(_client.platform) == null ? Text(user.displayName.characters.first.toUpperCase()) : null,
+                          ),
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: CircleAvatar(radius: 11, backgroundColor: scheme.primary, child: Icon(Icons.photo_camera_outlined, size: 13, color: scheme.onPrimary)),
+                          ),
+                        ]),
+                      ),
                     title: Text(user.displayName, style: Theme.of(context).textTheme.titleMedium),
                     subtitle: Text('@${user.handle}${user.email != null ? '\n${user.email}' : ''}'),
                     isThreeLine: user.email != null,

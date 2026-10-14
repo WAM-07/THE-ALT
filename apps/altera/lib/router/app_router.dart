@@ -25,6 +25,7 @@ import '../screens/ai/ai_chat_screen.dart';
 import '../screens/ai/your_ais_screen.dart';
 
 import '../providers/auth_provider.dart';
+import '../services/alt_photo.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -74,6 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           return AltAccountCenterScreen(
             client: auth.alt,
             handoff: auth.handoff,
+            pickPhoto: pickAltPhoto,
             onSignedOut: () async {
               await ref.read(authStateProvider.notifier).logout();
               if (context.mounted) context.go('/login');

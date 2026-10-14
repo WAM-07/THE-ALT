@@ -41,4 +41,17 @@ void main() {
     expect(AltHandoff.partnerOf(AltPlatform.altera), AltPlatform.alter);
     expect(AltHandoff.partnerOf(AltPlatform.altar), isNull);
   });
+
+  test('shows the picture chosen for one app there, and the main picture elsewhere', () {
+    final user = AltUser.fromJson({
+      'id': 'u1',
+      'handle': 'sara',
+      'displayName': 'Sara',
+      'avatarUrl': 'http://localhost:8080/core/avatars/human/chibi/01.png',
+      'platformAvatars': {'altera': 'http://localhost:8080/core/avatars/human/lorelei/03.png'},
+      'createdAt': '2026-10-15T00:00:00Z',
+    });
+    expect(user.avatarFor(AltPlatform.altera), endsWith('lorelei/03.png'));
+    expect(user.avatarFor(AltPlatform.alter), endsWith('chibi/01.png'));
+  });
 }

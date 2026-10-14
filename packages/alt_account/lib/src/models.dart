@@ -74,6 +74,7 @@ class AltUser {
     this.email,
     this.bio,
     this.avatarUrl,
+    this.platformAvatars = const {},
   });
 
   final String id;
@@ -82,6 +83,9 @@ class AltUser {
   final String? email;
   final String? bio;
   final String? avatarUrl;
+
+  /// Pictures chosen for one ALT app only ('alter', 'altera', 'altar'), overriding [avatarUrl] there.
+  final Map<String, String> platformAvatars;
   final List<String> roles;
   final bool emailVerified;
   final bool twoFactorEnabled;
@@ -94,6 +98,9 @@ class AltUser {
   bool get isAdmin => roles.contains('admin');
   bool hasUsed(AltPlatform p) => platforms.any((m) => m.platform == p);
 
+  /// The picture to show in [p]: its own, if one was chosen there, otherwise the global one.
+  String? avatarFor(AltPlatform p) => platformAvatars[p.name] ?? avatarUrl;
+
   factory AltUser.fromJson(Map<String, dynamic> j) => AltUser(
         id: j['id'] as String,
         handle: j['handle'] as String,
@@ -101,6 +108,10 @@ class AltUser {
         email: j['email'] as String?,
         bio: j['bio'] as String?,
         avatarUrl: j['avatarUrl'] as String?,
+        platformAvatars: {
+          for (final e in Map<String, dynamic>.from(j['platformAvatars'] as Map? ?? const {}).entries)
+            if (e.value is String) e.key: e.value as String,
+        },
         roles: (j['roles'] as List? ?? const []).cast<String>(),
         emailVerified: j['emailVerified'] as bool? ?? false,
         twoFactorEnabled: j['twoFactorEnabled'] as bool? ?? false,

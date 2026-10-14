@@ -19,4 +19,5 @@ export 'src/ui/account_center.dart';
 export 'src/ui/code_dialog.dart';
 export 'src/ui/continue_with_alt.dart';
 export 'src/ui/inbox_screen.dart';
+export 'src/ui/picture_picker.dart';
 export 'src/ui/sign_in_sheet.dart';

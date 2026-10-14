@@ -1,3 +1,5 @@
+import 'package:alt_account/alt_account.dart';
+import '../../services/alt_photo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +12,6 @@ import '../../providers/saved_posts_provider.dart';
 import '../../providers/feed_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/feed_service.dart';
-import '../../services/image_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/audio_viz.dart';
 import '../../widgets/post_card.dart';
@@ -497,130 +498,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                   onTap: isUploadingAvatar
                                       ? null
                                       : () async {
-                                          final source =
-                                              await showModalBottomSheet<ImageSource>(
-                                            context: ctx,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (pickerCtx) => Container(
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(pickerCtx)
-                                                    .cardColor,
-                                                borderRadius:
-                                                    const BorderRadius.vertical(
-                                                  top: Radius.circular(24),
-                                                ),
-                                              ),
-                                              child: SafeArea(
-                                                top: false,
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    const SizedBox(height: 12),
-                                                    Container(
-                                                      width: 40,
-                                                      height: 4,
-                                                      decoration: BoxDecoration(
-                                                        color:
-                                                            Theme.of(pickerCtx)
-                                                                .dividerColor,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                                2),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 12),
-                                                    const ListTile(
-                                                      title: Text(
-                                                        'Change Profile Picture',
-                                                        style: TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    ListTile(
-                                                      leading: const Icon(Icons
-                                                          .photo_camera_outlined),
-                                                      title:
-                                                          const Text('Take Photo'),
-                                                      onTap: () =>
-                                                          Navigator.pop(
-                                                        pickerCtx,
-                                                        ImageSource.camera,
-                                                      ),
-                                                    ),
-                                                    ListTile(
-                                                      leading: const Icon(Icons
-                                                          .photo_library_outlined),
-                                                      title: const Text(
-                                                          'Choose from Gallery'),
-                                                      onTap: () =>
-                                                          Navigator.pop(
-                                                        pickerCtx,
-                                                        ImageSource.gallery,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 12),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          );
-
-                                          if (source == null) return;
-
-                                          final image = await ImagePicker()
-                                              .pickImage(source: source);
-
-                                          if (image == null || !context.mounted) {
-                                            return;
-                                          }
-
-                                          setModalState(
-                                              () => isUploadingAvatar = true);
-
-                                          final avatarUrl = await ImageService()
-                                              .updateProfilePicture(
-                                            image,
-                                            ref
-                                                .read(authStateProvider)
-                                                .activeProfileId!,
-                                          );
-
+                                          // The shared ALT picture picker: ready-made pictures or a
+                                          // photo, everywhere or only on ALTERA.
+                                          final alt = ref.read(authServiceProvider).alt;
+                                          await showAltPicturePicker(ctx, client: alt, pickPhoto: pickAltPhoto);
                                           if (!context.mounted) return;
-
-                                          setModalState(() {
-                                            isUploadingAvatar = false;
-                                            if (avatarUrl != null &&
-                                                avatarUrl.isNotEmpty) {
-                                              currentAvatar = avatarUrl;
-                                            }
-                                          });
-
-                                          if (avatarUrl != null &&
-                                              avatarUrl.isNotEmpty) {
-                                            await ref
-                                                .read(authStateProvider.notifier)
-                                                .refreshProfile();
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(const SnackBar(
-                                                content: Text(
-                                                    'Profile picture updated successfully!'),
-                                                behavior:
-                                                    SnackBarBehavior.floating,
-                                              ));
-                                            }
-                                          } else if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(const SnackBar(
-                                              content: Text(
-                                                  'Failed to upload profile picture'),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                            ));
-                                          }
+                                          await ref.read(authStateProvider.notifier).refreshProfile();
+                                          final picture = alt.currentUser.value?.avatarFor(AltPlatform.altera);
+                                          if (picture != null) setModalState(() => currentAvatar = picture);
                                         },
                                   child: Container(
                                     padding: const EdgeInsets.all(6),

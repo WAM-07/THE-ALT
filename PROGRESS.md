@@ -462,7 +462,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - [x] A2. ALTERA: a rented or subscribed AI also drafts comments and replies for the person. The robot button in a post's comment box ("Reply with your AI", brief optional) drafts in your voice; the comment shows "✦ Replied with <AI>" (Core channel `altera_draft_comment`, ALTERA migration `0005`, shared `write_with_ai_sheet.dart`). Fixed on the way: a comment could appear twice (the live update raced the reply) and commenting dropped the post's "posted with" tag. Checked on the phone.
   - [x] A3. ALTER themes: onboarding and sign-in follow the active theme. The old colour, gradient and heading names (`colors.dart`, `gradients.dart`, `typography.dart`) now read `Ds`, so onboarding, memories, versions and the status badge follow every theme (headings in the theme's face, Fraunces in Sapphire). Checked on the phone in Sapphire: sign-in and onboarding.
 - **In progress (owner's go, 2026-10-15): group B.** Commit each, tick it here:
-  - [ ] B1. Picture picker in ALTER and ALTERA (Account Center in `alt_account`): ready-made pictures and an app-only picture, like ALTAR's.
+  - [x] B1. Picture picker in ALTER and ALTERA (`showAltPicturePicker` in `alt_account`): ready-made sets with their credits, "Upload a photo" (the app's own gallery picker), **Everywhere** or **Only in this app**, and "Use my main picture here". Opened from the Account Center picture, ALTER's Profile picture and ALTERA's Edit Profile. `AltUser.platformAvatars` / `avatarFor(app)`. Checked on the phone: an ALTERA-only picture leaves the main one unchanged.
   - [ ] B2. Spending confirmed in the ALT Account window (password or 2FA there, not on ALTAR's page).
   - [ ] B3. A seller keeps their old chats with a sold AI, read-only.
 - **Steps 1 and 2 of "AIs follow the ALT account" and the in-app sign-in card are done.** Next, waiting on the owner's review of step 2.
@@ -474,13 +474,11 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **ALTER themes:** which one stays the default after trying them (Sapphire for now).
 - **Smaller follow-ups:**
   - Confirm spending in the ALT Account window instead of on ALTAR's page.
-  - Add the picture picker to ALTER and ALTERA (`alt_account` Account Center).
   - Show a seller their old chats read-only.
   - "Connect MetaMask".
   - Deployment (Vercel for ALTAR web, Railway/Render for the services).
 
 ## Known mocks / not real yet
-- **Picture picker in the apps:** ALTER and ALTERA already show the ready-made pictures, but choosing a set or an ALTERA-only picture is only in ALTAR so far; the shared picker for the Account Center (`alt_account`) is next. ALTERA's own profile editor still changes the global picture.
 - **ALTAR:**
   - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, comments and replies (DM replies stay the person's own).
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/alt/ai_api.dart';
+import '../../../core/alt/alt_photo.dart';
 import '../../../core/alt/alt_session.dart';
 import '../../../core/theme/ds.dart';
 import '../../../shared/ui/theme_picker.dart';
@@ -44,11 +45,15 @@ class SettingsScreen extends StatelessWidget {
       ValueListenableBuilder<AltUser?>(
         valueListenable: altAccount.currentUser,
         builder: (context, user, _) {
-          final url = user?.avatarUrl == null ? null : media(user!.avatarUrl!);
+          final picture = user?.avatarFor(AltPlatform.alter);
+          final url = picture == null ? null : media(picture);
           return Glass(
             onTap: () => context.push('/account'),
             child: Row(children: [
-              Container(
+              // Tap the picture to change it (everywhere, or only in ALTER).
+              GestureDetector(
+                onTap: () => showAltPicturePicker(context, client: altAccount, pickPhoto: pickAltPhoto),
+                child: Container(
                 width: 56,
                 height: 56,
                 clipBehavior: Clip.antiAlias,
@@ -56,6 +61,7 @@ class SettingsScreen extends StatelessWidget {
                 child: url != null
                     ? Image.network(url, fit: BoxFit.cover)
                     : Center(child: Text((user?.displayName.isNotEmpty ?? false) ? user!.displayName[0].toUpperCase() : '·', style: Ds.title2)),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(

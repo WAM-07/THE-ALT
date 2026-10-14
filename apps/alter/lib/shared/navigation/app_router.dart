@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/alt/alt_photo.dart';
 import '../../core/alt/alt_session.dart';
 import '../../features/ai_profile/screens/ai_profile_screen.dart';
 import '../../features/ai_profile/screens/memories_screen.dart';
@@ -76,6 +77,7 @@ final goRouter = GoRouter(
         client: altAccount,
         handoff: altHandoff,
         onSignedOut: () => context.go('/auth'),
+        pickPhoto: pickAltPhoto,
       ),
     ),
     GoRoute(path: '/offline', builder: (context, state) => const OfflineScreen()),

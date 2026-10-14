@@ -302,7 +302,8 @@ class _UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = user?.avatarUrl == null ? null : media(user!.avatarUrl!);
+    final picture = user?.avatarFor(AltPlatform.alter);
+    final url = picture == null ? null : media(picture);
     return Pressable(
       onTap: () => context.push('/account'),
       child: Container(
