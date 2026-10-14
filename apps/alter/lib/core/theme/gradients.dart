@@ -1,42 +1,21 @@
 import 'package:flutter/material.dart';
+
 import 'colors.dart';
+import 'ds.dart';
 
+/// Older gradient names (onboarding, memories, versions), now drawn from the active theme.
 class ALTGradients {
-  static const RadialGradient heroAILight = RadialGradient(
-    colors: [ALTColors.irisViolet, ALTColors.skyFlux],
-    center: Alignment.center,
-    radius: 1.0,
-  );
+  ALTGradients._();
 
-  static const RadialGradient heroAIDark = RadialGradient(
-    colors: [ALTColors.violet900, ALTColors.irisViolet],
-    center: Alignment.center,
-    radius: 1.0,
-  );
+  static RadialGradient get heroAILight => RadialGradient(colors: Ds.palette.signature.take(2).toList(), center: Alignment.center, radius: 1.0);
 
-  static final List<RadialGradient> alterDark = [
-    RadialGradient(
-      center: const Alignment(-0.8, -0.6),
-      radius: 1.2,
-      colors: [ALTColors.violet950.withOpacity(0.5), Colors.transparent],
-    ),
-    RadialGradient(
-      center: const Alignment(0.8, 0.4),
-      radius: 1.0,
-      colors: [ALTColors.darkBgSurface02.withOpacity(0.3), Colors.transparent],
-    ),
-  ];
+  static RadialGradient get heroAIDark => RadialGradient(colors: [ALTColors.violet900, ALTColors.irisViolet], center: Alignment.center, radius: 1.0);
 
-  static final List<RadialGradient> alterLight = [
-    RadialGradient(
-      center: const Alignment(-0.8, -0.6),
-      radius: 1.2,
-      colors: [ALTColors.violet100.withOpacity(0.8), Colors.transparent],
-    ),
-    RadialGradient(
-      center: const Alignment(0.8, 0.4),
-      radius: 1.0,
-      colors: [ALTColors.lightBgSurface02.withOpacity(0.5), Colors.transparent],
-    ),
-  ];
+  /// The soft light behind those screens (the same for light and dark: the palette decides).
+  static List<RadialGradient> get alterDark => [
+        RadialGradient(center: const Alignment(-0.8, -0.6), radius: 1.2, colors: [Ds.palette.glow[0].withValues(alpha: Ds.isLight ? 0.7 : 0.35), Colors.transparent]),
+        RadialGradient(center: const Alignment(0.8, 0.4), radius: 1.0, colors: [Ds.palette.glow[1].withValues(alpha: Ds.isLight ? 0.5 : 0.25), Colors.transparent]),
+      ];
+
+  static List<RadialGradient> get alterLight => alterDark;
 }

@@ -192,7 +192,7 @@ class _Stage1BootSplashState extends State<_Stage1BootSplash> {
       child: Container(
         width: 150,
         height: 150,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: ALTGradients.heroAILight,
         ),
@@ -257,7 +257,7 @@ class _Stage2StoryTimerState extends State<_Stage2StoryTimer> with SingleTickerP
         // Show vibrant background on the final story
         if (currentIndex == 3)
           Positioned.fill(
-            child: const DecoratedBox(
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [ALTColors.irisViolet, ALTColors.jadeSurge],
@@ -287,7 +287,7 @@ class _Stage2StoryTimerState extends State<_Stage2StoryTimer> with SingleTickerP
                           return LinearProgressIndicator(
                             value: progress,
                             backgroundColor: ALTColors.violet100.withOpacity(0.3),
-                            valueColor: const AlwaysStoppedAnimation<Color>(ALTColors.irisViolet),
+                            valueColor: AlwaysStoppedAnimation<Color>(ALTColors.irisViolet),
                             minHeight: 4,
                             borderRadius: BorderRadius.circular(2),
                           );
@@ -305,7 +305,7 @@ class _Stage2StoryTimerState extends State<_Stage2StoryTimer> with SingleTickerP
                   child: Text(
                     stories[currentIndex],
                     style: ALTTypography.headlineLarge.copyWith(
-                      color: currentIndex == 3 ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                      color: currentIndex == 3 ? Ds.onAccent : Ds.text,
                     ),
                     textAlign: TextAlign.center,
                   ).animate(key: ValueKey(currentIndex)).fadeIn(duration: 500.ms).slideY(begin: 0.2, end: 0),
@@ -316,7 +316,7 @@ class _Stage2StoryTimerState extends State<_Stage2StoryTimer> with SingleTickerP
               padding: const EdgeInsets.all(24.0),
               child: TextButton(
                 onPressed: widget.onComplete,
-                child: Text("Skip", style: TextStyle(color: currentIndex == 3 ? Colors.white70 : ALTColors.lightTextMuted)),
+                child: Text("Skip", style: TextStyle(color: currentIndex == 3 ? Ds.onAccent.withValues(alpha: 0.7) : ALTColors.lightTextMuted)),
               ),
             )
           ],
@@ -437,7 +437,7 @@ class _Stage4IdentityState extends State<_Stage4Identity> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("What should I call you?", style: ALTTypography.headlineMedium),
+                Text("What should I call you?", style: ALTTypography.headlineMedium),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -476,7 +476,7 @@ class _Stage4IdentityState extends State<_Stage4Identity> {
             Text("Hello, ${_firstNameCtrl.text.trim()}.", style: ALTTypography.headlineMedium.copyWith(color: ALTColors.irisViolet))
                 .animate().fadeIn().slideY(begin: 0.2, end: 0),
             const SizedBox(height: 24),
-            const Text("How old are you?", style: ALTTypography.headlineSmall)
+            Text("How old are you?", style: ALTTypography.headlineSmall)
                 .animate().fadeIn(delay: 400.ms).slideY(begin: 0.2, end: 0),
             const SizedBox(height: 16),
             TextField(
@@ -535,7 +535,7 @@ class _Stage5DemographicsState extends State<_Stage5Demographics> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Pronouns", style: ALTTypography.headlineMedium),
+          Text("Pronouns", style: ALTTypography.headlineMedium),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(labelText: 'How should I refer to you?'),
@@ -548,7 +548,7 @@ class _Stage5DemographicsState extends State<_Stage5Demographics> {
             },
           ),
           const SizedBox(height: 48),
-          const Text("Your Interests / Roles", style: ALTTypography.headlineMedium),
+          Text("Your Interests / Roles", style: ALTTypography.headlineMedium),
           const Text("Pick up to 3.", style: ALTTypography.bodyMedium),
           const SizedBox(height: 16),
           Wrap(
@@ -568,7 +568,7 @@ class _Stage5DemographicsState extends State<_Stage5Demographics> {
                   ),
                   child: Text(
                     role, 
-                    style: TextStyle(color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
+                    style: TextStyle(color: isSelected ? Ds.onAccent : Ds.text),
                   ),
                 ),
               );
@@ -637,7 +637,7 @@ class _Stage6ConsentState extends State<_Stage6Consent> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Your data, your choice", style: ALTTypography.headlineLarge),
+          Text("Your data, your choice", style: ALTTypography.headlineLarge),
           const SizedBox(height: 8),
           const Text("Each choice is recorded and can be changed any time in Settings. The first one is needed to build your AI.",
               style: ALTTypography.bodyMedium),
@@ -696,7 +696,7 @@ class _Stage7AvatarState extends State<_Stage7Avatar> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text("Setting up your ALT", style: ALTTypography.headlineLarge),
+          Text("Setting up your ALT", style: ALTTypography.headlineLarge),
           const SizedBox(height: 16),
           const Text("Give your self-replicating digital twin a face.", style: ALTTypography.bodyLarge, textAlign: TextAlign.center),
           const SizedBox(height: 48),
@@ -712,14 +712,14 @@ class _Stage7AvatarState extends State<_Stage7Avatar> {
                 border: Border.all(color: ALTColors.irisViolet, width: 2),
               ),
               child: path == null
-                  ? const Center(child: Icon(Icons.person_add, size: 64, color: ALTColors.irisViolet))
-                  : const Center(child: Icon(Icons.check, size: 64, color: Colors.white)),
+                  ? Center(child: Icon(Icons.person_add, size: 64, color: ALTColors.irisViolet))
+                  : Center(child: Icon(Icons.check, size: 64, color: Ds.onAccent)),
             ),
           ),
           const SizedBox(height: 48),
           TextButton(
             onPressed: () { widget.onAvatarSelected(null); widget.onComplete(); },
-            child: const Text("Skip", style: TextStyle(color: ALTColors.lightTextMuted, fontSize: 18)),
+            child: Text("Skip", style: TextStyle(color: ALTColors.lightTextMuted, fontSize: 18)),
           )
         ],
       ).animate().fadeIn(),
@@ -767,7 +767,7 @@ class _Stage8SwipeProfileState extends State<_Stage8SwipeProfile> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("Profile your ALT", style: ALTTypography.headlineLarge),
+            Text("Profile your ALT", style: ALTTypography.headlineLarge),
             const SizedBox(height: 16),
             const Text("Swipe the card to choose its core trait.", style: ALTTypography.bodyLarge),
             const SizedBox(height: 64),
@@ -782,7 +782,7 @@ class _Stage8SwipeProfileState extends State<_Stage8SwipeProfile> {
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        const Icon(Icons.psychology, size: 64, color: ALTColors.irisViolet),
+                        Icon(Icons.psychology, size: 64, color: ALTColors.irisViolet),
                         const SizedBox(height: 16),
                         Text(
                           _dragOffset > 20 ? "Creative ->" : (_dragOffset < -20 ? "<- Logical" : "< Swipe >"),
@@ -832,10 +832,10 @@ class _Stage9GeneratingState extends State<_Stage9Generating> with SingleTickerP
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.memory, size: 80, color: ALTColors.irisViolet)
+        Icon(Icons.memory, size: 80, color: ALTColors.irisViolet)
             .animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(1,1), end: const Offset(1.2, 1.2), duration: 1.seconds),
         const SizedBox(height: 32),
-        const Text("Creating your personal AI...", style: ALTTypography.headlineMedium),
+        Text("Creating your personal AI...", style: ALTTypography.headlineMedium),
         const SizedBox(height: 48),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 48.0),
@@ -845,7 +845,7 @@ class _Stage9GeneratingState extends State<_Stage9Generating> with SingleTickerP
               return LinearProgressIndicator(
                 value: _progressController.value,
                 backgroundColor: ALTColors.violet100.withOpacity(0.3),
-                valueColor: const AlwaysStoppedAnimation<Color>(ALTColors.irisViolet),
+                valueColor: AlwaysStoppedAnimation<Color>(ALTColors.irisViolet),
               );
             },
           ),

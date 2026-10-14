@@ -141,7 +141,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
           body: _all == null
               ? Center(
                   child: _error == null
-                      ? const CircularProgressIndicator(color: ALTColors.irisViolet)
+                      ? CircularProgressIndicator(color: ALTColors.irisViolet)
                       : _Message(icon: Icons.cloud_off, title: _error!, action: TextButton(onPressed: _load, child: const Text('Try again'))),
                 )
               : TabBarView(children: [

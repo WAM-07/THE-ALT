@@ -100,15 +100,15 @@ class _VersionsScreenState extends State<VersionsScreen> {
                 style: ALTTypography.bodySmall,
               ),
               const SizedBox(height: 12),
-              if (versions == null && _error == null) const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator(color: ALTColors.irisViolet))),
+              if (versions == null && _error == null) Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator(color: ALTColors.irisViolet))),
               if (_error != null) Padding(padding: const EdgeInsets.all(24), child: Column(children: [Text(_error!, textAlign: TextAlign.center), TextButton(onPressed: _load, child: const Text('Try again'))])),
               if (versions != null && versions.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(32),
                   child: Column(children: [
-                    const Icon(Icons.history, size: 48, color: ALTColors.irisViolet),
+                    Icon(Icons.history, size: 48, color: ALTColors.irisViolet),
                     const SizedBox(height: 12),
-                    const Text('No versions yet', style: ALTTypography.headlineSmall),
+                    Text('No versions yet', style: ALTTypography.headlineSmall),
                     const SizedBox(height: 6),
                     const Text('Build your first version in Deploy once you have added data and chatted with your AI.', textAlign: TextAlign.center, style: ALTTypography.bodySmall),
                     const SizedBox(height: 12),
