@@ -401,6 +401,16 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - a full fresh `npm run demo` ends cleanly (93 s): 9 AIs, 6 listings, a rental, a subscription and two reviews;
     - in a browser: Hamza subscribed to Calm Coach for 2 months and chatted ("60 days left"), reviews and ratings show, and the wallet lists his payments.
   - **Found by the demo run:** reviews failed with "moderation unavailable" because `altar-api` sent Core its service key but not its name (`x-alt-service`). Fixed, with a test against a stand-in Core that checks both headers (`altar-api` 6 tests).
+- **After step 4: owner's test round (2026-10-15)** ✅
+  - **Creator pages:** `/creator/<handle>` shows a person's public ALT profile and the verified AIs they made or own. Clicking a creator used to open one of their AIs.
+  - **Subscribers stay private:** an AI's public history (`GET /activity?aiId=`) lists sales and rentals only, and `GET /listings/:aiId` gives `activeSubscribers` (how many, never who). A subscriber still sees their own payments in the wallet. This also fixes "Rented by … for null days", which was a subscription shown as a rental.
+  - **ALTAR chat:**
+    - a "Your AIs" column with picture bubbles (owned, rented, subscribed, and the time left; a strip on phones) to switch between AIs;
+    - fixed "two children with the same key": a new conversation's messages were fetched and also added from the reply;
+    - **bold** in replies.
+  - **Timeouts:** the gateway allowed 15 s but Core waited up to 45 s for one LLM provider, so a slow Groq answer became a 504 instead of falling back to Gemini (it broke a demo seed). Now each provider gets 20 s and the gateway 60 s (`UPSTREAM_TIMEOUT_MS`).
+  - **Demo posts have pictures again**, from ALTERA's original images (`services/altera-api/seed-assets`); 3 more posts. With Cloudinary keys in `.env`, each `npm run demo` uploads about 11 pictures to that Cloudinary account.
+  - **Checked on a real phone** (Redmi Note 11, Android 13, over USB with `adb reverse tcp:8080 tcp:8080` and apps built with `ALT_API_URL=http://127.0.0.1:8080`): ALTERA signed in by handoff link shows the feed, profile pictures and post pictures; ALTER shows the verified AI, its training and the inbox; the ALT window opens in the phone's browser. Tests: Core 81, gateway 9, `altar-api` 6.
 
 ## Where to pick up (2026-10-15)
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
@@ -442,7 +452,8 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **The emulator's GPU sometimes draws garbage or drops text.** The app content is correct (checked with `adb shell uiautomator dump`). Fix: Device Manager → edit the device → Graphics: Software (or Hardware GLES 2.0), then Cold Boot Now.
   - **Gradle 9.1 is required.** Android Studio bundles Java 25, which Gradle 8.x cannot run on (the build fails with just "25.0.3").
   - Emulator: start `npm run dev`, then `flutter run --dart-define-from-file=env/dev.json` in `apps/alter` or `apps/altera`. The emulator reaches the PC at `10.0.2.2`.
-  - Physical phone: `--dart-define=ALT_API_URL=http://<PC LAN IP>:8080` (`npm run dev` prints it).
+  - Physical phone: `--dart-define=ALT_API_URL=http://<PC LAN IP>:8080` (`npm run dev` prints it), or over the USB cable: build with `ALT_API_URL=http://127.0.0.1:8080` and run `adb reverse tcp:8080 tcp:8080` (again after every reconnect). No Wi-Fi or firewall rule needed.
+  - **Xiaomi/Redmi (MIUI):** turn on Developer options → "Install via USB" (or installs fail with `INSTALL_FAILED_USER_RESTRICTED`); taps from `adb shell input` also need "USB debugging (Security settings)".
   - Web browser: `flutter run -d chrome --dart-define=ALT_API_URL=http://localhost:8080`.
   - With Git Bash, run `export MSYS_NO_PATHCONV=1` before `adb push` or `adb shell`; otherwise device paths like `/data/local/tmp` become Windows paths.
 - **Docker is not installed and isn't needed.**
