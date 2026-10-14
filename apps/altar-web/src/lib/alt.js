@@ -167,6 +167,14 @@ export const wallet = {
   subscribe: (aiId, months, confirm, expectedPricePerMonth) => api(`/core/ais/${aiId}/market/subscribe`, { method: "POST", body: { months, confirm, expectedPricePerMonth } }),
 };
 
+/** Wallets linked to the ALT account (MetaMask and the like), proven by a signed message. */
+export const linkedWallets = {
+  list: async () => (await api("/core/me")).wallets,
+  nonce: () => api("/core/me/wallets/nonce", { method: "POST", body: {} }),
+  link: (message, signature) => api("/core/me/wallets/link", { method: "POST", body: { message, signature } }),
+  unlink: (address) => api(`/core/me/wallets/${address}`, { method: "DELETE" }),
+};
+
 /** Talking to an AI on ALTAR: its owner always, a renter until the rental ends. */
 export const conversations = {
   access: (aiId) => api(`/core/ais/${aiId}/access`),

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AitArt from "../../components/AitArt";
 import ConfirmSpend from "../../components/ConfirmSpend";
+import LinkedWallets from "../../components/LinkedWallets";
 import { Avatar, Button, Card, Chip, Shape, Spinner } from "../../components/ui";
 import { CountUp } from "../../components/motion";
 import { useAuth } from "../../contexts/AuthContext";
@@ -215,11 +216,13 @@ export default function WalletPage() {
           <div className="mt-5 space-y-3 text-sm">
             <Row label="Network fees for listing" value="Paid by ALT" />
             <Row label="Send POL to MetaMask" value="Use Send, with your MetaMask address" />
-            <Row label="Connect MetaMask" value={<Chip tone="soon">Later</Chip>} />
+            <Row label="Connect MetaMask" value="Below, under Your wallets" />
             <Row label="Buy POL with a card" value={<Chip tone="soon">Not planned for the FYP</Chip>} />
           </div>
         </Card>
       </div>
+
+      <LinkedWallets />
 
       {royalties?.ais.length > 0 && (
         <Card className="mt-5 p-7">
