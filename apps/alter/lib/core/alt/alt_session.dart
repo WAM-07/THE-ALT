@@ -1,5 +1,6 @@
 import 'package:alt_account/alt_account.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ai_api.dart';
 
@@ -46,19 +47,49 @@ enum AiPhase { unknown, loading, none, exists, error }
 /// Whether the signed-in person already has a personal AI (loaded from ALT Core after sign-in).
 final ValueNotifier<AiPhase> aiPhase = ValueNotifier<AiPhase>(AiPhase.unknown);
 
-/// The person's AI, kept fresh by screens that change it.
+/// The AI ALTER is working on (one the person owns), kept fresh by screens that change it.
 final ValueNotifier<AltAi?> currentAi = ValueNotifier<AltAi?>(null);
+
+/// Every AI on the person's ALT account: owned, rented and subscribed, as in ALTERA and ALTAR.
+final ValueNotifier<List<AccountAi>?> accountAis = ValueNotifier<List<AccountAi>?>(null);
+
+/// The AI the person last chose, remembered per account.
+String _chosenAiKey() => 'alter.currentAiId.${altAccount.currentUser.value?.id}';
+
+Future<void> loadAccountAis() async {
+  try {
+    accountAis.value = await aiApi.accountAis();
+  } catch (_) {
+    accountAis.value ??= const [];
+  }
+}
 
 Future<void> loadMyAi() async {
   aiPhase.value = AiPhase.loading;
   try {
-    final list = await aiApi.myAis();
-    currentAi.value = list.isEmpty ? null : await aiApi.get(list.first.id);
+    final results = await Future.wait([aiApi.myAis(), loadAccountAis()]);
+    final list = results[0] as List<AltAi>;
+    // The AI chosen last time; otherwise the one the person made themselves; otherwise the first.
+    String? chosen;
+    try {
+      chosen = (await SharedPreferences.getInstance()).getString(_chosenAiKey());
+    } catch (_) {}
+    final made = (accountAis.value ?? const <AccountAi>[]).where((a) => a.owned && a.created).map((a) => a.id).toSet();
+    final pick = list.where((a) => a.id == chosen).firstOrNull ?? list.where((a) => made.contains(a.id)).firstOrNull ?? list.firstOrNull;
+    currentAi.value = pick == null ? null : await aiApi.get(pick.id);
     aiPhase.value = list.isEmpty ? AiPhase.none : AiPhase.exists;
   } catch (_) {
     // Offline or server trouble. Never treat that as "no AI": onboarding would create a second one.
     aiPhase.value = currentAi.value == null ? AiPhase.error : AiPhase.exists;
   }
+}
+
+/// Makes another AI the person owns the one ALTER works on (teaching, memories, versions).
+Future<void> switchAi(String id) async {
+  currentAi.value = await aiApi.get(id);
+  try {
+    await (await SharedPreferences.getInstance()).setString(_chosenAiKey(), id);
+  } catch (_) {}
 }
 
 Future<AltAi?> refreshCurrentAi() async {
@@ -69,13 +100,17 @@ Future<AltAi?> refreshCurrentAi() async {
 }
 
 /// Keeps the AI state in step with sign-in and sign-out.
+/// Signing out, or another account signing in over this one (an ALT handoff link), starts afresh.
 void watchAltSession() {
+  String? lastUserId = altAccount.currentUser.value?.id;
   altAccount.currentUser.addListener(() {
-    if (altAccount.currentUser.value == null) {
+    final id = altAccount.currentUser.value?.id;
+    if (id != lastUserId) {
+      lastUserId = id;
       currentAi.value = null;
+      accountAis.value = null;
       aiPhase.value = AiPhase.unknown;
-    } else if (aiPhase.value == AiPhase.unknown) {
-      loadMyAi();
     }
+    if (id != null && aiPhase.value == AiPhase.unknown) loadMyAi();
   });
 }
