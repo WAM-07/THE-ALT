@@ -214,8 +214,13 @@ describe('subscriptions, reviews and royalties', () => {
     await wait(await fan.wallet.writeContract({ address: market, abi: altMarketplaceAbi, functionName: 'subscribe', args: [tokenId, 2], value: parseEther('0.4') }));
     expect(await index()).toBe(2);
 
+    // Subscribers stay private: the public history shows the sale, and the listing only counts them.
     const history = (await req('GET', `/activity?aiId=${aiId}`)).json();
-    expect(history[0]).toMatchObject({ kind: 'subscription', months: 2, amount: { pol: '0.4' }, royalty: { pol: '0.02' } });
+    expect(history.map((h: { kind: string }) => h.kind)).toEqual(['sale']);
+    await req('PUT', `/listings/${aiId}`, owner.token, { pitch: 'By the month' });
+    expect((await req('GET', `/listings/${aiId}`)).json().activeSubscribers).toBe(1);
+    const mine = (await req('GET', '/me/activity', fan.token)).json();
+    expect(mine[0]).toMatchObject({ kind: 'subscription', months: 2, amount: { pol: '0.4' }, royalty: { pol: '0.02' } });
     expect((await req('GET', '/me/activity', fan.token)).json()[0].role).toBe('subscribed');
     expect((await req('GET', '/me/activity', owner.token)).json()[0].role).toBe('subscribed_out');
     expect((await req('GET', '/me/rentals', fan.token)).json()).toEqual([expect.objectContaining({ kind: 'subscription', months: 2 })]);

@@ -302,6 +302,11 @@ export default function AgentDetails() {
                       {price ?? "Not offered"}
                     </p>
                     {offer === "rent" && listing?.rent && <p className="mt-1 text-sm text-ink-3">Up to {listing.rent.maxDays} days</p>}
+                    {offer === "subscribe" && listing?.subscription && listing.activeSubscribers > 0 && (
+                      <p className="mt-1 text-sm text-ink-3">
+                        {listing.activeSubscribers} {listing.activeSubscribers === 1 ? "person subscribes" : "people subscribe"} now
+                      </p>
+                    )}
                   </div>
                 </div>
                 {offer === "subscribe" && listing?.subscription && (

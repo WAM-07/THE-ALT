@@ -166,11 +166,20 @@ export async function buildApp(
     async () => (await db.query<ListingRow>(`${LIVE} ORDER BY l.updated_at DESC`)).rows.map(view),
   );
 
-  r.get('/listings/:aiId', { schema: { tags: ['listings'], summary: "One AI's listing", params: AiId } }, async (req) => {
+  r.get('/listings/:aiId', { schema: { tags: ['listings'], summary: "One AI's listing (with how many people subscribe now, never who)", params: AiId } }, async (req) => {
     const { rows } = await db.query<ListingRow>(`${LIVE} AND l.ai_id = $1`, [req.params.aiId]);
     if (!rows[0]) throw notFound('Listing');
-    return view(rows[0]);
+    return { ...view(rows[0]), activeSubscribers: await activeSubscribers(req.params.aiId) };
   });
+
+  /** How many people subscribe to an AI right now. Who they are stays private. */
+  async function activeSubscribers(aiId: string) {
+    const { rows } = await db.query<{ n: string }>(
+      `SELECT count(DISTINCT to_address)::text AS n FROM altar.transactions WHERE ai_id = $1 AND kind = 'subscription' AND expires_at > now()`,
+      [aiId],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
 
   r.put(
     '/listings/:aiId',
@@ -287,8 +296,12 @@ export async function buildApp(
 
   r.get(
     '/activity',
-    { schema: { tags: ['activity'], summary: "An AI's sales and rentals, newest first", querystring: z.object({ aiId: z.uuid() }) } },
-    async (req) => (await db.query(`${ACTIVITY} WHERE t.ai_id = $1 ORDER BY t.occurred_at DESC, t.id DESC LIMIT 50`, [req.query.aiId])).rows.map((t) => activityOut(t)),
+    { schema: { tags: ['activity'], summary: "An AI's sales and rentals, newest first (subscriptions stay private)", querystring: z.object({ aiId: z.uuid() }) } },
+    // Sales and rentals only: subscribers are private (the listing shows how many there are, not who).
+    async (req) =>
+      (await db.query(`${ACTIVITY} WHERE t.ai_id = $1 AND t.kind IN ('sale', 'rental') ORDER BY t.occurred_at DESC, t.id DESC LIMIT 50`, [req.query.aiId])).rows.map((t) =>
+        activityOut(t),
+      ),
   );
 
   r.get('/me/activity', { preHandler: requireUser, schema: { tags: ['activity'], summary: 'Your purchases, sales, rentals and royalties' } }, async (req) => {
