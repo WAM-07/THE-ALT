@@ -25,18 +25,37 @@ export interface LlmProvider {
 }
 
 /** Any OpenAI-compatible chat completions API: Groq, DeepSeek, OpenRouter, a local model server... */
-export function openAiCompatible(name: string, baseUrl: string, apiKey: string, model: string): LlmProvider {
+export function openAiCompatible(name: string, baseUrl: string, apiKey: string, model: string, fetchImpl: typeof fetch = fetch): LlmProvider {
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+  // Reasoning models (gpt-oss, as on Groq) count their thinking against max_tokens: unless it is kept
+  // short and given room, a reply comes back empty or cut off mid-sentence.
+  const reasoning = /gpt-oss/i.test(model);
+  const ask = (messages: LlmMessage[], temperature: number, maxTokens: number) =>
+    fetchImpl(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: reasoning ? maxTokens + REASONING_ALLOWANCE : maxTokens,
+        ...(reasoning ? { reasoning_effort: 'low' } : {}),
+      }),
+      // Short enough that a stalled provider leaves time for the next one before the gateway gives up.
+      signal: AbortSignal.timeout(20_000),
+    });
   return {
     name,
     async complete(messages, { temperature, maxTokens }) {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens }),
-        // Short enough that a stalled provider leaves time for the next one before the gateway gives up.
-        signal: AbortSignal.timeout(20_000),
-      });
+      let res = await ask(messages, temperature, maxTokens);
+      // Rate-limited for a moment ("try again in 1.5s"): wait once rather than skip to the next provider.
+      if (res.status === 429) {
+        const wait = retryAfterMs(res.headers.get('retry-after'), await res.clone().text().catch(() => ''));
+        if (wait !== null && wait <= 5_000) {
+          await new Promise((r) => setTimeout(r, wait));
+          res = await ask(messages, temperature, maxTokens);
+        }
+      }
       if (!res.ok) {
         const detail = (await res.text().catch(() => '')).slice(0, 200);
         throw new Error(`${name} answered HTTP ${res.status}: ${detail}`);
@@ -51,6 +70,17 @@ export function openAiCompatible(name: string, baseUrl: string, apiKey: string, 
       return { text, provider: name, model: body.model ?? model, tokensIn: body.usage?.prompt_tokens, tokensOut: body.usage?.completion_tokens };
     },
   };
+}
+
+/** Extra tokens a reasoning model may spend thinking (with reasoning_effort "low") before it answers. */
+export const REASONING_ALLOWANCE = 300;
+
+/** How long a 429 asks us to wait, from Retry-After or Groq's "Please try again in 1.5s"; null if it doesn't say. */
+export function retryAfterMs(header: string | null, body: string): number | null {
+  if (header && /^\d+(\.\d+)?$/.test(header.trim())) return Math.ceil(Number(header) * 1000);
+  const m = body.match(/try again in (\d+(?:\.\d+)?)(ms|s)\b/i);
+  if (!m) return null;
+  return Math.ceil(Number(m[1]) * (m[2]!.toLowerCase() === 'ms' ? 1 : 1000));
 }
 
 /**
