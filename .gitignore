@@ -17,17 +17,11 @@ coverage/
 .env.*
 !.env.example
 
-# vendored Flutter SDK (use FVM or a global install instead)
-ALTER/flutter/
-ALTER/node_modules/
-
 # legacy material kept locally only
+# (_archive/ also holds Soban's original ALTAR repo, altar-marketplace/, with his live Supabase settings)
 _archive/
-/ALTERA/
-Documentations/**/*.pdf
-Documentations/**/*.docx
-Documentations/**/*.pptx
-Documentations/SRS Presentation/
+docs/fyp/
+docs/**/*.pptx
 *.pdf
 *.docx
 
@@ -49,7 +43,7 @@ packages/contracts/ignition/deployments/chain-31337/
 services/altera-api/public/uploads/
 services/altera-api/seed-assets/
 services/altera-api/scripts/legacy/
-Documentations/ALTER/Plans/
+docs/history/alter/plans/
 apps/*/env/dev.json
 
 # agent scratch folders
@@ -60,8 +54,6 @@ packages/contracts/coverage/
 packages/contracts/deployments/localhost.json
 packages/contracts/deployments/testchain.json
 
-# Soban's original ALTAR repo, kept locally for reference (holds his live Supabase settings)
-/altar-marketplace/
 
 # Firebase config for push (each app's own project file; add it locally, see PROGRESS)
 apps/*/android/app/google-services.json

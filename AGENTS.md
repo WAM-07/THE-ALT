@@ -39,7 +39,7 @@ THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutt
    - Report failures honestly, with the output.
 9. **Do not touch these:**
    - `services/core/src/http/routes/auth.ts`, `services/core/src/modules/accounts/*`, `services/core/migrations/*`, `packages/alt_account/lib/src/client.dart`, `services/altera-api/src/middleware/auth.js` and `packages/contracts/*`, unless your task explicitly names them;
-   - anything under `_archive/` or `Documentations/*.pdf`.
+   - anything under `_archive/`, the university documents in `docs/fyp/`, or the PDFs in `docs/scope/`.
 10. **Keep changes small and focused.** Don't reformat files you didn't otherwise change. Match the style of the file you're editing.
 
 ## How to run and check things
@@ -68,7 +68,7 @@ npx tsc --noEmit    # inside services/core or services/gateway
 - **Profile pictures:** a person's picture is `core.users.avatar_url` (everywhere); `core.platform_avatars` may override it for one platform. Ready-made pictures come from `GET /core/avatars/presets`: `human` sets for people, `ai` sets for AIs, never mixed. Keep the credits visible wherever the sets are shown. To change the sets, edit and run `scripts/make-avatars.mjs`; don't add copyrighted characters.
 - **Ownership follows the token:** never change `core.personal_ais.owner_id` directly; call `syncToken` (`services/core/src/modules/market/holders.ts`), which reads the chain. Dataset routes show an item only to the person who added it, so a buyer never sees the seller's files.
 - **ALTAR API (`services/altar-api`):** owns the `altar` schema (listings, history, reviews, saved AIs). It reads the chain but **never signs or holds keys**; anything that spends goes through ALT Core (`/core/me/wallet/*`, `/core/ais/:id/market*`), which needs the person's password or 2FA code. On-chain prices are the truth; `altar.listings` and `altar.transactions` only mirror the contract's events. Reviews need a matching purchase, rental or subscription in `altar.transactions`.
-- **ALTAR web (`apps/altar-web`, Next.js):** the "Studio" design. Take colours only from the theme tokens in `src/app/globals.css` (`bg-canvas`, `text-ink`, `bg-accent`…, never raw `black`/`white`/`green-500`) and pieces from `src/components/ui.js`; every token's picture is `AitArt`. Themes live under Settings → Advanced on purpose; don't surface them. It talks to ALT only through `src/lib/alt.js`, on the same origin as the gateway (`/core/...`, `/altar/...`). It has no accounts, database or API routes of its own; never keep tokens in `localStorage`. Identify people by their ALT id, never by display name. `altar-marketplace/` is Soban's original, kept locally for reference only.
+- **ALTAR web (`apps/altar-web`, Next.js):** the "Studio" design. Take colours only from the theme tokens in `src/app/globals.css` (`bg-canvas`, `text-ink`, `bg-accent`…, never raw `black`/`white`/`green-500`) and pieces from `src/components/ui.js`; every token's picture is `AitArt`. Themes live under Settings → Advanced on purpose; don't surface them. It talks to ALT only through `src/lib/alt.js`, on the same origin as the gateway (`/core/...`, `/altar/...`). It has no accounts, database or API routes of its own; never keep tokens in `localStorage`. Identify people by their ALT id, never by display name. `_archive/altar-marketplace/` is Soban's original, kept locally for reference only.
 - **Commits:** imperative summary line, then what and why. One logical change per commit.
 
 ## When you finish a task

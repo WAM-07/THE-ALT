@@ -1,3 +1,4 @@
+// Extracts a PDF's text: npm run read-pdf -- <file.pdf> <out.txt> (made docs/scope/*.txt).
 const fs = require('fs');
 const PDFParser = require("pdf2json");
 

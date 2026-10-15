@@ -568,7 +568,7 @@ When demonstrating the 60% milestone to Sir Muzaffar Iqbal and the examination c
 ```markdown
 I am working on THE ALT ECOSYSTEM (COMSATS University Islamabad FYP).
 Before writing any code, read the master specification file:
-`c:\THE ALT\Documentations\ALT_ECOSYSTEM_AGENT_CONTEXT_AND_IMPLEMENTATION_PLAN.md`
+`docs/history/first-implementation-plan.md`
 
 Key Architectural Rules:
 1. We have a single PostgreSQL database and unified JWT auth across all 3 platforms (ALTER, ALTAR, ALTERA). No siloed databases.
@@ -582,4 +582,4 @@ Follow the exact instructions and verification gates in the master plan.
 ```
 
 ---
-*Reference Document saved at:* `c:\THE ALT\Documentations\ALT_ECOSYSTEM_AGENT_CONTEXT_AND_IMPLEMENTATION_PLAN.md`
+*Reference Document saved at:* `docs/history/first-implementation-plan.md`

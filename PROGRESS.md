@@ -11,7 +11,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 | 3 | Smart contracts (AITRegistry, ALTMarketplace) with tests, local chain, IPFS pinning, mint pipeline (M17, M6) | ✅ Done 2026-10-11 (Amoy deploy waits for a funded key) |
 | 4 | Core AIs, versions, consent and datasets; persona engine; ALTER onboarding, chat and deploy wired to the server (M8, M10) | ✅ Done 2026-10-11 |
 | 5 | Verified AIs on ALTERA: verified-only gate, persona engine for posts and DMs, moderation, notifications (M13–M16, M2) | ✅ Done 2026-10-11 |
-| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ✅ All 4 steps done (2026-10-13 to 15): `apps/altar-web` redesigned on ALT accounts; `services/altar-api`; the ALT wallet and on-chain listings; buying, reselling with royalties, renting and rental chat; subscriptions, reviews and the creator's royalties. Plan: `Documentations/ALTAR_EVALUATION.md` §7. Next: Polygon Amoy (needs the owner's key). |
+| 6 | ALTAR marketplace: buy, rent, royalties, wallet (M11, M12) | ✅ All 4 steps done (2026-10-13 to 15): `apps/altar-web` redesigned on ALT accounts; `services/altar-api`; the ALT wallet and on-chain listings; buying, reselling with royalties, renting and rental chat; subscriptions, reviews and the creator's royalties. Plan: `docs/altar-evaluation.md` §7. Next: Polygon Amoy (needs the owner's key). |
 | 7 | End-to-end demo run, fixes, seed data, demo script, report updates | 🟡 Demo seed and script done 2026-10-12; report updates left |
 
 ## How to check everything still works
@@ -29,7 +29,7 @@ npm run dev                     # everything at http://localhost:8080 (ALTAR is 
 ## Done
 
 ### Day 0–1 (2026-10-11)
-- **Monorepo:** `apps/`, `services/`, `packages/`, `scripts/` and `tools/`. ALTERA's old nested git history and the file whose name contained the old Groq key are kept locally in `_archive/` (git-ignored).
+- **Monorepo:** `apps/`, `services/`, `packages/`, `scripts/` and `docs/` (tidied 2026-10-15; `tools/` was folded into `scripts/`). ALTERA's old nested git history and the file whose name contained the old Groq key are kept locally in `_archive/` (git-ignored).
 - **`npm run dev`** starts embedded PostgreSQL 18 (no Docker), runs migrations, starts every service, waits for health and prints the URLs. Development secrets are generated into `.data/`. It also writes `apps/<app>/env/dev.json` for Flutter.
 - **ALT Core** (`services/core`) covers Module 1 in full:
   - **Sign-up and sign-in:**
@@ -170,7 +170,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 1. **ALT Core and the central system**: keep hardening it.
 2. **ALTERA fully on the central system**: fix issues along the way.
 3. **ALTER personal-AI module**, without the training part.
-4. **Now:** the ALTAR marketplace, in the four steps of `Documentations/ALTAR_EVALUATION.md` §7 (owner's go-ahead 2026-10-13).
+4. **Now:** the ALTAR marketplace, in the four steps of `docs/altar-evaluation.md` §7 (owner's go-ahead 2026-10-13).
 
 ### Step status
 - ✅ **Persona engine providers.** Groq (`openai/gpt-oss-120b`) is the primary, Gemini (`gemini-flash-latest`) the fallback, and DeepSeek last; its account currently has no balance (HTTP 402). Keys live in the root `.env`, copied from the old ALTERA config.
@@ -228,7 +228,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - an admin announcement.
 
     It refuses to run against an external database, and your everyday `alt` data is never touched.
-  - `Documentations/60_DEMO_SCRIPT.md`: a 10-minute, scene-by-scene walkthrough with what to click and what to say, a plan B and honest answers to likely questions.
+  - `docs/demo-script.md`: a 10-minute, scene-by-scene walkthrough with what to click and what to say, a plan B and honest answers to likely questions.
   - **Found while seeding:** the impersonation rule missed curly apostrophes (“I’m not an AI”, as phones type it) and “I’m a real human”. Fixed, with tests (`test/moderation.test.ts`).
   - **Noted for hardening:** ALTERA answers a malformed id (e.g. `/posts/undefined/react`) with 500 instead of 400 or 404.
 - ✅ **ALTER redesign: "Obsidian", a premium dark design.** Before/after review: https://claude.ai/artifact/EPgQxndBDhw7Gdm7z7fXtp (private to the owner).
@@ -393,7 +393,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - subscriptions on List AI (on-chain now);
     - a **Rented & subscribed** profile tab;
     - a **Royalties as a creator** card and subscription activity in the wallet.
-  - **Demo:** Sara subscribes to Calm Coach and Hamza rents Urdu Ustad; both leave reviews. `Documentations/60_DEMO_SCRIPT.md` gains **Scene 9: ALTAR** and the new accounts.
+  - **Demo:** Sara subscribes to Calm Coach and Hamza rents Urdu Ustad; both leave reviews. `docs/demo-script.md` gains **Scene 9: ALTAR** and the new accounts.
   - **Fixed along the way:** test runs could leave a PostgreSQL 18 I/O worker holding the test port, so the next run found "no test files". The embedded database now runs with `io_method=sync` (`packages/devkit`).
   - **Checked:**
     - tests: contracts 36, Core 81, `altar-api` 5, ALTERA 16, gateway 9, and nothing left running afterwards;
@@ -481,7 +481,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
   - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.
   - **C1 Polygon Amoy**: needs an RPC URL (e.g. Alchemy) and a faucet-funded key in `.env`; `CHAIN_MODE=amoy` is already supported.
-- **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
+- **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `docs/demo-script.md`.
 - **Waiting on the owner:**
   - **Push notifications:** a Firebase project (the steps are under C3 above).
   - **Biometric unlock:** try it with a real fingerprint (Account Center → Security).
@@ -506,7 +506,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 
 ## Environment notes
 - **ALTAR API** runs on port 4200 (`ALTAR_PORT`); `npm run dev` passes it the chain settings and sets the gateway's `ALTAR_URL`. Its tests use their own database (`.data/test-postgres-altar`, port 54398) and the test chain on 8546 after Core's tests.
-- **ALTAR web** runs on port 4300 (`ALTAR_WEB_PORT`) behind the gateway. Soban's original repo stays in `altar-marketplace/` (git-ignored; it holds his live Supabase settings, never copy them).
+- **ALTAR web** runs on port 4300 (`ALTAR_WEB_PORT`) behind the gateway. Soban's original repo stays in `_archive/altar-marketplace/` (git-ignored; it holds his live Supabase settings, never copy them).
 - **Development needs no keys.** Optional settings go in `.env`: `GOOGLE_CLIENT_IDS`, `SMTP_URL` with `MAIL_MODE=smtp`, and `ADMIN_EMAILS`.
 - **Flutter SDK is at `C:\flutter`.** It was moved out of `ALTER/flutter` because Flutter's native-asset build fails when the SDK path contains a space ("C:\THE ALT"). Add `C:\flutter\bin` to PATH.
 - **Android Studio is installed** (SDK 36, Android 16 emulator, licences accepted). Both apps build and run on the emulator. Checked 2026-10-12: sign-in, the ALTER → ALTERA handoff, the verified AI and the shared inbox.

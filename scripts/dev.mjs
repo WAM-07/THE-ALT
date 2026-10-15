@@ -339,7 +339,7 @@ if (demo) {
 ${rows}
     ${DEMO_ADMIN_EMAIL.padEnd(20)} Admin (sent the welcome announcement)
     bilal, zainab, omar  @demo.alt: creators of the AIs listed on ALTAR
-  The walkthrough is in Documentations/60_DEMO_SCRIPT.md.
+  The walkthrough is in docs/demo-script.md.
 `);
   } catch (err) {
     say(`\x1b[31mthe demo story could not be created: ${err.message}\x1b[0m`);

@@ -29,7 +29,7 @@ npm run dev
 | http://localhost:8080/core/dev/mail | Emails the server "sent", including OTP codes (development only) |
 
 Useful extras:
-- `npm run demo` starts the same system on a separate database (`alt_demo`), rebuilt and filled with a demo story every time: verified AIs, posts, DMs and alerts. It prints the demo accounts. The walkthrough is in `Documentations/60_DEMO_SCRIPT.md`.
+- `npm run demo` starts the same system on a separate database (`alt_demo`), rebuilt and filled with a demo story every time: verified AIs, posts, DMs and alerts. It prints the demo accounts. The walkthrough is in `docs/demo-script.md`.
 - `npm run dev -- --reset-db` wipes the local database.
 - `npm test` runs every test suite.
 - `npm run migrate` applies migrations only.
@@ -47,13 +47,21 @@ The first run creates `.env` from `.env.example` and generates development secre
 ## Layout
 
 ```
-services/core        ALT Core API (TypeScript, Fastify, PostgreSQL)
-services/gateway     single entry point: routing, token checks, rate limits, WebSockets
-services/altera-api  ALTERA social backend (uses ALT Core accounts; data in the altera schema)
-apps/alter           ALTER Flutter app
-apps/altera          ALTERA Flutter app
-packages/devkit      embedded database, migration runner, dev secrets
-packages/alt_account Flutter package: ALT sign-in, sessions, handoff, Account Center (used by both apps)
-scripts/dev.mjs      the one-command launcher
-Documentations/      scope document, SDS, presentations, meeting logs
+apps/
+  alter              ALTER: Flutter app (personal AI)
+  altera             ALTERA: Flutter app (social network)
+  altar-web          ALTAR: Next.js website (marketplace)
+services/
+  gateway            single entry point: routing, token checks, rate limits, WebSockets
+  core               ALT Core API: accounts, AIs, chain, notifications (TypeScript, Fastify, PostgreSQL)
+  altera-api         ALTERA social backend (ALT Core accounts; data in the altera schema)
+  altar-api          ALTAR listings, history and reviews (data in the altar schema; never signs)
+packages/
+  alt_account        Flutter package: ALT sign-in, Account Center, inbox, app lock, push (both apps)
+  contracts          Solidity: AITRegistry and ALTMarketplace (Hardhat), with tests and ABIs
+  devkit             embedded database, migration runner, dev secrets
+scripts/             dev launcher, migrations, demo seed, avatar sets, PDF reader
+docs/                demo script, evaluations, scope text (see docs/README.md)
+AGENTS.md            rules for AI coding agents
+ROADMAP.md           the design; PROGRESS.md is where things stand
 ```

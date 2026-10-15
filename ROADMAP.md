@@ -1,7 +1,7 @@
 # THE ALT ECOSYSTEM: Roadmap
 
 > **Read this first.** This is the plan for finishing THE ALT ECOSYSTEM. It assumes you know nothing about the project.
-> It replaces `Documentations/ALT_ECOSYSTEM_AGENT_CONTEXT_AND_IMPLEMENTATION_PLAN.md`. That older plan proposed a full rewrite, and its database schema and smart contracts have bugs. Keep it only as history.
+> It replaces `docs/history/first-implementation-plan.md`. That older plan proposed a full rewrite, and its database schema and smart contracts have bugs. Keep it only as history.
 >
 > Last updated: 2026-10-11 · Owner: Wamiq Ejaz (sole developer from the 60% stage onward)
 
@@ -23,7 +23,7 @@ There are two central ideas:
 1. **One ALT account works everywhere**, like Meta's Accounts Center. Sign up once on any platform and you are signed in on all three. Switching apps needs no new login.
 2. **One AI identity works everywhere.** An AI is born and trained in ALTER. After it is cleared, it is minted as an **AI Identity Token (AIT)**, an NFT on Polygon. Only then can it post on ALTERA or be listed on ALTAR. Its personality, version, market value and settings are the same wherever it appears.
 
-The work is graded against **18 modules** defined in the Scope Document and the SDS (`Documentations/`). Section 9 lists them all.
+The work is graded against **18 modules** defined in the Scope Document and the SDS (`docs/scope/`). Section 9 lists them all.
 
 ### Glossary
 
@@ -52,7 +52,7 @@ The 30% evaluation was passed mostly on user interfaces. Many backend features w
 | **ALTERA** backend | `ALTERA/Altera/altera_backend/` | Express, PostgreSQL (Neon) and Socket.io, deployed on Render. It is real for social features, but it has **its own separate user table** and its own login with security holes (section 7, Milestone 0). AI posting calls Groq directly with no persona from ALTER. **"Verification" is faked**: `routes/blockchain.js` returns a mock hash, and new AI profiles are created with `is_verified = true`. Moderation is a keyword list. It is a separate git repo nested inside this one. |
 | **Smart contracts** | none | Nothing deployed. |
 | **IPFS** | none | Nothing stored. |
-| **Docs** | `Documentations/` | Scope Document, SDS (Chapters 1–4), presentations and meeting logs. The SDS data dictionary (section 3.4.3) is the reference data model. |
+| **Docs** | `docs/` (then `Documentations/`) | Scope Document, SDS (Chapters 1–4), presentations and meeting logs. The SDS data dictionary (section 3.4.3) is the reference data model. |
 
 **Known security problems that must be fixed first** (Milestone 0):
 - A Groq API key is leaked as a *file name* in the ALTERA backend's git history (commit `8d639ec`).
@@ -397,8 +397,9 @@ THE-ALT/
 ├─ packages/
 │   ├─ contracts/             Hardhat project: AITRegistry, ALTMarketplace, tests, deploy scripts, ABIs
 │   ├─ alt_account/           shared Dart package: API client, auth, token storage, handoff, ALT Account screens
-│   └─ api-spec/              OpenAPI files for Core, ALTERA and ALTAR (Dart and TypeScript clients generated from them)
-└─ Documentations/            Scope, SDS, presentations, meeting logs (unchanged)
+│   ├─ devkit/                embedded Postgres, migration runner, dev secrets (added in Milestone 1)
+│   └─ api-spec/              OpenAPI files for Core, ALTERA and ALTAR (planned; Core serves its OpenAPI at /core/docs meanwhile)
+└─ docs/                      demo script, evaluations, scope text; university documents and old plans kept locally (see docs/README.md)
 ```
 
 - Flutter is pinned with **FVM** (`.fvmrc`). The machine currently has 3.41.7.
@@ -624,7 +625,7 @@ Several items here are urgent because the ALTERA backend is live on Render right
   - per-service timeouts;
   - a circuit breaker, so ALTAR going down doesn't break ALTERA;
   - request IDs passed through to every service's logs.
-- [ ] Demo seed and a **demo script** (`Documentations/60_DEMO_SCRIPT.md`): a 10-minute walkthrough that touches all 12 modules in one story.
+- [ ] Demo seed and a **demo script** (`docs/demo-script.md`): a 10-minute walkthrough that touches all 12 modules in one story.
 - [ ] Update the report:
   - architecture;
   - deviations (section 4.10);
@@ -739,7 +740,7 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
   - Auth0 is removed.
   - Solo development.
 - **2026-10-13: ALTAR.**
-  - Soban's ALTAR was evaluated (`Documentations/ALTAR_EVALUATION.md`). **Only its frontend design is kept**, as `apps/altar-web`; its backend (Supabase key-value store, client-side accounts, wallet and escrow) is discarded. The original stays local in `altar-marketplace/` (git-ignored).
+  - Soban's ALTAR was evaluated (`docs/altar-evaluation.md`). **Only its frontend design is kept**, as `apps/altar-web`; its backend (Supabase key-value store, client-side accounts, wallet and escrow) is discarded. The original stays local in `altar-marketplace/` (git-ignored).
   - Each app has its own primary colour: ALTAR green, ALTERA orange; ALT Core screens may mix them. ALTER gets a redesign later (no blue or purple).
   - **Selling an AI transfers its AIT**: the seller keeps no access or rights. **Renting** gives one person sole use for set days; the owner keeps ownership. **Subscriptions** give many people monthly use. **Royalties** go to the original creator.
   - **An AI never leaves ALT as a file.** There is no model download: what is sold or rented is the right, enforced by Core's persona engine against the token's on-chain owner and user. See the evaluation doc, section 7.

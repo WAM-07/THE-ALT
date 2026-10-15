@@ -1,4 +1,4 @@
-// Fills a fresh ALT with a small, believable story for the 60% demo (see Documentations/60_DEMO_SCRIPT.md).
+// Fills a fresh ALT with a small, believable story for the 60% demo (see docs/demo-script.md).
 // Everything goes through the public APIs behind the gateway, exactly as the apps do: sign-up with
 // e-mailed codes, consent, chat, build, mint, bring to ALTERA, post, follow, DM. Nothing is written to
 // the database directly, so the seed doubles as an end-to-end check of the system.

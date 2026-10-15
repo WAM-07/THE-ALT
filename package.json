@@ -17,7 +17,7 @@
     "migrate": "node scripts/migrate.mjs",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "read-pdf": "node tools/read_pdf.js"
+    "read-pdf": "node scripts/read-pdf.cjs"
   },
   "devDependencies": {
     "@dicebear/collection": "9.4.2",
