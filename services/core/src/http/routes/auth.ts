@@ -74,7 +74,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
       const count = rows[0]!.failed_login_count;
       if (count >= MAX_FAILED_LOGINS) {
         const until = new Date(Date.now() + LOCKOUT_MS);
-        await client.query('UPDATE core.users SET failed_login_count = 0, locked_until = $2 WHERE id = $1', [user.id, until]);
+        await client.query('UPDATE core.users SET failed_login_count = 0, locked_until = $2, lock_reason = NULL WHERE id = $1', [user.id, until]);
         await audit(client, { action: 'auth.lockout', actorUserId: user.id, entityType: 'user', entityId: user.id, ip, data: { reason } });
         await notify(client, {
           userId: user.id,
@@ -94,8 +94,19 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
   const lockedError = (until: Date) =>
     new AppError(423, 'ACCOUNT_LOCKED', 'Too many failed attempts. Try again later.', { lockedUntil: until.toISOString() });
 
+  /** Locked by ALT staff (the Command Centre), not by failed passwords: say so, and when it ends. */
+  const suspendedError = (until: Date) =>
+    new AppError(
+      423,
+      'ACCOUNT_SUSPENDED',
+      until.getUTCFullYear() >= 2100
+        ? 'ALT suspended this account until further notice. We emailed you the reason.'
+        : `ALT suspended this account until ${until.toUTCString()}. We emailed you the reason.`,
+      { lockedUntil: until.toISOString() },
+    );
+
   function assertNotLocked(user: UserRow) {
-    if (user.locked_until && user.locked_until > new Date()) throw lockedError(user.locked_until);
+    if (user.locked_until && user.locked_until > new Date()) throw user.lock_reason ? suspendedError(user.locked_until) : lockedError(user.locked_until);
   }
 
   /** After the first factor: either finish sign-in, or ask for the 2FA code. */

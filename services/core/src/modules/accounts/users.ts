@@ -18,6 +18,8 @@ export interface UserRow {
   failed_login_count: number;
   locked_until: Date | null;
   two_fa_enabled: boolean;
+  /** Set when ALT staff locked the account (with locked_until); NULL for the failed-password lock. */
+  lock_reason: string | null;
   two_fa_secret_enc: string | null;
   two_fa_pending_secret_enc: string | null;
   two_fa_last_step: string | null;

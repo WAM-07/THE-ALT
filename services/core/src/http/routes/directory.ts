@@ -128,7 +128,7 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
     { preHandler: admin, schema: { tags: ['admin'], summary: 'Clear a sign-in lockout', params: z.object({ id: z.uuid() }) } },
     async (req) => {
       await tx(ctx.db, async (client) => {
-        const { rowCount } = await client.query('UPDATE core.users SET locked_until = NULL, failed_login_count = 0 WHERE id = $1', [req.params.id]);
+        const { rowCount } = await client.query('UPDATE core.users SET locked_until = NULL, lock_reason = NULL, failed_login_count = 0 WHERE id = $1', [req.params.id]);
         if (!rowCount) throw notFound('User');
         await audit(client, { action: 'admin.user_unlocked', actorUserId: req.auth!.userId, entityType: 'user', entityId: req.params.id, ip: req.ip });
       });

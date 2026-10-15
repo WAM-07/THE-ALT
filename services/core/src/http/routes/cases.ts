@@ -611,7 +611,7 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
             throw forbidden('STAFF_ACCOUNT', 'Only an admin can lock a member of staff.');
           }
           const until = b.days ? new Date(Date.now() + b.days * 86_400_000) : INDEFINITE;
-          await client.query('UPDATE core.users SET locked_until = $2 WHERE id = $1', [userId, until]);
+          await client.query('UPDATE core.users SET locked_until = $2, lock_reason = $3 WHERE id = $1', [userId, until, b.reason]);
           // Signed out everywhere at once: every ALT service hears it (alt_sessions_revoked).
           const sessions = await revokeAllSessions(client, userId, 'locked_by_staff');
           const when = b.days ? `until ${until.toUTCString()}` : 'until further notice';
@@ -626,7 +626,7 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
         }
 
         // unlock_account
-        await client.query('UPDATE core.users SET locked_until = NULL, failed_login_count = 0 WHERE id = $1', [userId]);
+        await client.query('UPDATE core.users SET locked_until = NULL, lock_reason = NULL, failed_login_count = 0 WHERE id = $1', [userId]);
         await tell(userId, 'account.unlocked', 'Your ALT account is active again', b.reason);
         await ctx.mailer.send({ to: person.email, subject: 'Your ALT account is active again', text: `Hello ${person.display_name},\n\nYou can sign in to ALT again. ${b.reason}\n\nTHE ALT` });
         return record({ userId });

@@ -112,7 +112,10 @@ describe('acting on a case from the ALT Command Centre (P4)', () => {
     const locked = await act({ action: 'lock_account', reason: 'Repeated impersonation.', days: 1 });
     expect(locked.statusCode).toBe(200);
     expect((await call('GET', '/me', owner.accessToken)).json().error.code).toBe('SESSION_REVOKED');
-    expect((await login(owner, 'alter')).statusCode).toBe(423);
+    const refused = await login(owner, 'alter');
+    expect(refused.statusCode).toBe(423);
+    // Not the failed-password message: it says ALT suspended it, and until when.
+    expect(refused.json().error).toMatchObject({ code: 'ACCOUNT_SUSPENDED', message: expect.stringMatching(/^ALT suspended this account until .+ We emailed you the reason\.$/) });
     expect(t.mailer.outbox().find((m) => m.to === owner.email && m.subject === 'Your ALT account is suspended')?.text).toContain('Repeated impersonation.');
 
     // Undo both.

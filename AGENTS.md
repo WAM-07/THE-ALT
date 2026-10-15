@@ -4,11 +4,18 @@ Read this whole file before changing anything. Then read `PROGRESS.md` (where th
 
 ## What you are working on
 
-THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutter), ALTAR (Next.js), and ALTERA (Flutter).
+THE ALT ECOSYSTEM has one shared backend (ALT Core) behind one gateway, three platforms for people (ALTER, Flutter; ALTERA, Flutter with its own API; ALTAR, Next.js with its own API) and one website for staff (the ALT Command Centre, `/command`).
 
-- **One account works everywhere.**
-- **AIs are created only in ALTER.** An AI may act on ALTERA or ALTAR only after it is *verified*, meaning it has an AI Identity Token (AIT) on Polygon.
-- Design is in `ROADMAP.md`, section 4. Do not invent a different architecture.
+The core concepts. Every change keeps all of them; if a task seems to need breaking one, stop and ask:
+
+- **One account works everywhere.** People and staff alike sign in with their ALT account; there is no second account system.
+- **AIs are created only in ALTER.** An AI may act on ALTERA or ALTAR only after it is *verified*, meaning it has an AI Identity Token (AIT) on-chain. Ownership follows the token.
+- **Each service owns its data** (rule 4) and they reach each other only through the gateway, their APIs or Core's events.
+- **Everything people and staff do that matters is audited**, and nothing is faked (rule 7).
+- **Staff tools live only in the ALT Command Centre**, never inside the user apps.
+- **The scope is the 18 modules of the Scope Document** (`docs/scope/scope-document.txt`; status in `ROADMAP.md` §8–9). Build what serves them; say so when something is outside them.
+
+Design is in `ROADMAP.md`, section 4. Do not invent a different architecture.
 
 ## Hard rules
 
@@ -37,9 +44,10 @@ THE ALT ECOSYSTEM has one shared backend (ALT Core) and three apps: ALTER (Flutt
    - Add or update tests for any backend behaviour you change.
    - Run `npm test` (backend) and `flutter analyze` (apps) before saying you are done.
    - Report failures honestly, with the output.
-9. **Do not touch these:**
-   - `services/core/src/http/routes/auth.ts`, `services/core/src/modules/accounts/*`, `services/core/migrations/*`, `packages/alt_account/lib/src/client.dart`, `services/altera-api/src/middleware/auth.js` and `packages/contracts/*`, unless your task explicitly names them;
-   - anything under `_archive/`, the university documents in `docs/fyp/`, or the PDFs in `docs/scope/`.
+9. **Handle with care** (owner's update, 2026-10-15: these were once off-limits; now they may change when the task needs it, never to weaken them, always with tests, and with a line in `PROGRESS.md` saying what changed and why):
+   - sign-in and sessions: `services/core/src/http/routes/auth.ts`, `services/core/src/modules/accounts/*`, `packages/alt_account/lib/src/client.dart`, `services/altera-api/src/middleware/auth.js`;
+   - the smart contracts, `packages/contracts/contracts/*`: a change also needs its tests (`npm test -w @alt/contracts`), a redeploy, and invalidates the saved demo chain (`npm run demo -- --fresh` replaces the owner's demo, so ask first).
+   - **Never touch:** a committed migration (rule 5), anything under `_archive/`, the university documents in `docs/fyp/`, the PDFs in `docs/scope/`, or the owner's saved demo (`.data/demo-chain.*`, the `alt_demo` database) beyond running it.
 10. **Keep changes small and focused.** Don't reformat files you didn't otherwise change. Match the style of the file you're editing.
 
 ## How to run and check things
