@@ -16,6 +16,7 @@ const blockchainRoutes = require('./routes/blockchain');
 const messageRoutes = require('./routes/messages');
 const storyRoutes = require('./routes/stories');
 const aiRoutes = require('./routes/ai');
+const internalRoutes = require('./routes/internal');
 const { getStoredMedia } = require('./services/media_storage');
 
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
@@ -70,6 +71,7 @@ function createApp({ io = null, logRequests = true } = {}) {
   app.use('/messages', messageRoutes);
   app.use('/stories', storyRoutes);
   app.use('/ai', aiRoutes);
+  app.use('/internal', internalRoutes);
   app.use('/uploads', express.static('public/uploads'));
 
   app.get('/media/:id', async (req, res) => {

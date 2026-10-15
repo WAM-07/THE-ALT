@@ -2,7 +2,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { JWTVerifyGetKey } from 'jose';
 import pg from 'pg';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { formatEther, parseEther } from 'viem';
 import { z } from 'zod';
 import { createAuth } from './auth.js';
@@ -470,6 +470,33 @@ export async function buildApp(
         evidence: { rating: Number(review.rating), text: review.body ?? null, basis: review.basis, reviewer: `@${review.handle}`, ai: ai[0] ? `${ai[0].name} (@${ai[0].handle})` : aiId, written_at: review.updated_at },
       });
       return { received: true, number: filed.number };
+    },
+  );
+
+  // ---------------------------------------------------------------- for ALT Core only (the gateway never exposes /internal)
+
+  /** Only other ALT services, with the shared service key. */
+  const requireService = async (req: { headers: Record<string, unknown> }) => {
+    const key = Buffer.from(String(req.headers['x-alt-service-key'] ?? ''));
+    const want = Buffer.from(config.internalServiceKey ?? '');
+    if (!want.length || key.length !== want.length || !timingSafeEqual(key, want)) throw new AltarError(401, 'SERVICE_UNAUTHORIZED', 'Service credentials required.');
+  };
+
+  r.post(
+    '/internal/reviews/remove',
+    {
+      preHandler: requireService,
+      schema: {
+        tags: ['internal'],
+        summary: 'Staff removed a review in the ALT Command Centre (ALTAR owns reviews, so it removes them)',
+        body: z.object({ aiId: z.uuid(), reviewerId: z.uuid(), reason: z.string().max(1000).optional(), caseNumber: z.number().int().optional() }),
+      },
+    },
+    async (req) => {
+      const { rowCount } = await db.query('DELETE FROM altar.reviews WHERE ai_id = $1 AND reviewer_id = $2', [req.body.aiId, req.body.reviewerId]);
+      if (!rowCount) throw notFound('Review');
+      app.log.info({ case: req.body.caseNumber, aiId: req.body.aiId }, 'review removed by ALT staff');
+      return { removed: true };
     },
   );
 

@@ -944,7 +944,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     _SettingsTile(
                         icon: Icons.policy_outlined,
                         title: 'Moderation & Compliance',
-                        subtitle: 'View flagged content and anomaly flags',
+                        subtitle: 'What was flagged on your posts and AIs (ALT staff review it)',
                         onTap: () {
                           Navigator.pop(ctx);
                           context.push('/moderation');

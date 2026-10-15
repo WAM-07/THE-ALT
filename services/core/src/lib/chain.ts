@@ -22,6 +22,7 @@ export interface ChainConfig {
   registryAddress: string;
   marketplaceAddress?: string | undefined;
   relayerPrivateKey: string;
+  governorPrivateKey?: string | undefined;
   explorerUrl?: string | undefined;
   confirmations: number;
 }
@@ -59,6 +60,7 @@ export class ChainService {
   private readonly confirmations: number;
   private readonly publicClient;
   private readonly walletClient;
+  private readonly governorClient;
 
   constructor(cfg: ChainConfig) {
     const chain = defineChain({
@@ -78,6 +80,35 @@ export class ChainService {
     this.confirmations = cfg.confirmations;
     this.publicClient = createPublicClient({ chain, transport: http(cfg.rpcUrl) });
     this.walletClient = createWalletClient({ chain, account, transport: http(cfg.rpcUrl) });
+    this.governorClient = cfg.governorPrivateKey
+      ? createWalletClient({ chain, account: privateKeyToAccount(cfg.governorPrivateKey as Hex), transport: http(cfg.rpcUrl) })
+      : null;
+  }
+
+  /** Whether ALT can suspend AIs on-chain (it holds a key with the registry's GOVERNOR_ROLE). */
+  get canGovern() {
+    return this.governorClient !== null;
+  }
+
+  /** Suspends or restores an AI identity token (GOVERNOR_ROLE). A suspended token can't be transferred. */
+  async setSuspended(tokenId: bigint, suspended: boolean, reason: string) {
+    if (!this.governorClient) throw new AppError(503, 'CHAIN_NO_GOVERNOR', 'ALT has no governor key configured, so it cannot suspend AIs on-chain.');
+    try {
+      const { request } = await this.publicClient.simulateContract({
+        address: this.registryAddress,
+        abi: aitRegistryAbi,
+        functionName: suspended ? 'suspend' : 'unsuspend',
+        args: suspended ? [tokenId, reason.slice(0, 200)] : [tokenId],
+        account: this.governorClient.account,
+      } as never);
+      const hash = await this.governorClient.writeContract(request as never);
+      const receipt = await this.publicClient.waitForTransactionReceipt({ hash, confirmations: this.confirmations, timeout: 180_000 });
+      if (receipt.status !== 'success') throw new AppError(502, 'CHAIN_TX_FAILED', 'The suspension did not go through on-chain.');
+      return { hash, blockNumber: receipt.blockNumber };
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      this.explain(err, suspended ? 'suspend the AI' : 'lift the suspension');
+    }
   }
 
   explorerTx(hash: string) {

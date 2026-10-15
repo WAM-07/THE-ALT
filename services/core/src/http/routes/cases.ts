@@ -5,8 +5,10 @@ import { z } from 'zod';
 import type { Ctx, Role } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit } from '../../lib/audit.js';
-import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js';
+import { AppError, badRequest, conflict, forbidden, notFound } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
+import { callService } from '../../lib/services.js';
+import { revokeAllSessions } from '../../modules/accounts/sessions.js';
 import { parseRoles } from '../../modules/accounts/users.js';
 import {
   addEvent,
@@ -305,6 +307,7 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
     );
     return {
       case: staffOut(c),
+      targets: await targetsOf(c),
       canHandle: canHandle(roles(req), c.kind) && !(await isInvolved(ctx.db, c, req.auth!.userId)),
       events: rows.map((e) => ({
         id: String(e.id),
@@ -457,6 +460,178 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
         }
         return { outcome, notified: people.length };
       }),
+  );
+
+  // ---------------------------------------------------------------- actions from a case (P4)
+
+  /** What a case is about, as staff can act on it: the AI, the person, the post, comment or review. */
+  async function targetsOf(c: CaseRow) {
+    const ai = c.subject_ai_id
+      ? (
+          await ctx.db.query<{ id: string; name: string; handle: string; status: string; token_id: string | null; suspended: boolean | null }>(
+            `SELECT a.id, a.name, a.handle, a.status, t.token_id, t.suspended FROM core.personal_ais a
+               LEFT JOIN core.ai_identity_tokens t ON t.ai_id = a.id WHERE a.id = $1`,
+            [c.subject_ai_id],
+          )
+        ).rows[0]
+      : undefined;
+    const person = c.subject_user_id
+      ? (
+          await ctx.db.query<{ id: string; handle: string; display_name: string; locked_until: Date | null; roles: unknown; warnings: string }>(
+            `SELECT u.id, u.handle, u.display_name, u.locked_until, u.roles,
+                    (SELECT count(*) FROM core.case_events e WHERE e.kind = 'action' AND e.data->>'action' = 'warn_user' AND e.data->>'userId' = u.id::text) AS warnings
+               FROM core.users u WHERE u.id = $1`,
+            [c.subject_user_id],
+          )
+        ).rows[0]
+      : undefined;
+    const removable = (c.platform === 'altera' && (c.subject_type === 'post' || c.subject_type === 'comment')) || (c.platform === 'altar' && c.subject_type === 'review');
+    return {
+      ai: ai ? { id: ai.id, name: ai.name, handle: ai.handle, status: ai.status, tokenId: ai.token_id, suspended: Boolean(ai.suspended) } : null,
+      person: person
+        ? {
+            id: person.id,
+            handle: person.handle,
+            displayName: person.display_name,
+            lockedUntil: person.locked_until && person.locked_until > new Date() ? person.locked_until.toISOString() : null,
+            staff: parseRoles(person.roles).some((r) => ['admin', 'moderator', 'support', 'auditor'].includes(r)),
+            warnings: Number(person.warnings),
+          }
+        : null,
+      content: removable ? { type: c.subject_type, id: c.subject_id, platform: c.platform } : null,
+      canSuspendOnChain: Boolean(ctx.chain?.canGovern),
+    };
+  }
+
+  const Reason = z.string().trim().min(3).max(1000);
+  const ActionBody = z.discriminatedUnion('action', [
+    z.object({ action: z.literal('suspend_ai'), reason: Reason }),
+    z.object({ action: z.literal('unsuspend_ai'), reason: Reason }),
+    z.object({ action: z.literal('remove_content'), reason: Reason }),
+    z.object({ action: z.literal('warn_user'), reason: Reason }),
+    z.object({ action: z.literal('lock_account'), reason: Reason, days: z.number().int().min(1).max(3650).nullable() }),
+    z.object({ action: z.literal('unlock_account'), reason: Reason }),
+  ]);
+  // Warnings may come from support too; everything else is moderation.
+  const MAY_ACT: Record<z.infer<typeof ActionBody>['action'], Role[]> = {
+    suspend_ai: ['admin', 'moderator'],
+    unsuspend_ai: ['admin', 'moderator'],
+    remove_content: ['admin', 'moderator'],
+    warn_user: ['admin', 'moderator', 'support'],
+    lock_account: ['admin', 'moderator'],
+    unlock_account: ['admin', 'moderator'],
+  };
+  const appealHint = 'If you think this is a mistake, appeal it under Help & support in any ALT app.';
+  const INDEFINITE = new Date('2100-01-01T00:00:00Z');
+
+  r.post(
+    '/staff/cases/:id/actions',
+    {
+      preHandler: staff,
+      schema: {
+        tags: ['staff'],
+        summary: 'Act on what a case is about: suspend or restore an AI on-chain, remove the post, comment or review, warn the person, lock or unlock their account',
+        params: CaseId,
+        body: ActionBody,
+      },
+    },
+    async (req) => {
+      const b = req.body;
+      if (!MAY_ACT[b.action].some((role) => req.auth!.roles.includes(role))) throw forbidden('NOT_YOUR_ACTION', 'Your role cannot take this action.');
+      return change(req, `case.action.${b.action}`, async (client, c) => {
+        const me = req.auth!.userId;
+        const record = async (data: Record<string, unknown>) => {
+          await addEvent(client, c.id, { kind: 'action', visibility: 'staff', actorUserId: me, body: b.reason, data: { action: b.action, ...data } });
+          return { action: b.action, ...data };
+        };
+        const tell = (userId: string, type: string, title: string, body: string) =>
+          notify(client, { userId, category: 'moderation', type, title, body: `${body} ${appealHint}`.slice(0, 1000), data: { caseNumber: Number(c.number) } });
+
+        if (b.action === 'suspend_ai' || b.action === 'unsuspend_ai') {
+          const suspend = b.action === 'suspend_ai';
+          if (!c.subject_ai_id) throw badRequest('NO_AI', 'This case is not about an AI.');
+          const { rows } = await client.query<{ name: string; owner_id: string; token_id: string | null; suspended: boolean | null }>(
+            `SELECT a.name, a.owner_id, t.token_id, t.suspended FROM core.personal_ais a LEFT JOIN core.ai_identity_tokens t ON t.ai_id = a.id WHERE a.id = $1 FOR UPDATE OF a`,
+            [c.subject_ai_id],
+          );
+          const ai = rows[0];
+          if (!ai) throw notFound('AI');
+          if (!ai.token_id) throw conflict('AI_NOT_ON_CHAIN', 'This AI has no identity token, so there is nothing to suspend on-chain.');
+          if (Boolean(ai.suspended) === suspend) throw conflict(suspend ? 'ALREADY_SUSPENDED' : 'NOT_SUSPENDED', suspend ? 'This AI is already suspended.' : 'This AI is not suspended.');
+          if (!ctx.chain) throw new AppError(503, 'CHAIN_DISABLED', 'The blockchain is not configured on this server.');
+          const tx = await ctx.chain.setSuspended(BigInt(ai.token_id), suspend, b.reason);
+          await client.query('UPDATE core.ai_identity_tokens SET suspended = $2, synced_at = now() WHERE ai_id = $1', [c.subject_ai_id, suspend]);
+          await client.query(`UPDATE core.personal_ais SET status = $2 WHERE id = $1`, [c.subject_ai_id, suspend ? 'suspended' : 'verified']);
+          // ALTERA and ALTAR hear it at once (the AI stops acting there, or comes back).
+          await client.query(`SELECT pg_notify('alt_ai_events', $1)`, [JSON.stringify({ aiId: c.subject_ai_id, event: suspend ? 'suspended' : 'updated' })]);
+          await tell(
+            ai.owner_id,
+            suspend ? 'ai.suspended' : 'ai.unsuspended',
+            suspend ? `ALT suspended ${ai.name}` : `${ai.name} is active again`,
+            suspend ? `${ai.name} can't speak, post or be sold until this is lifted. Reason: ${b.reason}` : `The suspension was lifted. ${b.reason}`,
+          );
+          return record({ aiId: c.subject_ai_id, tokenId: ai.token_id, txHash: tx.hash, explorer: ctx.chain.explorerTx(tx.hash) });
+        }
+
+        if (b.action === 'remove_content') {
+          const what = c.subject_type;
+          if (c.platform === 'altera' && (what === 'post' || what === 'comment')) {
+            await callService(ctx, 'altera', '/internal/moderation/remove', { type: what, id: c.subject_id, reason: b.reason, caseNumber: Number(c.number) });
+          } else if (c.platform === 'altar' && what === 'review') {
+            const [aiId, reviewerId] = String(c.subject_id).split(':');
+            await callService(ctx, 'altar', '/internal/reviews/remove', { aiId, reviewerId, reason: b.reason, caseNumber: Number(c.number) });
+          } else {
+            throw badRequest('NOTHING_TO_REMOVE', 'This case is not about a post, comment or review.');
+          }
+          if (c.subject_user_id) {
+            const platform = c.platform === 'altera' ? 'ALTERA' : 'ALTAR';
+            await tell(c.subject_user_id, 'content.removed', `ALT removed your ${what} on ${platform}`, `It broke ALT's content rules. Reason: ${b.reason}`);
+          }
+          return record({ type: what, id: c.subject_id, platform: c.platform, userId: c.subject_user_id });
+        }
+
+        // The rest act on the person the case is about (an AI's owner, for a case about an AI).
+        const userId = c.subject_user_id;
+        if (!userId) throw badRequest('NO_PERSON', 'This case is not about a person.');
+        const { rows: people } = await client.query<{ email: string; display_name: string; roles: unknown; locked_until: Date | null }>(
+          'SELECT email, display_name, roles, locked_until FROM core.users WHERE id = $1 FOR UPDATE',
+          [userId],
+        );
+        const person = people[0];
+        if (!person) throw notFound('Person');
+
+        if (b.action === 'warn_user') {
+          await tell(userId, 'account.warning', 'A warning from ALT', b.reason);
+          return record({ userId });
+        }
+
+        if (b.action === 'lock_account') {
+          const theirRoles = parseRoles(person.roles);
+          if (!req.auth!.roles.includes('admin') && theirRoles.some((r) => ['admin', 'moderator', 'support', 'auditor'].includes(r))) {
+            throw forbidden('STAFF_ACCOUNT', 'Only an admin can lock a member of staff.');
+          }
+          const until = b.days ? new Date(Date.now() + b.days * 86_400_000) : INDEFINITE;
+          await client.query('UPDATE core.users SET locked_until = $2 WHERE id = $1', [userId, until]);
+          // Signed out everywhere at once: every ALT service hears it (alt_sessions_revoked).
+          const sessions = await revokeAllSessions(client, userId, 'locked_by_staff');
+          const when = b.days ? `until ${until.toUTCString()}` : 'until further notice';
+          await tell(userId, 'account.locked', 'ALT suspended your account', `Your account is suspended ${when}. Reason: ${b.reason}`);
+          // They can't sign in to read their inbox, so the reason also goes by email.
+          await ctx.mailer.send({
+            to: person.email,
+            subject: 'Your ALT account is suspended',
+            text: `Hello ${person.display_name},\n\nALT suspended your account ${when}.\n\nReason: ${b.reason}\n\nYou can't sign in to ALTER, ALTERA or ALTAR meanwhile. If you think this is a mistake, reply to this email.\n\nTHE ALT`,
+          });
+          return record({ userId, until: b.days ? until.toISOString() : null, sessionsEnded: sessions });
+        }
+
+        // unlock_account
+        await client.query('UPDATE core.users SET locked_until = NULL, failed_login_count = 0 WHERE id = $1', [userId]);
+        await tell(userId, 'account.unlocked', 'Your ALT account is active again', b.reason);
+        await ctx.mailer.send({ to: person.email, subject: 'Your ALT account is active again', text: `Hello ${person.display_name},\n\nYou can sign in to ALT again. ${b.reason}\n\nTHE ALT` });
+        return record({ userId });
+      });
+    },
   );
 
   // Kinds are fixed, so the Command Centre can build its filters from this.

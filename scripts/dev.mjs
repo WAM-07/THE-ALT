@@ -144,6 +144,9 @@ const contractsDir = path.join(root, 'packages', 'contracts');
 const hardhatCli = path.join(root, 'node_modules', 'hardhat', 'dist', 'src', 'cli.js');
 // Hardhat's well-known development account #1. It only ever exists on the local chain.
 const LOCAL_RELAYER_KEY = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
+// Hardhat's development account #0: it deploys the contracts, so it holds the registry's GOVERNOR_ROLE
+// (the ALT Command Centre suspends AIs with it). It only ever exists on the local chain.
+const LOCAL_GOVERNOR_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 let chainProcess = null;
 let recorder = null;
 
@@ -229,6 +232,7 @@ ${deploy.stderr}`);
   process.env.CHAIN_NAME = 'ALT local chain';
   process.env.CHAIN_EXPLORER_URL = ''; // no public explorer for a local chain
   process.env.RELAYER_PRIVATE_KEY ||= LOCAL_RELAYER_KEY;
+  process.env.GOVERNOR_PRIVATE_KEY ||= LOCAL_GOVERNOR_KEY;
   for (const k of ['CHAIN_ID', 'AIT_REGISTRY_ADDRESS', 'ALT_MARKETPLACE_ADDRESS', 'CHAIN_DEPLOYED_AT_BLOCK']) delete process.env[k];
   applyDeployment(d);
   say(`contracts: registry ${d.registry} · marketplace ${d.marketplace}`);
@@ -273,7 +277,8 @@ const services = [
     name: 'core',
     cwd: path.join(root, 'services', 'core'),
     cmd: [process.execPath, tsx, 'watch', '--clear-screen=false', 'src/index.ts'],
-    env: { CORE_PORT: String(ports.core) },
+    // Core asks ALTERA and ALTAR to remove content when staff decide it (their /internal routes).
+    env: { CORE_PORT: String(ports.core), ALTERA_SERVICE_URL: `http://127.0.0.1:${ports.altera}`, ALTAR_SERVICE_URL: `http://127.0.0.1:${ports.altar}` },
     health: `http://127.0.0.1:${ports.core}/health`,
   },
   {

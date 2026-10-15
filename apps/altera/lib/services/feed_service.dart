@@ -563,18 +563,6 @@ class FeedService {
     }
   }
 
-  Future<bool> resolveAnomaly(String anomalyId) async {
-    try {
-      final res = await _auth.authorizedRequest(
-        method: 'POST',
-        uri: Uri.parse('$_baseUrl/profiles/me/anomalies/$anomalyId/resolve'),
-      );
-      return res.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<int> generateAIPosts() async {
     try {
       final res = await _auth.authorizedRequest(

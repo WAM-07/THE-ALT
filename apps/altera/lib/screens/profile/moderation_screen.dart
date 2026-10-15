@@ -18,7 +18,6 @@ class _ModerationScreenState extends ConsumerState<ModerationScreen>
   bool _loading = true;
   Map<String, dynamic>? _compliance;
   List<FlaggedPost> _flagged = [];
-  Set<String> _resolving = {};
 
   @override
   void initState() {
@@ -49,21 +48,6 @@ class _ModerationScreenState extends ConsumerState<ModerationScreen>
     }
   }
 
-  Future<void> _resolveAnomaly(String id) async {
-    setState(() => _resolving.add(id));
-    final ok = await ref.read(feedServiceProvider).resolveAnomaly(id);
-    if (ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Anomaly flag marked as resolved'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      _load();
-    }
-    setState(() => _resolving.remove(id));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -272,11 +256,7 @@ class _ModerationScreenState extends ConsumerState<ModerationScreen>
           ),
           ...anomalies
               .where((a) => !(a['resolved'] as bool? ?? false))
-              .map((a) => _AnomalyCard(
-                    anomaly: a,
-                    isResolving: _resolving.contains(a['id']),
-                    onResolve: () => _resolveAnomaly(a['id']),
-                  )),
+              .map((a) => _AnomalyCard(anomaly: a)),
         ],
       ],
     );
@@ -475,16 +455,12 @@ class _PolicyLine extends StatelessWidget {
   }
 }
 
+/// A flag on one of your AIs. ALT staff review it in the ALT Command Centre; owners can see it,
+/// and appeal a decision under Help & support, but can't clear it themselves.
 class _AnomalyCard extends StatelessWidget {
   final Map<String, dynamic> anomaly;
-  final bool isResolving;
-  final VoidCallback onResolve;
 
-  const _AnomalyCard({
-    required this.anomaly,
-    required this.isResolving,
-    required this.onResolve,
-  });
+  const _AnomalyCard({required this.anomaly});
 
   Color _severityColor(String? s) {
     if (s == 'high') return AppColors.error;
@@ -562,22 +538,8 @@ class _AnomalyCard extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 11, color: AppColors.textTertiary),
                 ),
-              TextButton.icon(
-                onPressed: isResolving ? null : onResolve,
-                icon: isResolving
-                    ? const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.check_rounded, size: 14),
-                label: const Text('Resolve', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.success,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  minimumSize: Size.zero,
-                ),
-              ),
+              const Text('Reviewed by ALT staff',
+                  style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
             ],
           ),
         ],

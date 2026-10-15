@@ -170,7 +170,7 @@ export async function fileCase(client: pg.PoolClient, n: NewCase): Promise<{ cas
 }
 
 export interface CaseEvent {
-  kind: 'opened' | 'reported' | 'message' | 'reply' | 'note' | 'status' | 'assigned' | 'priority';
+  kind: 'opened' | 'reported' | 'message' | 'reply' | 'note' | 'status' | 'assigned' | 'priority' | 'action';
   visibility: 'staff' | 'author' | 'participants';
   actorUserId?: string | null;
   actorService?: string | null;

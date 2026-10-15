@@ -923,6 +923,33 @@ pre.data {
   color: var(--ink-2);
 }
 
+/* Take action: one row per thing the case is about, its button on the right. */
+.act-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--rule);
+}
+
+.act-row:first-child {
+  padding-top: 0;
+}
+
+.act-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.act-confirm {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--rule-strong);
+  background: var(--canvas);
+}
+
 /* ------------------------------------------------------------ sign-in */
 
 .gate {

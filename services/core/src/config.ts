@@ -47,6 +47,12 @@ const EnvSchema = z.object({
   AIT_REGISTRY_ADDRESS: z.string().optional(),
   ALT_MARKETPLACE_ADDRESS: z.string().optional(),
   RELAYER_PRIVATE_KEY: z.string().optional(),
+  // The account holding the registry's GOVERNOR_ROLE (it suspends AIs). Optional: without it, the
+  // ALT Command Centre can't suspend on-chain. Kept apart from the relayer, which only mints.
+  GOVERNOR_PRIVATE_KEY: z.string().optional(),
+  // Where ALTERA's and ALTAR's APIs run, so Core can ask them to remove content (their /internal routes).
+  ALTERA_SERVICE_URL: z.string().optional(),
+  ALTAR_SERVICE_URL: z.string().optional(),
   CHAIN_EXPLORER_URL: z.string().optional(),
   CHAIN_CONFIRMATIONS: z.coerce.number().int().min(1).default(1),
   // IPFS (Module 6): local = content-addressed files under STORAGE_DIR; pinata = pinned for real.
@@ -104,6 +110,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     mail: { mode: e.MAIL_MODE, smtpUrl: e.SMTP_URL, from: e.MAIL_FROM },
     googleClientIds: list(e.GOOGLE_CLIENT_IDS),
     push: loadPushConfig(e.FCM_SERVICE_ACCOUNT),
+    services: { altera: e.ALTERA_SERVICE_URL?.replace(/\/$/, '') || null, altar: e.ALTAR_SERVICE_URL?.replace(/\/$/, '') || null },
     adminEmails: list(e.ADMIN_EMAILS).map((s) => s.toLowerCase()),
     corsOrigins: list(e.CORS_ORIGINS),
     storageDir: e.STORAGE_DIR,
@@ -117,6 +124,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
           registryAddress: e.AIT_REGISTRY_ADDRESS!,
           marketplaceAddress: e.ALT_MARKETPLACE_ADDRESS,
           relayerPrivateKey: e.RELAYER_PRIVATE_KEY!,
+          governorPrivateKey: e.GOVERNOR_PRIVATE_KEY || undefined,
           explorerUrl: e.CHAIN_EXPLORER_URL,
           confirmations: e.CHAIN_CONFIRMATIONS,
         }

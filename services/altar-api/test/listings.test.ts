@@ -35,7 +35,7 @@ beforeAll(async () => {
       .setAudience('alt')
       .setExpirationTime('10m')
       .sign(privateKey);
-  const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: inject('databaseUrl'), CHAIN_RPC_URL: chainCfg.rpcUrl, AIT_REGISTRY_ADDRESS: registry, ALT_MARKETPLACE_ADDRESS: market });
+  const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: inject('databaseUrl'), CHAIN_RPC_URL: chainCfg.rpcUrl, AIT_REGISTRY_ADDRESS: registry, ALT_MARKETPLACE_ADDRESS: market, INTERNAL_SERVICE_KEY: 'test-internal-service-key-0123456789abcdef' });
   // Reviews are moderated by ALT Core in real life; here anything containing "BADWORD" is flagged.
   const moderate = async (text: string) => ({ flagged: text.includes('BADWORD') });
   // Reports go to ALT Core's case queue in real life; here they are collected.
@@ -252,6 +252,18 @@ describe('subscriptions, reviews and royalties', () => {
     expect((await req('POST', `/reviews/${aiId}/${fan.user}/report`, stranger.token, { reason: 'shouting' })).statusCode).toBe(400);
     const reported = await req('POST', `/reviews/${aiId}/${fan.user}/report`, stranger.token, { reason: 'fake', details: 'Copied from another AI.' });
     expect(reported.json()).toMatchObject({ received: true });
+    // ALT staff decided to remove it: ALT Core asks ALTAR, with the service key.
+    const removeReview = (key?: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/internal/reviews/remove',
+        headers: key ? { 'x-alt-service-key': key, 'x-alt-service': 'core' } : {},
+        payload: { aiId, reviewerId: fan.user, reason: 'Fake', caseNumber: 3 },
+      });
+    expect((await removeReview()).statusCode).toBe(401);
+    expect((await removeReview('test-internal-service-key-0123456789abcdef')).json()).toEqual({ removed: true });
+    expect((await removeReview('test-internal-service-key-0123456789abcdef')).statusCode).toBe(404);
+    await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 5, body: 'Even better the second week.' });
     expect(filed.at(-1)).toMatchObject({
       kind: 'report',
       category: 'fake',

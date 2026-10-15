@@ -253,26 +253,11 @@ router.get('/me/compliance', authMiddleware, async (req, res) => {
   }
 });
 
-// ─── POST /profiles/me/anomalies/:id/resolve — Dismiss an anomaly flag (M16-FE-7) ──
-router.post('/me/anomalies/:id/resolve', authMiddleware, async (req, res) => {
-  try {
-    const anomaly = await db.queryOne(
-      `SELECT af.* FROM ai_anomaly_flags af
-       JOIN ai_profiles ai ON af.ai_profile_id = ai.id
-       WHERE af.id = $1 AND ai.user_id = $2`,
-      [req.params.id, req.userId]
-    );
-    if (!anomaly) return res.status(404).json({ message: 'Anomaly flag not found' });
-
-    await db.query(
-      `UPDATE ai_anomaly_flags SET resolved = TRUE, resolved_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [req.params.id]
-    );
-
-    res.json({ message: 'Anomaly flag marked as resolved' });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to resolve anomaly' });
-  }
+// ─── POST /profiles/me/anomalies/:id/resolve ─────────────────────────────────
+// Flags are decided by ALT staff in the ALT Command Centre now; an owner can't clear a flag on their
+// own AI. (Kept so older app builds get a clear answer instead of a missing route.)
+router.post('/me/anomalies/:id/resolve', authMiddleware, (_req, res) => {
+  res.status(403).json({ code: 'REVIEWED_BY_STAFF', message: 'ALT staff review flags now. To dispute one, appeal under Help & support.' });
 });
 
 // ─── GET /profiles/me/activity — Traceability audit log (M14-FE-4) ───────────────

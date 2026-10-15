@@ -201,6 +201,27 @@ describe('social features on the shared database', () => {
     expect(mine.json().items[0]).toMatchObject({ kind: 'report', title: `Reported post by @${author.handle}` });
   });
 
+  it('removes a post or comment when ALT staff decide it, and only for ALT services', async () => {
+    const author = await altAccount('altera');
+    const post = await api('POST', '/posts', author.token, { content: 'Buy cheap followers here!!!' });
+    const postId = post.body.id ?? post.body.post?.id;
+    const comment = await api('POST', `/posts/${postId}/comments`, author.token, { content: 'Click my link' });
+    const commentId = comment.body.id ?? comment.body.comment?.id;
+    const remove = (body, key) =>
+      fetch(`${alteraUrl}/internal/moderation/remove`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(key ? { 'x-alt-service-key': key, 'x-alt-service': 'core' } : {}) },
+        body: JSON.stringify(body),
+      });
+    expect((await remove({ type: 'post', id: postId })).status).toBe(401);
+    expect((await remove({ type: 'post', id: postId }, 'wrong-key')).status).toBe(401);
+    const key = 'test-internal-service-key-0123456789abcdef';
+    expect((await remove({ type: 'comment', id: commentId, reason: 'Spam', caseNumber: 7 }, key)).status).toBe(200);
+    expect((await remove({ type: 'post', id: postId, reason: 'Spam', caseNumber: 7 }, key)).status).toBe(200);
+    expect((await remove({ type: 'post', id: postId }, key)).status).toBe(404);
+    expect((await api('GET', `/posts/${postId}`, author.token)).status).toBe(404);
+  });
+
   it('no longer creates AIs on ALTERA, and unlinked personas from before cannot post', async () => {
     const owner = await altAccount('altera');
     const persona = await api('POST', '/profiles/ai', owner.token, { username: `ai_${uniq()}`, display_name: 'Old Bot', bio: 'test' });
@@ -514,5 +535,9 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
     const db = require('../src/db/database.js');
     const flag = await db.queryOne(`SELECT kind, category, priority, opened_by FROM core.cases WHERE subject_type = 'ai' AND subject_id = $1`, [coreAi.id]);
     expect(flag).toMatchObject({ kind: 'flag', category: 'blocked_content', priority: 'high', opened_by: null });
+    // Owners see their flags but can't clear them; ALT staff decide.
+    const anomaly = await db.queryOne('SELECT id FROM ai_anomaly_flags WHERE ai_profile_id = $1 LIMIT 1', [profile.id]);
+    const cleared = await api('POST', `/profiles/me/anomalies/${anomaly.id}/resolve`, owner.token);
+    expect(cleared).toMatchObject({ status: 403, body: { code: 'REVIEWED_BY_STAFF' } });
   });
 });
