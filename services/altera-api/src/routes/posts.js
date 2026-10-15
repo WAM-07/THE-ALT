@@ -51,6 +51,8 @@ async function flagAiBehaviour(aiProfileId, description) {
     `INSERT INTO ai_anomaly_flags (ai_profile_id, flag_type, severity, description) VALUES ($1, 'policy_violation', 'high', $2)`,
     [aiProfileId, description.slice(0, 500)]
   ).catch(() => {});
+  // M16-FE-3: staff review it in the ALT Command Centre.
+  await flagToAlt(aiProfileId, 'blocked_content', 'Moderation blocked what this AI wrote', description);
   // M2-FE-2: the owner hears about violations by their AI in their ALT inbox.
   const ai = await db.queryOne('SELECT user_id, display_name FROM ai_profiles WHERE id = $1', [aiProfileId]).catch(() => null);
   if (ai) {
@@ -63,6 +65,50 @@ async function flagAiBehaviour(aiProfileId, description) {
       data: { aiProfileId },
     });
   }
+}
+
+/** An automatic flag about an AI, for staff in the ALT Command Centre (one case per AI while open). */
+async function flagToAlt(aiProfileId, category, title, description) {
+  const ai = await db.queryOne('SELECT user_id, display_name, username, core_ai_id FROM ai_profiles WHERE id = $1', [aiProfileId]).catch(() => null);
+  if (!ai?.core_ai_id) return;
+  await core.fileCase({
+    kind: 'flag',
+    category,
+    title: `${ai.display_name}: ${title}`.slice(0, 140),
+    priority: 'high',
+    subject: { type: 'ai', id: ai.core_ai_id, aiId: ai.core_ai_id, userId: ai.user_id },
+    evidence: { altera_profile: `@${ai.username}`, what_happened: description },
+  });
+}
+
+/** A report a person made on ALTERA, for staff in the ALT Command Centre, with a snapshot of what was reported. */
+async function reportToAlt(reporterId, type, id, reason, details) {
+  const item =
+    type === 'post'
+      ? await db.queryOne('SELECT p.id, p.content, p.user_id, p.ai_profile_id, p.media_urls, p.created_at FROM posts p WHERE p.id = $1', [id])
+      : await db.queryOne('SELECT c.id, c.content, c.user_id, c.ai_profile_id, c.post_id, c.created_at FROM comments c WHERE c.id = $1', [id]);
+  if (!item) return;
+  const author = await db.queryOne('SELECT username, full_name FROM users WHERE id = $1', [item.user_id]).catch(() => null);
+  const ai = item.ai_profile_id ? await db.queryOne('SELECT display_name, username, core_ai_id FROM ai_profiles WHERE id = $1', [item.ai_profile_id]).catch(() => null) : null;
+  const by = ai ? `${ai.display_name} (AI)` : author ? `@${author.username}` : 'someone';
+  const category = String(reason).toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'other';
+  await core.fileCase({
+    kind: 'report',
+    category: /^[a-z][a-z_]{1,39}$/.test(category) ? category : 'other',
+    title: `Reported ${type} by ${by}`.slice(0, 140),
+    body: details || `Reason: ${reason}`,
+    subject: { type, id: String(item.id), aiId: ai?.core_ai_id ?? null, userId: item.user_id },
+    reporterId,
+    evidence: {
+      content: item.content,
+      author: author ? `${author.full_name} (@${author.username})` : null,
+      ...(ai ? { written_by_ai: `${ai.display_name} (@${ai.username})` } : {}),
+      ...(item.post_id ? { on_post: item.post_id } : {}),
+      ...(item.media_urls?.length ? { media: item.media_urls } : {}),
+      posted_at: item.created_at,
+      reason,
+    },
+  });
 }
 
 // ─── Conditional Publishing Quality Gate (M15-FE-1 Phase 4) ─────────────────
@@ -195,6 +241,7 @@ router.post('/', authMiddleware, async (req, res) => {
              VALUES ($1, 'rate_exceeded', 'high', $2)`,
             [aiProfileId, `AI posted ${postCount.cnt} times today, limit is ${limit}`]
           );
+          await flagToAlt(aiProfileId, 'post_limit', 'far over its daily post limit', `Tried to post ${postCount.cnt} times today; the limit is ${limit}.`);
         }
         return res.status(429).json({ message: `Daily post limit (${limit}) reached for this AI`, code: 'RATE_LIMITED' });
       }
@@ -795,6 +842,7 @@ router.post('/:id/comments/:commentId/report', authMiddleware, async (req, res) 
     }
 
     await logActivity(req.userId, 'comment_reported', 'comment', req.params.commentId, null, { reason });
+    await reportToAlt(req.userId, 'comment', req.params.commentId, reason, details);
     res.json({ message: 'Report submitted. Our team will review it.' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to submit report' });
@@ -831,6 +879,7 @@ router.post('/:id/report', authMiddleware, async (req, res) => {
     }
 
     await logActivity(req.userId, 'post_reported', 'post', req.params.id, null, { reason });
+    await reportToAlt(req.userId, 'post', req.params.id, reason, details);
     res.json({ message: 'Report submitted. Our team will review it.' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to submit report' });

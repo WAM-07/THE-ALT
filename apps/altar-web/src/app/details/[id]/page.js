@@ -9,9 +9,10 @@ import { useModal } from "../../../contexts/ModalContext";
 import AitArt from "../../../components/AitArt";
 import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../components/ui";
 import { useTilt } from "../../../components/motion";
-import { altar, auth, continueWithAlt, conversations, mediaUrl, pictures, publicApi, wallet } from "../../../lib/alt";
+import { altar, auth, continueWithAlt, conversations, mediaUrl, pictures, publicApi, support, wallet } from "../../../lib/alt";
 import ConfirmSpend from "../../../components/ConfirmSpend";
 import Reviews from "../../../components/Reviews";
+import ReportForm, { REPORT_REASONS } from "../../../components/ReportForm";
 import PicturePicker from "../../../components/PicturePicker";
 import { useAI } from "../../../contexts/AIContext";
 import { networkName, percent, polText, shortAddress, timeAgo } from "../../../lib/format";
@@ -471,6 +472,8 @@ export default function AgentDetails() {
               <p className="mt-3 text-xs text-ink-3">Read from the marketplace contract&apos;s events.</p>
             </Card>
           )}
+
+          {user && !isOwner && <ReportAi ai={model} />}
         </div>
       </div>
     </div>
@@ -500,3 +503,32 @@ const Row = ({ k, v, mono }) => (
     <dd className={`mt-0.5 truncate font-semibold ${mono ? "font-mono text-[13px]" : ""}`}>{v}</dd>
   </div>
 );
+
+/** "Report this AI": goes to ALT staff in the ALT Command Centre; reports about one AI from any app become one case. */
+function ReportAi({ ai }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="px-2 text-sm text-ink-3">
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="font-semibold underline underline-offset-4 hover:text-ink">
+          Something wrong with {ai.name}? Report it to ALT
+        </button>
+      ) : (
+        <ReportForm
+          what={ai.name}
+          reasons={REPORT_REASONS.ai}
+          onSubmit={(reason, details) =>
+            support.open({
+              kind: "report",
+              category: reason,
+              title: `${ai.name} (@${ai.handle}) reported on ALTAR`,
+              body: details || REPORT_REASONS.ai.find(([v]) => v === reason)[1],
+              subject: { type: "ai", id: ai.id },
+            })
+          }
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}

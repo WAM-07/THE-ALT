@@ -10,6 +10,7 @@ import '../models.dart';
 import 'code_dialog.dart';
 import 'app_lock.dart';
 import 'picture_picker.dart';
+import 'support_screen.dart';
 
 /// The ALT Account Center: one place, in every ALT app, to manage the account that works across
 /// ALTER, ALTAR and ALTERA (profile, password, two-factor, devices, wallets and connected apps).
@@ -387,6 +388,16 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
+                  const _Section('Help'),
+                  _Group([
+                    ListTile(
+                      leading: const Icon(Icons.support_agent_outlined),
+                      title: const Text('Help & support'),
+                      subtitle: const Text('Ask ALT, or follow up on a report'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AltSupportScreen(client: _client))),
+                    ),
+                  ]),
                   const SizedBox(height: 12),
                   _Group([
                   ListTile(

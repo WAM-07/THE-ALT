@@ -201,9 +201,22 @@ export const altar = {
   myReview: (aiId) => api(`/altar/me/reviews/${aiId}`),
   saveReview: (aiId, rating, body) => api(`/altar/reviews/${aiId}`, { method: "PUT", body: { rating, body } }),
   deleteReview: (aiId) => api(`/altar/reviews/${aiId}`, { method: "DELETE" }),
+  /** Reports a review to ALT staff; ALTAR files it with a snapshot of the review. */
+  reportReview: (aiId, reviewerId, reason, details) => api(`/altar/reviews/${aiId}/${reviewerId}/report`, { method: "POST", body: { reason, ...(details ? { details } : {}) } }),
   saved: () => api("/altar/wishlist"),
   save: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "PUT" }),
   unsave: (aiId) => api(`/altar/wishlist/${aiId}`, { method: "DELETE" }),
+};
+
+/**
+ * Help & support, and reports about AIs: cases in ALT's queue, handled by staff in the ALT Command
+ * Centre. Replies come signed "ALT" and also land in the person's ALT inbox.
+ */
+export const support = {
+  mine: () => api("/core/me/cases"),
+  get: (id) => api(`/core/me/cases/${id}`),
+  open: (body) => api("/core/me/cases", { method: "POST", body }),
+  reply: (id, body) => api(`/core/me/cases/${id}/messages`, { method: "POST", body: { body } }),
 };
 
 /** ALT file links name the server's public address; serve them from wherever ALTAR is open. */

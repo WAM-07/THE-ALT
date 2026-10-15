@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { altar, mediaUrl } from "../lib/alt";
+import ReportForm, { REPORT_REASONS } from "./ReportForm";
 import { timeAgo } from "../lib/format";
 import { Avatar, Button, Card } from "./ui";
 
@@ -30,6 +31,7 @@ export default function Reviews({ ai, onChange }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [reporting, setReporting] = useState(null);
 
   const load = useCallback(async () => {
     setData(await altar.reviews(ai.id).catch(() => ({ average: null, count: 0, reviews: [] })));
@@ -127,6 +129,19 @@ export default function Reviews({ ai, onChange }) {
                 </p>
                 <Stars value={r.rating} size="text-sm" />
                 {r.body && <p className="mt-1 whitespace-pre-line text-ink-2">{r.body}</p>}
+                {user && !isMine && reporting !== r.reviewer.id && (
+                  <button onClick={() => setReporting(r.reviewer.id)} className="mt-2 text-xs font-semibold text-ink-3 underline underline-offset-4 hover:text-ink">
+                    Report
+                  </button>
+                )}
+                {reporting === r.reviewer.id && (
+                  <ReportForm
+                    what={`${r.reviewer.name}'s review`}
+                    reasons={REPORT_REASONS.review}
+                    onSubmit={(reason, details) => altar.reportReview(ai.id, r.reviewer.id, reason, details)}
+                    onClose={() => setReporting(null)}
+                  />
+                )}
                 {isMine && !editing && (
                   <p className="mt-2 flex gap-3 text-sm">
                     <button onClick={() => setEditing(true)} className="font-semibold text-ink-2 underline underline-offset-4 hover:text-ink">

@@ -189,6 +189,16 @@ describe('social features on the shared database', () => {
     }
     const me = await api('GET', '/auth/me', author.token);
     expect(me.body.human_profile.health_score).toBe(95);
+
+    // It also reaches staff in the ALT Command Centre, once, with a snapshot of the post.
+    const db = require('../src/db/database.js');
+    const cases = await db.query(`SELECT c.kind, c.platform, c.category, c.reports, c.subject_user_id, e.data FROM core.cases c
+      JOIN core.case_events e ON e.case_id = c.id AND e.kind = 'opened' WHERE c.subject_type = 'post' AND c.subject_id = $1`, [String(postId)]);
+    expect(cases.rows).toHaveLength(1);
+    expect(cases.rows[0]).toMatchObject({ kind: 'report', platform: 'altera', category: 'spam', reports: 1, subject_user_id: author.id });
+    expect(cases.rows[0].data.evidence).toMatchObject({ content: 'Totally normal post', reason: 'spam' });
+    const mine = await core.inject({ method: 'GET', url: '/me/cases', headers: { authorization: `Bearer ${reporter.token}` } });
+    expect(mine.json().items[0]).toMatchObject({ kind: 'report', title: `Reported post by @${author.handle}` });
   });
 
   it('no longer creates AIs on ALTERA, and unlinked personas from before cannot post', async () => {
@@ -500,5 +510,9 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
     expect(blocked.status).toBe(422);
     const inbox = (await coreCall('GET', '/notifications?category=moderation', owner.token)).body;
     expect(inbox.items[0]).toMatchObject({ platform: 'altera', type: 'altera.ai_content_blocked', title: 'ALTERA blocked something Nova wrote' });
+    // And staff get an automatic flag about the AI.
+    const db = require('../src/db/database.js');
+    const flag = await db.queryOne(`SELECT kind, category, priority, opened_by FROM core.cases WHERE subject_type = 'ai' AND subject_id = $1`, [coreAi.id]);
+    expect(flag).toMatchObject({ kind: 'flag', category: 'blocked_content', priority: 'high', opened_by: null });
   });
 });

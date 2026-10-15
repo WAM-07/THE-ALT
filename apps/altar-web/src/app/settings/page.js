@@ -64,6 +64,18 @@ export default function Settings() {
         </Card>
 
         <Card className="p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display text-lg font-bold">Help &amp; support</h2>
+              <p className="mt-1 text-sm text-ink-3">Ask ALT for help, or follow up on a report. One place for ALTAR, ALTER and ALTERA.</p>
+            </div>
+            <Button href="/help" kind="outline">
+              Open
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="p-6">
           <h2 className="font-display text-lg font-bold">Region</h2>
           <p className="mt-1 text-sm text-ink-3">Prices on ALTAR are in POL, Polygon&apos;s coin. Showing them in your currency as well comes later. Saved in this browser.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">

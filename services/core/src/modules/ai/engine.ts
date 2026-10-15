@@ -2,6 +2,8 @@ import type { Ctx } from '../../context.js';
 import { AppError } from '../../lib/errors.js';
 import type { LlmMessage } from './llm.js';
 import { FLAGGED_REPLY, moderate } from './moderation.js';
+import { tx } from '../../db.js';
+import { fileCase } from '../cases/cases.js';
 import { buildSystemPrompt, parsePersona, temperatureFor, type Channel } from './persona.js';
 import { approvedMemories, consentState, datasetTexts, loadVersion, retrieve, type AiRow } from './repo.js';
 
@@ -84,6 +86,25 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [ai.id, versionId, input.channel, input.callerUserId ?? null, input.callerService ?? null, result.provider, result.model, latencyMs, result.tokensIn ?? null, result.tokensOut ?? null, check.flagged],
   );
+
+  // M16-FE-3: a live AI that says something the rules block is flagged for staff in the ALT Command
+  // Centre (one case per AI while open). Only the blocked reply is kept as evidence, not what the
+  // person wrote. An owner testing a draft in ALTER is not flagged.
+  if (check.flagged && input.version === 'current') {
+    const platform = input.channel.startsWith('altera') ? 'altera' : input.channel.startsWith('altar') ? 'altar' : 'alter';
+    await tx(ctx.db, (client) =>
+      fileCase(client, {
+        kind: 'flag',
+        platform,
+        category: 'blocked_reply',
+        title: `${ai.name}: moderation blocked a reply`,
+        priority: 'high',
+        subject: { type: 'ai', id: ai.id, aiId: ai.id, userId: ai.owner_id },
+        evidence: { channel: input.channel, categories: check.categories, blocked_reply: result.text.slice(0, 2000) },
+        service: 'core',
+      }),
+    ).catch(() => {});
+  }
 
   return {
     text: check.flagged ? FLAGGED_REPLY : result.text,

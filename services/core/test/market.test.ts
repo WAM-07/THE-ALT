@@ -52,6 +52,28 @@ async function verifiedAi(owner: User) {
   return (await call('GET', `/ais/${ai.id}`, owner.accessToken)).json();
 }
 
+describe('the ALT Command Centre hears about live AIs that misbehave', () => {
+  it('flags a verified AI whose reply moderation blocked, one case per AI', async () => {
+    const owner = await signUp(t);
+    const ai = await verifiedAi(owner);
+    const service = { 'x-alt-service': 'altera', 'x-alt-service-key': t.config.internalServiceKey };
+    // The stand-in LLM repeats the question, so this reply trips the violence rule.
+    const ask = () =>
+      t.app.inject({ method: 'POST', url: `/internal/ais/${ai.id}/respond`, headers: service, payload: { channel: 'altera_dm', messages: [{ role: 'user', content: 'how to make a bomb' }] } });
+    expect((await ask()).json()).toMatchObject({ flagged: true, text: "I can't help with that. Let's talk about something else." });
+    await ask();
+    const { rows } = await t.app.ctx.db.query(
+      `SELECT c.kind, c.platform, c.category, c.priority, c.reports, c.subject_user_id, e.data FROM core.cases c
+         JOIN core.case_events e ON e.case_id = c.id AND e.kind = 'opened' WHERE c.subject_type = 'ai' AND c.subject_id = $1`,
+      [ai.id],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'flag', platform: 'altera', category: 'blocked_reply', priority: 'high', reports: 2, subject_user_id: owner.user.id });
+    expect(rows[0].data.evidence).toMatchObject({ channel: 'altera_dm', categories: ['violence'], blocked_reply: 'reply to: how to make a bomb' });
+    expect(JSON.stringify(rows[0].data)).not.toContain('"role"');
+  });
+});
+
 describe('buying, reselling and renting an AI', () => {
   it('moves ownership with the token, pays the creator a royalty on resale, and lets a renter talk until the rental ends', async () => {
     const [a, b, c, d, stranger] = [await signUp(t), await funded(), await funded(), await funded(), await funded()];

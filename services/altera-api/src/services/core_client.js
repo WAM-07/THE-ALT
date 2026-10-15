@@ -47,6 +47,15 @@ module.exports = {
   moderate: (text) => call('POST', '/internal/moderate', { text }),
   /** Puts a notification in a person's ALT inbox (shown in every ALT app). Never throws. */
   notify: (notification) => call('POST', '/internal/notifications', notification).catch((err) => console.error('[core notify]', err.message)),
+  /**
+   * Files a report or an automatic flag in ALT's case queue (the ALT Command Centre). Reports about
+   * the same post merge there. Never throws: a report is already stored in ALTERA either way.
+   */
+  fileCase: (c) =>
+    call('POST', '/internal/cases', { platform: 'altera', ...c }).catch((err) => {
+      console.error('[core case]', err.message);
+      return null;
+    }),
   /** Independent check of an AI identity token: chain record + IPFS manifest. */
   verifyToken: (tokenId) => call('GET', `/verify/token/${encodeURIComponent(tokenId)}`),
 };

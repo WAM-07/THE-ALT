@@ -22,6 +22,8 @@ let app: Awaited<ReturnType<typeof buildApp>>;
 let db: pg.Pool;
 let sign: (userId: string, sessionId: string) => Promise<string>;
 
+const filed: Record<string, unknown>[] = [];
+
 beforeAll(async () => {
   const { publicKey, privateKey } = await generateKeyPair('RS256');
   const jwk = { ...(await exportJWK(publicKey)), kid: 'test', alg: 'RS256' };
@@ -36,7 +38,12 @@ beforeAll(async () => {
   const config = loadConfig({ NODE_ENV: 'test', DATABASE_URL: inject('databaseUrl'), CHAIN_RPC_URL: chainCfg.rpcUrl, AIT_REGISTRY_ADDRESS: registry, ALT_MARKETPLACE_ADDRESS: market });
   // Reviews are moderated by ALT Core in real life; here anything containing "BADWORD" is flagged.
   const moderate = async (text: string) => ({ flagged: text.includes('BADWORD') });
-  app = await buildApp(config, { keySet: createLocalJWKSet({ keys: [jwk] }), logger: false, indexer: false, moderate });
+  // Reports go to ALT Core's case queue in real life; here they are collected.
+  const fileCase = async (c: Record<string, unknown>) => {
+    filed.push(c);
+    return { caseId: 'case-1', number: filed.length, merged: false };
+  };
+  app = await buildApp(config, { keySet: createLocalJWKSet({ keys: [jwk] }), logger: false, indexer: false, moderate, fileCase });
   await app.ready();
   db = new pg.Pool({ connectionString: inject('databaseUrl') });
 });
@@ -239,6 +246,19 @@ describe('subscriptions, reviews and royalties', () => {
     const review = (await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 4, body: 'Helpful and kind.' })).json();
     expect(review).toMatchObject({ rating: 4, basis: 'subscribed', reviewer: { id: fan.user } });
     await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 5, body: 'Even better the second week.' });
+
+    // Anyone signed in can report a review to ALT staff, with a snapshot of it; never their own.
+    expect((await req('POST', `/reviews/${aiId}/${fan.user}/report`, fan.token, { reason: 'spam' })).json().error.code).toBe('OWN_REVIEW');
+    expect((await req('POST', `/reviews/${aiId}/${fan.user}/report`, stranger.token, { reason: 'shouting' })).statusCode).toBe(400);
+    const reported = await req('POST', `/reviews/${aiId}/${fan.user}/report`, stranger.token, { reason: 'fake', details: 'Copied from another AI.' });
+    expect(reported.json()).toMatchObject({ received: true });
+    expect(filed.at(-1)).toMatchObject({
+      kind: 'report',
+      category: 'fake',
+      reporterId: stranger.user,
+      subject: { type: 'review', id: `${aiId}:${fan.user}`, aiId, userId: fan.user },
+      evidence: { rating: 5, text: 'Even better the second week.', basis: 'subscribed' },
+    });
     expect((await req('PUT', `/reviews/${aiId}`, owner.token, { rating: 5 })).json().error.code).toBe('OWN_AI');
 
     const all = (await req('GET', `/reviews?aiId=${aiId}`)).json();

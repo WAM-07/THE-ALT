@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 94 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 95 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -492,7 +492,13 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - **Demo:** the seed files four cases (two reports of Muse merged into one, a billing question, an appeal); `docs/demo-script.md` has **Scene 10**.
     - **Checked** in headless Chrome against the live demo: popup sign-in as `admin@demo.alt`, every page, taking a case, a reply and a note, light and dark, 390px and 320px. Tests: Core 94, gateway 10; `eslint` and `next build` pass.
     - **Not yet:** the session ends on reload (a Command-Centre-only httpOnly cookie needs Core's sign-in routes, `auth.ts`, which are on the don't-touch list; ask before changing); actions such as suspending an AI come in P4.
-  - [ ] P3. Platforms report in: ALTERA's reports and AI anomaly flags, Core's moderation blocks, ALTAR review reports, and **Help & support** in the apps (shared screen in `alt_account`) and on ALTAR.
+  - [x] P3. Every platform reports in to the Command Centre's queue.
+    - **ALTERA:** the existing Report buttons on posts and comments also file a case (category from the reason, a snapshot of the post or comment, the author and the AI if one wrote it); reports about one post merge. Its automatic flags (moderation blocked what an AI wrote; an AI far over its daily post limit) become `flag` cases about the AI. `core_client.fileCase`, never blocking the report itself.
+    - **Core:** when moderation blocks a reply from a **live** AI (any channel), the persona engine files a `flag` about it (one open case per AI; only the blocked reply is kept as evidence, never what the person wrote; draft tests in ALTER are not flagged).
+    - **ALTAR:** "Something wrong with <AI>? Report it to ALT" on AI pages and **Report** on other people's reviews (`altar-api` `POST /reviews/:aiId/:reviewerId/report` files it with a snapshot of the review); **Help & support** at `/help` (from Settings): ask for help (account, payments, a purchase dispute, an appeal against a moderation decision), see your requests and reports, read ALT's replies and answer.
+    - **ALTER and ALTERA:** **Help & support** in the Account Center (`AltSupportScreen` and `AltSupport` in `alt_account`): the same cases, the thread with ALT's replies, answering, and new requests.
+    - Tests: ALTERA (a report reaches Core once, with its snapshot; a blocked AI post becomes a flag), `altar-api` (review reports, never your own), Core (blocked live reply → one flag per AI), `alt_account` (support API and screen). Core 95, ALTERA 17, `altar-api` 6, `alt_account` 17.
+    - **Checked live:** on the demo, Sara reported Calm Coach and asked for help on ALTAR, Hamza reported an ALTERA post; all reached the admin's queue. On the owner's phone, ALTERA → ALT Account → Help & support listed Sara's ALTAR cases and showed staff's reply signed "ALT team".
   - [ ] P4. Actions from a case: suspend or unsuspend an AI on the chain, remove a post, comment or review (through its service), warn a person, lock an account; the reporter hears the outcome in their inbox.
   - [ ] P5. Policies (versioned Terms, Privacy, AI content policy, with acceptance records), marketplace disputes and appeals.
 - **Later (owner, 2026-10-15), not now:**

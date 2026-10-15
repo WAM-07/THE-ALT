@@ -71,14 +71,32 @@ export function coreModeration(config: Pick<Config, 'coreUrl' | 'internalService
   };
 }
 
+/** Files a report in ALT's case queue (the ALT Command Centre). */
+export type FileCase = (c: Record<string, unknown>) => Promise<{ caseId: string; number: number; merged: boolean }>;
+
+/** ALT Core's case queue (POST /internal/cases), called as the "altar" service. */
+export function coreCases(config: Pick<Config, 'coreUrl' | 'internalServiceKey'>): FileCase {
+  return async (c) => {
+    if (!config.internalServiceKey) throw new AltarError(503, 'REPORTS_UNAVAILABLE', 'Reporting is unavailable right now.');
+    const res = await fetch(`${config.coreUrl}/internal/cases`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-alt-service': 'altar', 'x-alt-service-key': config.internalServiceKey },
+      body: JSON.stringify({ platform: 'altar', ...c }),
+    });
+    if (!res.ok) throw new AltarError(503, 'REPORTS_UNAVAILABLE', 'Reporting is unavailable right now.');
+    return (await res.json()) as { caseId: string; number: number; merged: boolean };
+  };
+}
+
 export async function buildApp(
   config: Config,
-  opts: { keySet?: JWTVerifyGetKey; chain?: ChainReader | null; logger?: boolean; indexer?: boolean; moderate?: Moderate } = {},
+  opts: { keySet?: JWTVerifyGetKey; chain?: ChainReader | null; logger?: boolean; indexer?: boolean; moderate?: Moderate; fileCase?: FileCase } = {},
 ) {
   const db = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
   const chain = opts.chain !== undefined ? opts.chain : config.chain ? createChainReader(config.chain) : null;
   // Reviews go through the same moderation as everything else people write in ALT.
   const moderate: Moderate = opts.moderate ?? coreModeration(config);
+  const fileCase: FileCase = opts.fileCase ?? coreCases(config);
   const { requireUser, forget } = createAuth({ db, issuer: config.issuer, jwksUrl: config.jwksUrl, ...(opts.keySet ? { keySet: opts.keySet } : {}) });
 
   const app = Fastify({
@@ -422,6 +440,38 @@ export async function buildApp(
     await db.query('DELETE FROM altar.reviews WHERE ai_id = $1 AND reviewer_id = $2', [req.params.aiId, req.caller!.userId]);
     return reply.status(204).send();
   });
+
+  r.post(
+    '/reviews/:aiId/:reviewerId/report',
+    {
+      preHandler: requireUser,
+      schema: {
+        tags: ['reviews'],
+        summary: 'Report a review to ALT staff (the ALT Command Centre), with a snapshot of it',
+        params: z.object({ aiId: z.uuid(), reviewerId: z.uuid() }),
+        body: z.object({ reason: z.enum(['spam', 'offensive', 'fake', 'harassment', 'private_data', 'other']), details: z.string().trim().max(1000).optional() }),
+      },
+    },
+    async (req) => {
+      const me = req.caller!.userId;
+      const { aiId, reviewerId } = req.params;
+      if (reviewerId === me) throw conflict('OWN_REVIEW', "You can't report your own review.");
+      const { rows } = await db.query(`${REVIEWS} WHERE r.ai_id = $1 AND r.reviewer_id = $2`, [aiId, reviewerId]);
+      const review = rows[0];
+      if (!review) throw notFound('Review');
+      const { rows: ai } = await db.query<{ name: string; handle: string }>('SELECT name, handle FROM core.personal_ais WHERE id = $1', [aiId]);
+      const filed = await fileCase({
+        kind: 'report',
+        category: req.body.reason,
+        title: `Review of ${ai[0]?.name ?? 'an AI'} by @${review.handle}`.slice(0, 140),
+        body: req.body.details || null,
+        subject: { type: 'review', id: `${aiId}:${reviewerId}`, aiId, userId: reviewerId },
+        reporterId: me,
+        evidence: { rating: Number(review.rating), text: review.body ?? null, basis: review.basis, reviewer: `@${review.handle}`, ai: ai[0] ? `${ai[0].name} (@${ai[0].handle})` : aiId, written_at: review.updated_at },
+      });
+      return { received: true, number: filed.number };
+    },
+  );
 
   // ---------------------------------------------------------------- saved AIs
 
