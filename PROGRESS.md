@@ -483,10 +483,11 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - **C1 Polygon Amoy**: needs an RPC URL (e.g. Alchemy) and a faucet-funded key in `.env`; `CHAIN_MODE=amoy` is already supported.
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `Documentations/60_DEMO_SCRIPT.md`.
 - **Waiting on the owner:**
-  - **Polygon Amoy:** an RPC URL (e.g. Alchemy) and a wallet key funded from the faucet, so tokens and sales are public on amoy.polygonscan.com.
+  - **Push notifications:** a Firebase project (the steps are under C3 above).
+  - **Biometric unlock:** try it with a real fingerprint (Account Center → Security).
   - **ALTER themes:** which one stays the default after trying them (Sapphire for now).
-- **Smaller follow-ups:**
-  - Deployment (Vercel for ALTAR web, Railway/Render for the services).
+  - Amoy, deployment and Google sign-in are under **Later** above.
+- **Next, after the 60% evaluation** (`ROADMAP.md` §9, in this order): M9 Training Manager (embeddings, style guide, evaluation set and readiness score; text and PDF reading with BM25 is done), M7 Health Score, M18 Creator Control Panel (replaces the mocked one), M3 Admin & Governance, M12 completion (auctions and licence terms), M5 completion (audit explorer, audit hash anchored on-chain).
 
 ## Known mocks / not real yet
 - **ALTAR:**

@@ -311,7 +311,7 @@ Both contracts run on Polygon Amoy and are built with Solidity, OpenZeppelin v5 
 - **Delisting** uses `cancelListing(tokenId)`. It is also automatic when the token moves.
 - **Safety:** `nonReentrant` on all payable functions, checks-effects-interactions ordering, and an event for every state change. The ALTAR indexer builds `altar.transactions` and `altar.rentals` from those events (M12 FE-4: an immutable log).
 - **Off-chain enforcement:** the persona engine checks the rental mirror before serving `altar_rental` calls, so a renter can use the AI only while `expires > now`.
-- **Deferred until after 60%:** subscriptions, auctions and licence terms beyond sale and rent. Say so honestly in the report.
+- **Deferred until after 60%:** auctions and licence terms beyond sale, rent and subscription. Say so honestly in the report. (Subscriptions were built early, on 2026-10-15.)
 
 ### 4.8 Data model
 
@@ -655,7 +655,7 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
 | 6 | Version Control & Decentralised Storage | ✅ IPFS manifests, immutable versions, hash verification | M5 |
 | 8 | Consent Engine | ✅ Per-item consent, revoke and delete, enforced | M4 |
 | 11 | ALTAR Core Engine | ✅ | M7 |
-| 12 | Transactions, Usage Rights & Royalties | ✅ Sale, rent, royalties. ⚠️ Subscription and auction deferred. | M5, M7 |
+| 12 | Transactions, Usage Rights & Royalties | ✅ Sale, rent, subscription, royalties. ⚠️ Auction and licence terms deferred. | M5, M7 |
 | 13 | ALTERA Core | ✅ (existing, plus AI identity data) | M6 |
 | 14 | AI-Hub Social Interaction | ✅ Including the verified-only gate | M6 |
 | 15 | AI Social Publishing | ✅ Through the persona engine | M6 |
@@ -676,7 +676,7 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
 | **M7 Health Score** | Computed from `interaction_log`: latency, moderation hits, user ratings, consistency against the version's evaluation set, and drift between versions. The score drives ranking and badges on ALTAR and ALTERA. It replaces ALTERA's "−10 per report" rule. |
 | **M18 Creator Control Panel** | Built on real data: earnings and royalties (from `altar`), engagement (from `altera`), health and versions (from `core`). It includes pricing and licensing management and CSV/PDF export. This replaces ALTERA's mocked panel. |
 | **M3 Admin & Governance** | `/admin` in `altar-web`. Admins can: <br>• review AIs (clearance approval); <br>• suspend or unsuspend AIs on-chain; <br>• moderate the reports queue; <br>• manage users and roles; <br>• manage disputes; <br>• edit policies. <br>A support channel is also included. |
-| **M12 completion** | Subscriptions (time-boxed ERC-4907 renewals), auctions and licence terms. |
+| **M12 completion** | Auctions and licence terms (subscriptions are done: `ALTMarketplace.subscribe`, 2026-10-15). |
 | **M5 completion** | Audit explorer UI, plus periodically anchoring the audit-log hash on-chain. |
 
 ---
