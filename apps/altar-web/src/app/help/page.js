@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Chip, Spinner } from "../../components/ui";
 import { useAuth } from "../../contexts/AuthContext";
-import { continueWithAlt, support } from "../../lib/alt";
-import { timeAgo } from "../../lib/format";
+import { altar, continueWithAlt, support } from "../../lib/alt";
+import { polText, timeAgo } from "../../lib/format";
 
 // What people can ask about. Disputes about a purchase and appeals against a moderation decision
 // are their own kinds of case, so the right staff see them.
@@ -111,12 +111,24 @@ export default function HelpPage() {
   );
 }
 
+const ROLE = { bought: "You bought", rented: "You rented", subscribed: "You subscribed to", sold: "You sold", rented_out: "You rented out", subscribed_out: "Subscription to", royalty: "Royalty from" };
+
 function NewRequest({ onClose, onSent }) {
   const [topic, setTopic] = useState(TOPICS[0]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // An appeal names the decision; a dispute names the payment.
+  const [decisions, setDecisions] = useState(null);
+  const [payments, setPayments] = useState(null);
+  const [decision, setDecision] = useState(null);
+  const [payment, setPayment] = useState(null);
+
+  useEffect(() => {
+    if (topic.kind === "appeal" && !decisions) support.decisions().then((r) => setDecisions(r.items)).catch(() => setDecisions([]));
+    if (topic.kind === "dispute" && !payments) altar.myActivity().then(setPayments).catch(() => setPayments([]));
+  }, [topic, decisions, payments]);
 
   async function send(e) {
     e.preventDefault();
@@ -124,7 +136,14 @@ function NewRequest({ onClose, onSent }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await support.open({ kind: topic.kind, category: topic.category, title: title.trim(), body: body.trim() });
+      const r = await support.open({
+        kind: topic.kind,
+        category: topic.category,
+        title: title.trim(),
+        body: body.trim(),
+        ...(topic.kind === "appeal" && decision ? { appealOf: decision.caseNumber } : {}),
+        ...(topic.kind === "dispute" && payment ? { subject: { type: "transaction", id: payment.txHash } } : {}),
+      });
       await onSent(r.case);
     } catch (err) {
       setError(err.message);
@@ -151,6 +170,48 @@ function NewRequest({ onClose, onSent }) {
             </button>
           ))}
         </div>
+        {topic.kind === "appeal" && (
+          <Picker
+            label="Which decision?"
+            empty="ALT staff haven't decided anything about you. You can still tell us what happened."
+            items={decisions}
+            selected={decision}
+            onPick={(d) => {
+              setDecision(d);
+              setTitle(`Appeal of #${String(d.caseNumber).padStart(4, "0")}: ${d.label}`);
+            }}
+            render={(d) => (
+              <>
+                <span className="font-semibold">{d.label}</span> · {timeAgo(d.at)}
+                <span className="block text-ink-3">{d.reason}</span>
+              </>
+            )}
+            disabled={(d) => d.appealed && "Already appealed"}
+            keyOf={(d) => `${d.caseNumber}-${d.action}-${d.at}`}
+          />
+        )}
+        {topic.kind === "dispute" && (
+          <Picker
+            label="Which payment?"
+            empty="No marketplace payments on your account yet."
+            items={payments}
+            selected={payment}
+            onPick={(p) => {
+              setPayment(p);
+              setTitle(`About ${p.ai?.name ?? "an AI"}: ${p.kind} on ${new Date(p.occurredAt).toLocaleDateString()}`);
+            }}
+            render={(p) => (
+              <>
+                <span className="font-semibold">
+                  {ROLE[p.role] ?? p.role} {p.ai?.name ?? "an AI"}
+                </span>{" "}
+                · {polText(p.amount)} · {timeAgo(p.occurredAt)}
+              </>
+            )}
+            disabled={() => false}
+            keyOf={(p) => p.id}
+          />
+        )}
         <label className="mt-4 block text-sm font-semibold text-ink-2">
           Title
           <input
@@ -265,5 +326,42 @@ function Thread({ id, onChange }) {
       )}
       {error && <p className="mt-2 rounded-2xl bg-rose-500/10 px-4 py-2 text-sm text-rose-600">{error}</p>}
     </div>
+  );
+}
+
+/** Picks the decision an appeal is about, or the payment a dispute is about. */
+function Picker({ label, empty, items, selected, onPick, render, disabled, keyOf }) {
+  return (
+    <fieldset className="mt-4">
+      <legend className="text-sm font-semibold text-ink-2">{label}</legend>
+      {!items ? (
+        <div className="py-4">
+          <Spinner />
+        </div>
+      ) : items.length === 0 ? (
+        <p className="mt-2 text-sm text-ink-3">{empty}</p>
+      ) : (
+        <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+          {items.map((it) => {
+            const why = disabled(it);
+            const on = selected && keyOf(selected) === keyOf(it);
+            return (
+              <li key={keyOf(it)}>
+                <button
+                  type="button"
+                  disabled={Boolean(why)}
+                  onClick={() => onPick(it)}
+                  aria-pressed={on}
+                  className={`w-full rounded-2xl border px-4 py-3 text-left text-sm transition disabled:opacity-50 ${on ? "border-ink bg-sunken" : "border-line bg-surface hover:border-ink/30"}`}
+                >
+                  {render(it)}
+                  {why && <span className="mt-1 block text-xs font-semibold text-ink-3">{why}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </fieldset>
   );
 }

@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 98 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 100 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -507,12 +507,17 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - Tests: Core `case-actions.test.ts` (on-chain suspend and lift, the AI silenced, warn, lock and unlock, removal requests to stand-in services, role and staff limits); ALTERA and `altar-api` (their internal removal routes refuse calls without the key). Core 97, ALTERA 18, `altar-api` 6.
     - **Checked on the demo** without changing it: the governor account holds the role on the replayed chain (read-only call), and the case page offers the right actions up to the confirm step.
     - **Follow-up (owner, 2026-10-15: the don't-touch list became "handle with care", AGENTS.md rule 9):** a staff lock now says so at sign-in (`ACCOUNT_SUSPENDED`: "ALT suspended this account until … We emailed you the reason.") instead of the failed-password message. `auth.ts` and `accounts/users.ts` changed for it; `core.users.lock_reason` (migration `0010`) tells the two locks apart. Tested in `case-actions.test.ts` and the auth tests.
-  - [ ] P5. Policies, appeals and disputes (in two parts).
+  - [x] P5. Policies, appeals and disputes (in two parts).
     - [x] **P5a. Policies (M3 FE-5).** Terms of use, Privacy policy and AI content policy, versioned (`core.policies`, version 1 of each in migration `0011`, written for the project and marked "not legal advice"), with who agreed to which version (`core.policy_acceptances`, with the platform).
       - Anyone reads them: `GET /policies`, `/policies/:slug?version=`; ALTAR web shows every version at **`/legal/<slug>`** (footer links), which the phone apps open too.
       - People agree to the current version: `GET /me/policies` (`pending`), `POST /me/policies/accept`. Signing up in the ALT window says what you agree to and records it; ALTAR shows a bar, and ALTER and ALTERA a card (`AltPolicyGate` in `alt_account`) until people agree or sign out.
       - Admins publish a new version in the Command Centre (**05 Policies**: the text, how many agreed, every version, write with preview); everyone is notified and asked again. Audited (`policy.accepted`, `policy.published`).
       - Tests: Core `policies.test.ts`, `alt_account` `policy_gate_test.dart` (Core 98, `alt_account` 18).
+    - [x] **P5b. Appeals and disputes (M3 FE-4).**
+      - **Appeals name the decision:** `GET /me/decisions` lists what staff decided about a person, their AI or their content (suspended, removed, warned, locked); an appeal (`POST /me/cases`, `appealOf`: the case number) is linked to that case (`core.cases.related_case_id`, migration `0011`), once per decision. **Whoever took the decision can't judge the appeal** (they count as involved). The Command Centre shows "Appeal of #N" with the decisions and who made them, and "Appealed in #N" on the original; overturning uses Take action (lift, unlock) on the appeal itself.
+      - **Disputes name the payment:** a dispute picks one of the person's ALTAR payments; ALTAR confirms it (`POST /internal/transactions/lookup`, service key) and its details become the case's evidence; the case is about the other side of the payment, so staff can act on them. On-chain payments are final: ALT cannot refund them automatically; staff mediate and can act on the seller or the AI.
+      - Help & support on ALTAR and in the apps offers "Which decision?" and "Which payment?" pickers.
+      - Tests: Core `case-actions.test.ts` (appeal once, by the person affected, judged by someone else, upheld; dispute only on your own payment, with its evidence), `altar-api` (the lookup needs the key), `alt_account` (pickers' requests). Core 100, `alt_account` 19.
 - **Later (owner, 2026-10-15), not now:**
   - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
   - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.
@@ -532,6 +537,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - An AI held by a wallet outside ALT has no owner in ALT until it comes back, unless that wallet is linked (Your wallets on ALTAR).
   - Rentals are not replayed when the local dev chain restarts.
   - Spend approvals are remembered as used in Core's memory (fine for one Core instance; several instances would need a shared store). When the browser blocks pop-ups, ALTAR falls back to asking for the password on its own page (sent straight to Core, never stored).
+- **Marketplace refunds aren't automatic:** payments are final on-chain; a dispute is mediated by staff (Command Centre), who can act on the seller or the AI.
 - **Moderation is rule-based** (Core's `moderation.ts`, used by ALTERA too): clear categories, not an ML classifier. **The creator control panel is mocked** (after 60%).
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **The ALT sign-in card:** "Continue with ALTER/ALTERA" can't show the other app's account name before you tap it (apps can't read each other's data); it says which app, and that app shows the account when it asks you to confirm. Remembered accounts are per app (name, handle, email, picture in encrypted storage). The apps target Android only (owner, 2026-10-15); iOS is out of scope.

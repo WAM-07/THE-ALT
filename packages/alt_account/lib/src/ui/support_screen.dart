@@ -141,6 +141,19 @@ class _NewRequestScreen extends StatefulWidget {
 
 class _NewRequestScreenState extends State<_NewRequestScreen> {
   var _topic = _topics.first;
+  // An appeal names the decision; a dispute names the payment.
+  Future<List<AltDecision>>? _decisions;
+  Future<List<AltPayment>>? _payments;
+  AltDecision? _decision;
+  AltPayment? _payment;
+
+  void _pickTopic((String, String, String) t) {
+    setState(() {
+      _topic = t;
+      if (t.$2 == 'appeal') _decisions ??= widget.support.decisions();
+      if (t.$2 == 'dispute') _payments ??= widget.support.payments();
+    });
+  }
   final _title = TextEditingController();
   final _body = TextEditingController();
   bool _busy = false;
@@ -163,7 +176,14 @@ class _NewRequestScreenState extends State<_NewRequestScreen> {
       _error = null;
     });
     try {
-      final c = await widget.support.open(kind: _topic.$2, category: _topic.$3, title: _title.text.trim(), body: _body.text.trim());
+      final c = await widget.support.open(
+        kind: _topic.$2,
+        category: _topic.$3,
+        title: _title.text.trim(),
+        body: _body.text.trim(),
+        appealOf: _topic.$2 == 'appeal' ? _decision?.caseNumber : null,
+        subject: _topic.$2 == 'dispute' && _payment != null ? {'type': 'transaction', 'id': _payment!.txHash} : null,
+      );
       if (mounted) Navigator.of(context).pop(c);
     } on AltApiException catch (e) {
       if (!mounted) return;
@@ -188,9 +208,37 @@ class _NewRequestScreenState extends State<_NewRequestScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final t in _topics) ChoiceChip(label: Text(t.$1), selected: _topic == t, onSelected: (_) => setState(() => _topic = t)),
+              for (final t in _topics) ChoiceChip(label: Text(t.$1), selected: _topic == t, onSelected: (_) => _pickTopic(t)),
             ],
           ),
+          if (_topic.$2 == 'appeal')
+            _Picker<AltDecision>(
+              label: 'Which decision?',
+              empty: 'ALT staff have not decided anything about you. You can still tell us what happened.',
+              future: _decisions!,
+              selected: _decision,
+              title: (d) => d.label,
+              subtitle: (d) => d.appealed ? 'Already appealed' : d.reason,
+              enabled: (d) => !d.appealed,
+              onPick: (d) => setState(() {
+                _decision = d;
+                _title.text = 'Appeal of #${d.caseNumber.toString().padLeft(4, '0')}: ${d.label}';
+              }),
+            ),
+          if (_topic.$2 == 'dispute')
+            _Picker<AltPayment>(
+              label: 'Which payment?',
+              empty: 'No marketplace payments on your account yet.',
+              future: _payments!,
+              selected: _payment,
+              title: (p) => p.summary,
+              subtitle: (p) => _ago(p.at),
+              enabled: (_) => true,
+              onPick: (p) => setState(() {
+                _payment = p;
+                _title.text = '${p.summary.split(' · ').first} (${_ago(p.at)})';
+              }),
+            ),
           const SizedBox(height: 20),
           TextField(
             controller: _title,
@@ -349,6 +397,64 @@ class _CaseScreenState extends State<_CaseScreen> {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// Picks the decision an appeal is about, or the payment a dispute is about.
+class _Picker<T> extends StatelessWidget {
+  const _Picker({
+    required this.label,
+    required this.empty,
+    required this.future,
+    required this.selected,
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.onPick,
+  });
+
+  final String label;
+  final String empty;
+  final Future<List<T>> future;
+  final T? selected;
+  final String Function(T) title;
+  final String Function(T) subtitle;
+  final bool Function(T) enabled;
+  final void Function(T) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.titleSmall),
+          FutureBuilder<List<T>>(
+            future: future,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
+              }
+              final items = snap.data ?? <T>[];
+              if (items.isEmpty) return Padding(padding: const EdgeInsets.only(top: 8), child: Text(empty, style: theme.textTheme.bodySmall));
+              return Column(children: [
+                for (final it in items)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    enabled: enabled(it),
+                    leading: Icon(it == selected ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                    title: Text(title(it)),
+                    subtitle: Text(subtitle(it), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    onTap: () => onPick(it),
+                  ),
+              ]);
+            },
+          ),
+        ],
+      ),
     );
   }
 }

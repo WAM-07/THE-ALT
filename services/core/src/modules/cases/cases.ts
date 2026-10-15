@@ -56,6 +56,8 @@ export interface CaseRow {
   reports: number;
   assignee_id: string | null;
   resolution: string | null;
+  /** For an appeal: the case whose decision it disputes. */
+  related_case_id: string | null;
   created_at: Date;
   updated_at: Date;
   closed_at: Date | null;
@@ -73,6 +75,8 @@ export interface NewCase {
   evidence?: Record<string, unknown>;
   /** The person filing it; absent when a service files it on its own (an automatic flag). */
   openedBy?: string | null;
+  /** An appeal's original case. */
+  relatedCaseId?: string | null;
   service?: string | null;
   ip?: string | null;
 }
@@ -123,8 +127,8 @@ export async function fileCase(client: pg.PoolClient, n: NewCase): Promise<{ cas
     }
   }
   const { rows } = await client.query<CaseRow>(
-    `INSERT INTO core.cases (kind, platform, category, title, priority, subject_type, subject_id, subject_ai_id, subject_user_id, opened_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    `INSERT INTO core.cases (kind, platform, category, title, priority, subject_type, subject_id, subject_ai_id, subject_user_id, opened_by, related_case_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
     [
       n.kind,
       n.platform,
@@ -136,6 +140,7 @@ export async function fileCase(client: pg.PoolClient, n: NewCase): Promise<{ cas
       n.subject?.aiId ?? null,
       n.subject?.userId ?? null,
       n.openedBy ?? null,
+      n.relatedCaseId ?? null,
     ],
   );
   const c = rows[0]!;
@@ -196,11 +201,40 @@ export async function participants(client: pg.PoolClient, caseId: string) {
   return rows.map((r) => r.user_id);
 }
 
-/** Whether someone is involved in a case: they opened it, reported it, or it is about them. */
+/**
+ * Whether someone is involved in a case: they opened it, reported it, or it is about them; for an
+ * appeal, also whoever took the decision being appealed (a decision is never judged by its maker).
+ */
 export async function isInvolved(q: pg.Pool | pg.PoolClient, c: CaseRow, userId: string) {
   if (c.opened_by === userId || c.subject_user_id === userId) return true;
-  const { rowCount } = await q.query(`SELECT 1 FROM core.case_events WHERE case_id = $1 AND actor_user_id = $2 AND kind IN ('opened', 'reported')`, [c.id, userId]);
+  const { rowCount } = await q.query(
+    `SELECT 1 FROM core.case_events WHERE actor_user_id = $2
+        AND ((case_id = $1 AND kind IN ('opened', 'reported')) OR (case_id = $3 AND kind = 'action'))`,
+    [c.id, userId, c.related_case_id],
+  );
   return Boolean(rowCount);
+}
+
+/** Decisions people can appeal, in the words the person affected reads. */
+export const APPEALABLE: Record<string, string> = {
+  suspend_ai: 'Your AI was suspended',
+  remove_content: 'Your content was removed',
+  warn_user: 'You were warned',
+  lock_account: 'Your account was locked',
+};
+
+/** Staff decisions about this person (or their AI or content), newest first. */
+export async function decisionsAbout(q: pg.Pool | pg.PoolClient, userId: string) {
+  const { rows } = await q.query<{ case_id: string; number: string; action: string; reason: string | null; at: Date; appealed: boolean }>(
+    `SELECT c.id AS case_id, c.number, e.data->>'action' AS action, e.body AS reason, e.at,
+            EXISTS (SELECT 1 FROM core.cases a WHERE a.related_case_id = c.id AND a.opened_by = $1) AS appealed
+       FROM core.case_events e JOIN core.cases c ON c.id = e.case_id
+      WHERE e.kind = 'action' AND e.data->>'action' = ANY($2::text[])
+        AND (e.data->>'userId' = $1::text OR c.subject_user_id = $1)
+      ORDER BY e.at DESC LIMIT 50`,
+    [userId, Object.keys(APPEALABLE)],
+  );
+  return rows;
 }
 
 /** Staff never handle a case they are involved in. */

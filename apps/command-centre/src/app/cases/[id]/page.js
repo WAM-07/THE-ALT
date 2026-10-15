@@ -52,7 +52,7 @@ export default function CasePage() {
       </>
     );
 
-  const { case: c, events, canHandle, targets } = res.data;
+  const { case: c, events, canHandle, targets, appealOf, appeals } = res.data;
   const open = OPEN.includes(c.status);
   const mine = c.assignee?.id === s.user?.id;
 
@@ -97,6 +97,39 @@ export default function CasePage() {
           </div>
         </div>
       </div>
+
+      {appealOf && (
+        <section className="panel" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
+          <h2 className="section">
+            Appeal of <Link href={`/cases/${appealOf.id}`}>{caseNo(appealOf.number)}</Link> <span className="aside">{appealOf.title}</span>
+          </h2>
+          <div className="pad">
+            {appealOf.decisions.length ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {appealOf.decisions.map((d, i) => (
+                  <li key={i}>
+                    <b>{ACTION_DONE[d.action] ?? d.action}</b> by <span className="mono">@{d.by ?? "staff"}</span> on {stamp(d.at)}: {d.reason}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="muted">No action was taken on that case.</span>
+            )}
+            <p className="muted" style={{ fontSize: 12.5, margin: "10px 0 0" }}>Whoever took that decision can&apos;t judge this appeal. To overturn it, use Take action (lift, unlock), then close this case.</p>
+          </div>
+        </section>
+      )}
+      {appeals?.length > 0 && (
+        <p className="mono" style={{ fontSize: 12, margin: "0 0 12px" }}>
+          Appealed in{" "}
+          {appeals.map((a, i) => (
+            <span key={a.id}>
+              {i > 0 && ", "}
+              <Link href={`/cases/${a.id}`}>{caseNo(a.number)}</Link> ({STATUS[a.status]})
+            </span>
+          ))}
+        </p>
+      )}
 
       <div className="split">
         <div className="stack">

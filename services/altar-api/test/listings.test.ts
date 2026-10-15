@@ -263,6 +263,12 @@ describe('subscriptions, reviews and royalties', () => {
     expect((await removeReview()).statusCode).toBe(401);
     expect((await removeReview('test-internal-service-key-0123456789abcdef')).json()).toEqual({ removed: true });
     expect((await removeReview('test-internal-service-key-0123456789abcdef')).statusCode).toBe(404);
+    // ALT Core checks a dispute against the payment (service key only).
+    const { rows: paid } = await db.query(`SELECT tx_hash FROM altar.transactions WHERE ai_id = $1 AND kind = 'subscription' LIMIT 1`, [aiId]);
+    const lookup = (key?: string) =>
+      app.inject({ method: 'POST', url: '/internal/transactions/lookup', headers: key ? { 'x-alt-service-key': key, 'x-alt-service': 'core' } : {}, payload: { txHash: paid[0].tx_hash } });
+    expect((await lookup()).statusCode).toBe(401);
+    expect((await lookup('test-internal-service-key-0123456789abcdef')).json()).toMatchObject({ kind: 'subscription', txHash: paid[0].tx_hash, toUserId: fan.user, aiId });
     await req('PUT', `/reviews/${aiId}`, fan.token, { rating: 5, body: 'Even better the second week.' });
     expect(filed.at(-1)).toMatchObject({
       kind: 'report',

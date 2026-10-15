@@ -500,6 +500,24 @@ export async function buildApp(
     },
   );
 
+  r.post(
+    '/internal/transactions/lookup',
+    {
+      preHandler: requireService,
+      schema: {
+        tags: ['internal'],
+        summary: 'One marketplace payment by its transaction hash (ALT Core checks a dispute against it)',
+        body: z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }),
+      },
+    },
+    async (req) => {
+      const { rows } = await db.query(`${ACTIVITY} WHERE lower(t.tx_hash) = lower($1) ORDER BY t.log_index LIMIT 1`, [req.body.txHash]);
+      if (!rows[0]) throw notFound('Payment');
+      const t = rows[0];
+      return { ...activityOut(t), aiId: (t.ai_id as string | null) ?? null, fromUserId: (t.from_user_id as string | null) ?? null, toUserId: (t.to_user_id as string | null) ?? null };
+    },
+  );
+
   // ---------------------------------------------------------------- saved AIs
 
   r.get('/wishlist', { preHandler: requireUser, schema: { tags: ['wishlist'], summary: 'AIs you saved' } }, async (req) => {

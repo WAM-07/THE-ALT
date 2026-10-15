@@ -16,12 +16,18 @@ let t: TestApp;
 let services: FastifyInstance;
 const calls: { url: string; headers: Record<string, unknown>; body: Record<string, unknown> }[] = [];
 const bossEmail = `boss_${uniq()}@alt.test`;
+// What the stand-in ALTAR says a payment was (set by the dispute test).
+let payment: Record<string, unknown> | null = null;
 let boss: Awaited<ReturnType<typeof signUp>>;
 const serviceHeaders = { 'x-alt-service-key': 'test-internal-service-key-0123456789abcdef', 'x-alt-service': 'altera-api' };
 
 beforeAll(async () => {
   // Stand-ins for ALTERA's and ALTAR's /internal routes: they record what Core asked.
   services = Fastify();
+  services.post('/internal/transactions/lookup', async (req, reply) => {
+    const { txHash } = req.body as { txHash: string };
+    return payment && payment.txHash === txHash ? payment : reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Payment not found.' } });
+  });
   services.post('/*', async (req) => {
     calls.push({ url: req.url, headers: req.headers, body: req.body as Record<string, unknown> });
     return { removed: true };
@@ -175,5 +181,61 @@ describe('acting on a case from the ALT Command Centre (P4)', () => {
     const other = await staffMember('moderator');
     expect((await call('POST', `/staff/cases/${help.id}/actions`, other.token, { action: 'remove_content', reason: 'Nothing.' })).json().error.code).toBe('NOTHING_TO_REMOVE');
     expect((await call('POST', `/staff/cases/${help.id}/actions`, other.token, { action: 'lock_account', reason: 'No.', days: 1 })).json().error.code).toBe('STAFF_ACCOUNT');
+  });
+
+  it('lets the person affected appeal a decision, judged by someone other than its maker', async () => {
+    const owner = await signUp(t);
+    const reporter = await signUp(t, { platform: 'altera' });
+    const ai = await verifiedAi(owner);
+    const filed = (
+      await call('POST', '/me/cases', reporter.accessToken, { kind: 'report', category: 'harmful', title: 'Harmful advice', body: 'See chat.', subject: { type: 'ai', id: ai.id } })
+    ).json().case;
+    const decider = await staffMember('moderator');
+    await call('POST', `/staff/cases/${filed.id}/actions`, decider.token, { action: 'suspend_ai', reason: 'Gave harmful advice.' });
+
+    // The owner sees the decision and appeals it, once.
+    const decisions = (await call('GET', '/me/decisions', owner.accessToken)).json().items;
+    expect(decisions[0]).toMatchObject({ caseNumber: filed.number, action: 'suspend_ai', label: 'Your AI was suspended', reason: 'Gave harmful advice.', appealed: false });
+    const appeal = { kind: 'appeal', category: 'moderation', title: `Appeal of #${filed.number}`, body: 'It was quoting a safety guide.', appealOf: filed.number };
+    const opened = await call('POST', '/me/cases', owner.accessToken, appeal);
+    expect(opened.statusCode).toBe(201);
+    const appealCase = opened.json().case;
+    expect((await call('POST', '/me/cases', owner.accessToken, appeal)).json().error.code).toBe('ALREADY_APPEALED');
+    expect((await call('POST', '/me/cases', reporter.accessToken, appeal)).statusCode).toBe(404); // not their decision
+    expect((await call('GET', '/me/decisions', owner.accessToken)).json().items[0].appealed).toBe(true);
+
+    // The moderator who decided can't judge the appeal; another one can, and sees the decision.
+    const asDecider = (await call('GET', `/staff/cases/${appealCase.id}`, decider.token)).json();
+    expect(asDecider.canHandle).toBe(false);
+    const judge = await staffMember('moderator');
+    const view = (await call('GET', `/staff/cases/${appealCase.id}`, judge.token)).json();
+    expect(view.canHandle).toBe(true);
+    expect(view.appealOf).toMatchObject({ number: filed.number, decisions: [{ action: 'suspend_ai', reason: 'Gave harmful advice.', by: decider.handle }] });
+    expect(view.targets.ai).toMatchObject({ id: ai.id, suspended: true });
+    expect((await call('GET', `/staff/cases/${filed.id}`, judge.token)).json().appeals).toEqual([expect.objectContaining({ number: appealCase.number })]);
+
+    // Upheld for the owner: the suspension is lifted from the appeal itself.
+    expect((await call('POST', `/staff/cases/${appealCase.id}/actions`, judge.token, { action: 'unsuspend_ai', reason: 'Appeal upheld: it was a quote.' })).statusCode).toBe(200);
+    await call('POST', `/staff/cases/${appealCase.id}/resolve`, judge.token, { outcome: 'resolved', resolution: 'Appeal upheld; your AI is active again.' });
+    expect((await t.app.ctx.chain!.readIdentity(BigInt(ai.token.tokenId))).suspended).toBe(false);
+    expect((await call('GET', '/notifications', owner.accessToken)).json().items[0]).toMatchObject({ type: 'case.resolved', body: 'Appeal upheld; your AI is active again.' });
+  });
+
+  it("ties a dispute to one of the person's own ALTAR payments, checked by ALTAR", async () => {
+    const [buyer, seller, stranger] = [await signUp(t, { platform: 'altar' }), await signUp(t), await signUp(t)];
+    const txHash = `0x${'ab'.repeat(32)}`;
+    payment = { txHash, kind: 'rental', amount: { pol: '2.5' }, days: 3, ai: { name: 'Urdu Ustad' }, aiId: null, fromUserId: seller.user.id, toUserId: buyer.user.id, occurredAt: '2026-10-15T10:00:00.000Z' };
+    const dispute = { kind: 'dispute', category: 'marketplace', title: 'Rental never worked', body: 'The chat was read-only from day one.', subject: { type: 'transaction', id: txHash } };
+    expect((await call('POST', '/me/cases', stranger.accessToken, dispute)).json().error.code).toBe('NOT_YOUR_PAYMENT');
+    expect((await call('POST', '/me/cases', buyer.accessToken, { ...dispute, kind: 'support' })).json().error.code).toBe('NOT_A_DISPUTE');
+    expect((await call('POST', '/me/cases', buyer.accessToken, { ...dispute, subject: { type: 'transaction', id: `0x${'cd'.repeat(32)}` } })).statusCode).toBe(404);
+    const opened = (await call('POST', '/me/cases', buyer.accessToken, dispute)).json().case;
+    expect(opened).toMatchObject({ kind: 'dispute', platform: 'altar', subject: { type: 'transaction', id: txHash } });
+    const sup = await staffMember('support');
+    const view = (await call('GET', `/staff/cases/${opened.id}`, sup.token)).json();
+    // About the other side of the payment, with the payment's details as evidence.
+    expect(view.case.subject).toMatchObject({ type: 'transaction', id: txHash, userId: seller.user.id });
+    expect(view.events[0].data.evidence.payment).toMatchObject({ kind: 'rental', days: 3, amount: { pol: '2.5' } });
+    expect(view.events[0].data.evidence.payment.fromUserId).toBeUndefined();
   });
 });

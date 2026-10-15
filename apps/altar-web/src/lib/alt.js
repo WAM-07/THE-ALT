@@ -217,6 +217,8 @@ export const support = {
   get: (id) => api(`/core/me/cases/${id}`),
   open: (body) => api("/core/me/cases", { method: "POST", body }),
   reply: (id, body) => api(`/core/me/cases/${id}/messages`, { method: "POST", body: { body } }),
+  /** What ALT staff decided about you, your AIs or your content: what you can appeal. */
+  decisions: () => api("/core/me/decisions"),
 };
 
 /** ALT's policies (Terms, Privacy, AI content): versioned by ALT staff; people agree to the current one. */

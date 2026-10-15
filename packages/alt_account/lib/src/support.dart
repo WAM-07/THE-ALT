@@ -85,6 +85,49 @@ class AltCaseMessage {
   final String? body;
 }
 
+/// A staff decision about the person, their AI or their content: something they can appeal.
+class AltDecision {
+  AltDecision({required this.caseNumber, required this.label, required this.reason, required this.at, required this.appealed});
+
+  factory AltDecision.fromJson(Map<String, dynamic> j) => AltDecision(
+        caseNumber: (j['caseNumber'] as num).toInt(),
+        label: j['label'] as String,
+        reason: j['reason'] as String? ?? '',
+        at: DateTime.parse(j['at'] as String),
+        appealed: j['appealed'] as bool? ?? false,
+      );
+
+  final int caseNumber;
+  final String label;
+  final String reason;
+  final DateTime at;
+  final bool appealed;
+}
+
+/// One of the person's ALTAR payments, for a dispute.
+class AltPayment {
+  AltPayment({required this.txHash, required this.summary, required this.at});
+
+  factory AltPayment.fromJson(Map<String, dynamic> j) {
+    const role = {
+      'bought': 'You bought',
+      'rented': 'You rented',
+      'subscribed': 'You subscribed to',
+      'sold': 'You sold',
+      'rented_out': 'You rented out',
+      'subscribed_out': 'Subscription to',
+      'royalty': 'Royalty from',
+    };
+    final ai = (j['ai'] as Map?)?['name'] ?? 'an AI';
+    final pol = (j['amount'] as Map?)?['pol'] ?? '?';
+    return AltPayment(txHash: j['txHash'] as String, summary: '${role[j['role']] ?? j['role']} $ai · $pol POL', at: DateTime.parse(j['occurredAt'] as String));
+  }
+
+  final String txHash;
+  final String summary;
+  final DateTime at;
+}
+
 /// Help & support through ALT Core (`/me/cases`).
 class AltSupport {
   AltSupport(this.client);
@@ -118,17 +161,40 @@ class AltSupport {
     );
   }
 
-  /// [kind]: support, report, dispute or appeal. [subject] e.g. `{'type': 'ai', 'id': aiId}`.
-  Future<AltCase> open({required String kind, required String category, required String title, required String body, Map<String, String>? subject}) async {
+  /// [kind]: support, report, dispute or appeal. [subject] e.g. `{'type': 'ai', 'id': aiId}`, or a
+  /// payment for a dispute (`{'type': 'transaction', 'id': txHash}`); [appealOf]: the decision's case number.
+  Future<AltCase> open({required String kind, required String category, required String title, required String body, Map<String, String>? subject, int? appealOf}) async {
     final res = await _json('POST', '/me/cases', {
       'kind': kind,
       'category': category,
       'title': title,
       'body': body,
       if (subject != null) 'subject': subject,
+      if (appealOf != null) 'appealOf': appealOf,
     });
     return AltCase.fromJson(Map<String, dynamic>.from(res['case'] as Map));
   }
 
   Future<void> reply(String id, String body) => _json('POST', '/me/cases/$id/messages', {'body': body});
+
+  /// What ALT staff decided about this person (what they can appeal).
+  Future<List<AltDecision>> decisions() async {
+    final body = await _json('GET', '/me/decisions');
+    return [for (final d in body['items'] as List) AltDecision.fromJson(Map<String, dynamic>.from(d as Map))];
+  }
+
+  /// Their ALTAR payments (bought, rented, subscribed, sold...), for a dispute.
+  Future<List<AltPayment>> payments() async {
+    http.Response res;
+    try {
+      res = await client.authorizedSend('GET', Uri.parse('${client.apiUrl}/altar/me/activity')).timeout(const Duration(seconds: 20));
+    } on AltApiException {
+      rethrow;
+    } catch (e) {
+      throw AltApiException.network(e);
+    }
+    final decoded = res.body.isEmpty ? <dynamic>[] : jsonDecode(res.body);
+    if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, decoded);
+    return [for (final p in decoded as List) AltPayment.fromJson(Map<String, dynamic>.from(p as Map))];
+  }
 }

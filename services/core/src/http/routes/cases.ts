@@ -12,7 +12,9 @@ import { revokeAllSessions } from '../../modules/accounts/sessions.js';
 import { parseRoles } from '../../modules/accounts/users.js';
 import {
   addEvent,
+  APPEALABLE,
   assertNoConflict,
+  decisionsAbout,
   isInvolved,
   CASE_KINDS,
   CASE_PRIORITIES,
@@ -116,19 +118,60 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
           title: z.string().trim().min(3).max(140),
           body: Body,
           subject: Subject.optional(),
+          // An appeal names the case whose decision it disputes (its number, as people were told it).
+          appealOf: z.number().int().positive().optional(),
         }),
       },
     },
     async (req, reply) => {
       const a = req.auth!;
+      const b = req.body;
       const platform = a.platform === 'alter' || a.platform === 'altera' || a.platform === 'altar' ? a.platform : 'core';
+      if (b.appealOf && b.kind !== 'appeal') throw badRequest('NOT_AN_APPEAL', 'Only an appeal can name a decision.');
+      if (b.subject?.type === 'transaction' && b.kind !== 'dispute') throw badRequest('NOT_A_DISPUTE', 'Only a dispute is about a payment.');
+      // A dispute is about one of the person's own payments on ALTAR: ALTAR confirms it and the details become evidence.
+      let payment: Record<string, unknown> | null = null;
+      if (b.subject?.type === 'transaction') {
+        payment = (await callService(ctx, 'altar', '/internal/transactions/lookup', { txHash: b.subject.id })) as Record<string, unknown>;
+        if (payment.fromUserId !== a.userId && payment.toUserId !== a.userId) throw forbidden('NOT_YOUR_PAYMENT', 'You can only dispute a payment you made or received.');
+      }
       const result = await tx(ctx.db, async (client) => {
-        const subject = req.body.subject ? await resolveSubject(client, req.body.subject) : null;
-        return fileCase(client, { ...req.body, platform, subject, openedBy: a.userId, ip: req.ip });
+        if (b.appealOf) {
+          const decided = (await decisionsAbout(client, a.userId)).find((d) => Number(d.number) === b.appealOf);
+          if (!decided) throw notFound('Decision about you');
+          if (decided.appealed) throw conflict('ALREADY_APPEALED', 'You already appealed this decision. Follow it under Help & support.');
+          const { rows } = await client.query<CaseRow>('SELECT * FROM core.cases WHERE id = $1', [decided.case_id]);
+          const original = rows[0]!;
+          const subject = original.subject_type
+            ? { type: original.subject_type as (typeof SUBJECT_TYPES)[number], id: original.subject_id!, aiId: original.subject_ai_id, userId: a.userId }
+            : { type: 'user' as const, id: a.userId, userId: a.userId };
+          return fileCase(client, { ...b, platform, subject, relatedCaseId: original.id, openedBy: a.userId, ip: req.ip });
+        }
+        if (payment) {
+          const counterparty = (payment.toUserId === a.userId ? payment.fromUserId : payment.toUserId) as string | null;
+          const { fromUserId: _f, toUserId: _t, ...shown } = payment;
+          return fileCase(client, {
+            ...b,
+            platform: 'altar',
+            subject: { type: 'transaction', id: String(payment.txHash), aiId: (payment.aiId as string | null) ?? null, userId: counterparty },
+            evidence: { payment: shown },
+            openedBy: a.userId,
+            ip: req.ip,
+          });
+        }
+        const subject = b.subject ? await resolveSubject(client, b.subject) : null;
+        return fileCase(client, { ...b, platform, subject, openedBy: a.userId, ip: req.ip });
       });
       return reply.status(result.merged ? 200 : 201).send({ case: personOut(result.case), merged: result.merged });
     },
   );
+
+  r.get('/me/decisions', { preHandler: authed, schema: { tags: ['cases'], summary: 'What ALT staff decided about you, your AIs or your content (what you can appeal)' } }, async (req) => {
+    const rows = await decisionsAbout(ctx.db, req.auth!.userId);
+    return {
+      items: rows.map((d) => ({ caseNumber: Number(d.number), action: d.action, label: APPEALABLE[d.action] ?? d.action, reason: d.reason, at: d.at.toISOString(), appealed: d.appealed })),
+    };
+  });
 
   r.get('/me/cases', { preHandler: authed, schema: { tags: ['cases'], summary: 'Your requests and reports, newest activity first' } }, async (req) => {
     const { rows } = await ctx.db.query<CaseRow>(
@@ -305,8 +348,26 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
       `SELECT e.*, u.handle, u.display_name FROM core.case_events e LEFT JOIN core.users u ON u.id = e.actor_user_id WHERE e.case_id = $1 ORDER BY e.id`,
       [c.id],
     );
+    const { rows: linked } = await ctx.db.query<{ id: string; number: string; title: string; status: string; related_case_id: string | null }>(
+      'SELECT id, number, title, status, related_case_id FROM core.cases WHERE id = $1 OR related_case_id = $2 ORDER BY number',
+      [c.related_case_id, c.id],
+    );
+    const original = linked.find((x) => x.id === c.related_case_id);
+    const decisions = original
+      ? (
+          await ctx.db.query<{ action: string; body: string | null; at: Date; handle: string | null }>(
+            `SELECT e.data->>'action' AS action, e.body, e.at, u.handle FROM core.case_events e LEFT JOIN core.users u ON u.id = e.actor_user_id
+              WHERE e.case_id = $1 AND e.kind = 'action' ORDER BY e.id`,
+            [original.id],
+          )
+        ).rows
+      : [];
     return {
       case: staffOut(c),
+      appealOf: original
+        ? { id: original.id, number: Number(original.number), title: original.title, status: original.status, decisions: decisions.map((d) => ({ action: d.action, reason: d.body, at: d.at.toISOString(), by: d.handle })) }
+        : null,
+      appeals: linked.filter((x) => x.related_case_id === c.id).map((x) => ({ id: x.id, number: Number(x.number), title: x.title, status: x.status })),
       targets: await targetsOf(c),
       canHandle: canHandle(roles(req), c.kind) && !(await isInvolved(ctx.db, c, req.auth!.userId)),
       events: rows.map((e) => ({

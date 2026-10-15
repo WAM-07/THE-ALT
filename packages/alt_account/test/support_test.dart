@@ -86,6 +86,30 @@ void main() {
     expect(seen.last.headers['authorization'], 'Bearer a1');
   });
 
+  test('appeals name the decision, disputes name the payment', () async {
+    final seen = <http.Request>[];
+    final client = await _client({
+      'GET /core/me/decisions': (_) => _json(200, {
+            'items': [
+              {'caseNumber': 3, 'action': 'suspend_ai', 'label': 'Your AI was suspended', 'reason': 'Harmful advice.', 'at': '2026-10-15T10:00:00.000Z', 'appealed': false},
+            ],
+          }),
+      'GET /altar/me/activity': (_) => _json(200, [
+            {'id': '1', 'kind': 'rental', 'role': 'rented', 'ai': {'name': 'Urdu Ustad'}, 'amount': {'pol': '2.5'}, 'txHash': '0xabc', 'occurredAt': '2026-10-15T09:00:00.000Z'},
+          ]),
+      'POST /core/me/cases': (_) => _json(201, {'case': _case('open'), 'merged': false}),
+    }, seen);
+    final support = AltSupport(client);
+    final d = (await support.decisions()).single;
+    expect((d.caseNumber, d.label), (3, 'Your AI was suspended'));
+    final p = (await support.payments()).single;
+    expect(p.summary, 'You rented Urdu Ustad · 2.5 POL');
+    await support.open(kind: 'appeal', category: 'moderation', title: 'Appeal of #0003', body: 'It was a quote.', appealOf: d.caseNumber);
+    expect(jsonDecode(seen.last.body)['appealOf'], 3);
+    await support.open(kind: 'dispute', category: 'marketplace', title: 'Rental', body: 'Never worked.', subject: {'type': 'transaction', 'id': p.txHash});
+    expect(jsonDecode(seen.last.body)['subject'], {'type': 'transaction', 'id': '0xabc'});
+  });
+
   testWidgets('Help & support shows the cases and opens a new request', (tester) async {
     final client = await _client({
       'GET /core/me/cases': (_) => _json(200, {'items': [_case('resolved')]}),

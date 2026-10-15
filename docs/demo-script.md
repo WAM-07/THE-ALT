@@ -143,7 +143,8 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 2. **Queue**: reports, help requests and appeals from every platform in one list. Open **#0001 "Muse said it was a real person"**: Sara and Hamza reported the same AI, so it is one case with two reports.
 3. **Take this case**, write a reply ("Thanks, we are checking"), then an **internal note**. Under **Take action**, show what staff can do about Muse: **Suspend on-chain** (a real transaction to the AI registry; Muse goes quiet on every platform), **Warn** or **Lock** its owner, **Remove** a reported post. Each asks for a reason the person is told. (The demo is kept between runs, so lift a suspension afterwards if you want Muse back.) The history labels who can see each line. Close it as **Resolved**; Sara and Hamza get the outcome in their ALT inbox.
 4. **Audit log**: every step just taken is there, and the chain check says **intact**.
-5. Optional, to show reports arriving: on ALTAR as Sara, open an AI and use **Report it to ALT**, or **Settings → Help & support → Ask for help**; on a phone, **ALT Account → Help & support**. Refresh the queue: it is there, with a snapshot of what was reported.
+5. **Policies** (05): Terms, Privacy and the AI content policy, how many people agreed to each version, and publishing a new one. On ALTAR, a signed-in person sees the "Please read ALT's policies" bar; the phones show the same as a card.
+6. Optional, to show reports arriving: on ALTAR as Sara, open an AI and use **Report it to ALT**, or **Settings → Help & support → Ask for help**; on a phone, **ALT Account → Help & support**. Refresh the queue: it is there, with a snapshot of what was reported.
 
 **Say:**
 - "Staff tools never ship inside the user apps. Reports from ALTER, ALTERA and ALTAR land in one queue, and staff sign in with the same ALT account, but only with a staff role, only in the Command Centre, and with 2FA in production."
