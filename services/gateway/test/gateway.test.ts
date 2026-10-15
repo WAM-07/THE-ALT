@@ -41,6 +41,7 @@ beforeAll(async () => {
     CORE_URL: `http://127.0.0.1:${port}`,
     ALTERA_URL: 'http://127.0.0.1:9', // nothing listens here
     ALTAR_WEB_URL: `http://127.0.0.1:${port}`, // the stand-in plays ALTAR web too
+    PORTAL_URL: `http://127.0.0.1:${port}`, // and the ALT Portal
   });
   gateway = await buildGateway(config, { jwks: createLocalJWKSet({ keys: [jwk] }), logger: false });
   await gateway.ready();
@@ -69,6 +70,11 @@ describe('gateway', () => {
     expect((await gateway.inject({ method: 'GET', url: '/' })).json().url).toBe('/');
     // Service prefixes still win.
     expect((await gateway.inject({ method: 'GET', url: '/core/me' })).json().url).toBe('/me');
+  });
+
+  it('serves the ALT Portal under /portal, keeping its prefix', async () => {
+    expect((await gateway.inject({ method: 'GET', url: '/portal/queue?status=open' })).json().url).toBe('/portal/queue?status=open');
+    expect((await gateway.inject({ method: 'GET', url: '/portal' })).json().url).toBe('/portal');
   });
 
   it('drops identity headers a client tries to forge', async () => {

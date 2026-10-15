@@ -51,6 +51,7 @@ apps/
   alter              ALTER: Flutter app (personal AI)
   altera             ALTERA: Flutter app (social network)
   altar-web          ALTAR: Next.js website (marketplace)
+  alt-portal         the ALT Portal: staff website at /portal (moderation, support, people, audit)
 services/
   gateway            single entry point: routing, token checks, rate limits, WebSockets
   core               ALT Core API: accounts, AIs, chain, notifications (TypeScript, Fastify, PostgreSQL)

@@ -328,6 +328,15 @@ export async function seedDemo({ gateway, log = console.log }) {
   log('an announcement from the ALT team to everyone…');
   await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
 
+  // The ALT Portal (/portal) opens on a queue with real work in it: two people report the same AI
+  // (one case, two reports), a help request and an appeal. Sign in there as admin@demo.alt.
+  log('a few cases for the ALT Portal…');
+  const aiReport = { kind: 'report', category: 'impersonation', title: 'Muse said it was a real person', subject: { type: 'ai', id: museAi.id } };
+  await call('POST', '/core/me/cases', t.sara, { ...aiReport, body: 'I asked if it was an AI and it said no, it is Ayesha herself.' });
+  await call('POST', '/core/me/cases', t.hamza, { ...aiReport, body: 'Same here: it claimed to be human in our chat.' });
+  await call('POST', '/core/me/cases', t.hamza, { kind: 'support', category: 'billing', title: 'Was my rental charged twice?', body: 'My wallet shows two payments for Urdu Ustad on the same day.' });
+  await call('POST', '/core/me/cases', t.wamiq, { kind: 'appeal', category: 'moderation', title: 'A post by my AI was blocked by mistake', body: 'It quoted a Faiz poem; there was nothing harmful in it.' });
+
   log(`demo data ready in ${Math.round((Date.now() - started) / 1000)} s`);
   return { wamiqAi, museAi };
 }

@@ -9,7 +9,7 @@ import { tx } from '../../db.js';
 import { audit, verifyAuditChain } from '../../lib/audit.js';
 import { notFound } from '../../lib/errors.js';
 import { findUserByHandle, findUserById, handleTaken, parseRoles, publicProfile, type UserRow } from '../../modules/accounts/users.js';
-import { requireRole, requireService } from '../auth-guard.js';
+import { requireAnyRole, requireRole, requireService } from '../auth-guard.js';
 import { Handle } from '../schemas.js';
 
 const MEDIA_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
@@ -75,6 +75,8 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
   // ---------------------------------------------------------------- admin
 
   const admin = requireRole(ctx, 'admin');
+  // Auditors read the audit log too (the ALT Portal's audit page); only admins change anything.
+  const auditReader = requireAnyRole(ctx, ['admin', 'auditor']);
 
   r.get(
     '/admin/users',
@@ -137,29 +139,34 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
   r.get(
     '/admin/audit',
     {
-      preHandler: admin,
+      preHandler: auditReader,
       schema: {
         tags: ['admin'],
-        summary: 'Recent audit log entries',
+        summary: 'Audit log entries, newest first (before = an entry id, to page back)',
         querystring: z.object({
           userId: z.uuid().optional(),
           action: z.string().max(80).optional(),
+          entityId: z.string().max(200).optional(),
+          before: z.coerce.number().int().positive().optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
       },
     },
     async (req) => {
+      const q = req.query;
       const { rows } = await ctx.db.query(
-        `SELECT id, occurred_at, actor_user_id, actor_service, action, entity_type, entity_id, ip, data, hash FROM core.audit_log
-          WHERE ($1::uuid IS NULL OR actor_user_id = $1) AND ($2::text IS NULL OR action LIKE $2 || '%')
-          ORDER BY id DESC LIMIT $3`,
-        [req.query.userId ?? null, req.query.action ?? null, req.query.limit],
+        `SELECT a.id, a.occurred_at, a.actor_user_id, u.handle AS actor_handle, a.actor_service, a.action, a.entity_type, a.entity_id, a.ip, a.data, a.hash
+           FROM core.audit_log a LEFT JOIN core.users u ON u.id = a.actor_user_id
+          WHERE ($1::uuid IS NULL OR a.actor_user_id = $1) AND ($2::text IS NULL OR a.action LIKE $2 || '%')
+            AND ($3::text IS NULL OR a.entity_id = $3) AND ($4::bigint IS NULL OR a.id < $4)
+          ORDER BY a.id DESC LIMIT $5`,
+        [q.userId ?? null, q.action ?? null, q.entityId ?? null, q.before ?? null, q.limit],
       );
       return rows;
     },
   );
 
-  r.get('/admin/audit/verify', { preHandler: admin, schema: { tags: ['admin'], summary: 'Re-check the audit log hash chain' } }, async () =>
+  r.get('/admin/audit/verify', { preHandler: auditReader, schema: { tags: ['admin'], summary: 'Re-check the audit log hash chain' } }, async () =>
     verifyAuditChain(ctx.db),
   );
 

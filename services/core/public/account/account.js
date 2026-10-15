@@ -13,7 +13,7 @@
 (() => {
   'use strict';
 
-  const PLATFORMS = { alter: 'ALTER', altera: 'ALTERA', altar: 'ALTAR' };
+  const PLATFORMS = { alter: 'ALTER', altera: 'ALTERA', altar: 'ALTAR', admin: 'ALT Portal' };
   const q = new URLSearchParams(location.search);
   const platform = PLATFORMS[q.get('platform')] ? q.get('platform') : null;
   const returnMode = ['popup', 'app', 'redirect'].includes(q.get('return')) ? q.get('return') : 'redirect';

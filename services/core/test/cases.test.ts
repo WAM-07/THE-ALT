@@ -88,6 +88,11 @@ describe('the ALT Portal case queue (M3)', () => {
     expect((await t.app.inject({ method: 'GET', url: `/staff/cases/${helpId}`, headers: auth(aud.token) })).statusCode).toBe(200);
     const audAssign = await t.app.inject({ method: 'POST', url: `/staff/cases/${helpId}/assign`, headers: auth(aud.token), payload: {} });
     expect(audAssign.json().error.code).toBe('NOT_YOUR_QUEUE');
+    // The portal's audit page: auditors and admins read the log, nobody else.
+    expect((await t.app.inject({ method: 'GET', url: '/admin/audit/verify', headers: auth(aud.token) })).json().ok).toBe(true);
+    const caseLog = await t.app.inject({ method: 'GET', url: `/admin/audit?action=case.&entityId=${helpId}`, headers: auth(aud.token) });
+    expect(caseLog.json()).toMatchObject([{ action: 'case.opened', entity_id: helpId, actor_handle: someone.handle }]);
+    expect((await t.app.inject({ method: 'GET', url: '/admin/audit', headers: auth(mod.token) })).statusCode).toBe(403);
 
     // Support answers; the person sees "ALT", replies, and the case comes back to the queue.
     await t.app.inject({ method: 'POST', url: `/staff/cases/${helpId}/assign`, headers: auth(sup.token), payload: {} });

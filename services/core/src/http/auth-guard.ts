@@ -46,6 +46,15 @@ export function requireRole(ctx: Ctx, role: Role) {
   };
 }
 
+/** Like requireRole, for routes several roles may use (e.g. the audit log: admins and auditors). */
+export function requireAnyRole(ctx: Ctx, roles: Role[]) {
+  const user = requireUser(ctx);
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    await user(req, reply);
+    if (!req.auth!.roles.some((r) => roles.includes(r))) throw forbidden();
+  };
+}
+
 /**
  * preHandler for the ALT Portal's /staff routes: a staff role, a session signed in to the portal
  * itself (platform 'admin', so a token from a phone app can't be used here) and, when configured,

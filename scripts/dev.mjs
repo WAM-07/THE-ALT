@@ -21,7 +21,7 @@ const dataDir = path.join(root, '.data');
 const args = new Set(process.argv.slice(2));
 const require = createRequire(import.meta.url);
 
-const colors = { core: 36, gateway: 35, altera: 33, altar: 32, 'altar-web': 92, postgres: 34, chain: 94, dev: 37 };
+const colors = { core: 36, gateway: 35, altera: 33, altar: 32, 'altar-web': 92, portal: 96, postgres: 34, chain: 94, dev: 37 };
 const tag = (name) => `\x1b[${colors[name] ?? 37}m${name.padEnd(8)}\x1b[0m`;
 const say = (msg) => console.log(`${tag('dev')} ${msg}`);
 const fail = (msg) => {
@@ -58,6 +58,7 @@ const ports = {
   altera: Number(process.env.ALTERA_PORT || 4100),
   altar: Number(process.env.ALTAR_PORT || 4200),
   altarWeb: Number(process.env.ALTAR_WEB_PORT || 4300),
+  portal: Number(process.env.PORTAL_PORT || 4400),
 };
 process.env.ALT_PUBLIC_URL ||= `http://localhost:${ports.gateway}`;
 
@@ -218,6 +219,7 @@ const services = [
       ...(existsSync(path.join(root, 'services', 'altera-api', 'migrations')) ? { ALTERA_URL: `http://127.0.0.1:${ports.altera}` } : {}),
       ALTAR_URL: `http://127.0.0.1:${ports.altar}`,
       ALTAR_WEB_URL: `http://127.0.0.1:${ports.altarWeb}`,
+      PORTAL_URL: `http://127.0.0.1:${ports.portal}`,
     },
     health: `http://127.0.0.1:${ports.gateway}/health`,
   },
@@ -249,6 +251,15 @@ services.push({
   cmd: [process.execPath, require.resolve('next/dist/bin/next'), 'dev', '-p', String(ports.altarWeb), '-H', '127.0.0.1'],
   env: { NEXT_TELEMETRY_DISABLED: '1', ALTAR_DEV_ORIGINS: ['localhost', '127.0.0.1', lanIp].filter(Boolean).join(',') },
   health: `http://127.0.0.1:${ports.altarWeb}/`,
+});
+
+// The ALT Portal (Next.js, staff only): http://localhost:8080/portal
+services.push({
+  name: 'portal',
+  cwd: path.join(root, 'apps', 'alt-portal'),
+  cmd: [process.execPath, require.resolve('next/dist/bin/next'), 'dev', '-p', String(ports.portal), '-H', '127.0.0.1'],
+  env: { NEXT_TELEMETRY_DISABLED: '1', PORTAL_DEV_ORIGINS: ['localhost', '127.0.0.1', lanIp].filter(Boolean).join(',') },
+  health: `http://127.0.0.1:${ports.portal}/portal`,
 });
 
 /** Turns pino JSON lines into short readable ones. */

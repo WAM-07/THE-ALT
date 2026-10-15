@@ -18,6 +18,8 @@ const EnvSchema = z.object({
   ALTERA_URL: z.url().optional(),
   ALTAR_URL: z.url().optional(),
   ALTAR_WEB_URL: z.url().optional(),
+  // The ALT Portal (staff website, Next.js with basePath /portal).
+  PORTAL_URL: z.url().optional(),
   CORS_ORIGINS: z.string().optional(),
   GATEWAY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(600),
   // Long enough for an AI reply, including Core falling back from one LLM provider to the next.
@@ -41,6 +43,7 @@ export function loadGatewayConfig(env: Record<string, string | undefined> = proc
     publicUrl: e.ALT_PUBLIC_URL.replace(/\/$/, ''),
     coreUrl: e.CORE_URL.replace(/\/$/, ''),
     altarWebUrl: e.ALTAR_WEB_URL,
+    portalUrl: e.PORTAL_URL,
     upstreams,
     corsOrigins: list(e.CORS_ORIGINS),
     rateLimitPerMinute: e.GATEWAY_RATE_LIMIT_PER_MINUTE,
@@ -201,6 +204,18 @@ export async function buildGateway(config: GatewayConfig, opts: { jwks?: JWTVeri
   app.server.on('upgrade', (_req, socket) => {
     socket.on('error', (err) => app.log.debug({ err }, 'websocket client went away'));
   });
+
+  if (config.portalUrl) {
+    // The ALT Portal keeps its /portal prefix: Next.js serves it under that basePath.
+    await app.register(proxy, {
+      upstream: config.portalUrl,
+      prefix: '/portal',
+      rewritePrefix: '/portal',
+      httpMethods: ['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'],
+      websocket: true,
+      replyOptions: { onError: upstreamError('portal') },
+    });
+  }
 
   if (config.altarWebUrl) {
     // ALTAR web is the public face of the ecosystem; everything not matched above goes to it.

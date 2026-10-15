@@ -1,0 +1,21 @@
+{
+  "name": "@alt/alt-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The ALT Portal: the staff website for moderation, support, people and the audit log. Runs behind the gateway at /portal.",
+  "scripts": {
+    "dev": "next dev -p 4400",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "next": "16.4.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "eslint": "^9",
+    "eslint-config-next": "16.4.0"
+  }
+}

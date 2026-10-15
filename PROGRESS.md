@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 94 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 94 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -484,7 +484,14 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - **Filing:** people use `POST /me/cases` (support, report, dispute, appeal; 10 an hour), services `POST /internal/cases` (service key; reports for a person and automatic flags, with an evidence snapshot). Reports about the same post merge into one case (three or more make it high priority; the same person counts once); reports about a person or an AI merge across apps.
     - **People** see their cases at `/me/cases` with their own messages and ALT's replies (signed "ALT", never a staff name, never another reporter's words), answer with `…/messages`, and get the reply and the outcome in their inbox.
     - Tests: `cases.test.ts` (Core 94). Checked on the live demo: Hamza's help request from ALTERA reached the admin's queue.
-  - [ ] P2. The portal website (`apps/alt-portal`, Next.js): staff sign-in through the ALT window, dashboard, case queue and case page, people and roles, audit log with its hash-chain check.
+  - [x] P2. The portal website (`apps/alt-portal`, Next.js 16, at `localhost:8080/portal`; `npm run dev` starts it on port 4400, `PORTAL_PORT`).
+    - **Design "control room"**, unlike the user apps (owner's request): flat and square, graphite and cool grey, a black side rail, IBM Plex Sans and Mono, one ultramarine accent, red and amber only for priority; light and dark; the rail becomes a top strip on phones (checked at 390px and 320px, no sideways scroll).
+    - **Sign-in:** "Continue with ALT" opens the ALT Account window ("to continue to ALT Portal"; `platform=admin`), which hands back a one-time code; the session lives in the tab's memory only. People without a staff role see "This account isn't staff".
+    - **Pages:** Overview (open, unassigned, yours, high priority, oldest open; by kind and status; next up; audit chain check), Queue (status tabs, kind, platform, assignee and search filters; `j`/`k`/`Enter`/`/` keys), Case (full history with who-can-see-it labels and evidence; reply or internal note; take, status, priority, close as resolved or dismissed, reopen), People (admins: search accounts, give or take roles, clear lockouts), Audit log (admins and auditors: filter, page back, entry details, chain status), plus a jump-to-case box.
+    - **Core:** the audit log is readable by auditors too, filters by entity and pages back (`/admin/audit`); the ALT window knows the portal; handoffs for `admin` return to `/portal/handoff`. **Gateway:** `/portal` goes to the portal with its prefix kept (`PORTAL_URL`; test).
+    - **Demo:** the seed files four cases (two reports of Muse merged into one, a billing question, an appeal); `docs/demo-script.md` has **Scene 10**.
+    - **Checked** in headless Chrome against the live demo: popup sign-in as `admin@demo.alt`, every page, taking a case, a reply and a note, light and dark, 390px and 320px. Tests: Core 94, gateway 10; `eslint` and `next build` pass.
+    - **Not yet:** the session ends on reload (a portal-only httpOnly cookie needs Core's sign-in routes, `auth.ts`, which are on the don't-touch list; ask before changing); actions such as suspending an AI come in P4.
   - [ ] P3. Platforms report in: ALTERA's reports and AI anomaly flags, Core's moderation blocks, ALTAR review reports, and **Help & support** in the apps (shared screen in `alt_account`) and on ALTAR.
   - [ ] P4. Actions from a case: suspend or unsuspend an AI on the chain, remove a post, comment or review (through its service), warn a person, lock an account; the reporter hears the outcome in their inbox.
   - [ ] P5. Policies (versioned Terms, Privacy, AI content policy, with acceptance records), marketplace disputes and appeals.
@@ -511,6 +518,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **The ALT sign-in card:** "Continue with ALTER/ALTERA" can't show the other app's account name before you tap it (apps can't read each other's data); it says which app, and that app shows the account when it asks you to confirm. Remembered accounts are per app (name, handle, email, picture in encrypted storage). The apps target Android only (owner, 2026-10-15); iOS is out of scope.
 - **Push notifications need the owner's Firebase project** (see C3: `google-services.json` for each app and `FCM_SERVICE_ACCOUNT`). Until then the ALT inbox is live only while an app is open. One Core instance sends the pushes (each instance listens, so several would send duplicates).
+- **The ALT Portal's session ends when its tab is reloaded or closed** (memory only, on purpose for now; see P2).
 - **"Training" means building a version:** persona, consented data and approved memories, frozen and hashed. Text files and PDFs are read, with BM25 retrieval over passages; embeddings and evaluation come later. Images, voice notes and scanned PDFs (no text layer) are stored but not read yet. PDFs uploaded before 2026-10-15 need uploading again to be read.
 - **The local chain resets on every `npm run dev`.** Core re-mints the tokens recorded in the database onto it, so verified AIs stay verified. Token transfers and rentals on the old chain are not replayed. Use `npm run dev -- --reset-db` for a clean slate, or `CHAIN_MODE=amoy` for a persistent chain.
 - **Google sign-in** works in Core but the apps hide the button until `GOOGLE_CLIENT_IDS` (Core) and `GOOGLE_SERVER_CLIENT_ID` (app) are configured and the `google_sign_in` plugin is added.

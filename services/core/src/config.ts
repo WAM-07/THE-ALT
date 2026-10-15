@@ -149,7 +149,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       alter: e.DEEP_LINK_ALTER,
       altera: e.DEEP_LINK_ALTERA,
       altar: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/handoff`,
-      admin: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/admin/handoff`,
+      admin: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/portal/handoff`,
     },
   };
 }
