@@ -4,7 +4,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import type { Ctx } from '../../context.js';
+import { ALL_ROLES, type Ctx } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit, verifyAuditChain } from '../../lib/audit.js';
 import { notFound } from '../../lib/errors.js';
@@ -106,7 +106,7 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
         tags: ['admin'],
         summary: 'Set a user’s roles',
         params: z.object({ id: z.uuid() }),
-        body: z.object({ roles: z.array(z.enum(['creator', 'consumer', 'participant', 'admin'])).min(1) }),
+        body: z.object({ roles: z.array(z.enum(ALL_ROLES)).min(1) }),
       },
     },
     async (req) => {

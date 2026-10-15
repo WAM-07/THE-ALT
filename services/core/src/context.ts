@@ -30,5 +30,7 @@ export const PLATFORMS = ['alter', 'altera', 'altar', 'admin'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 export const SELF_ROLES = ['creator', 'consumer', 'participant'] as const;
-export const ALL_ROLES = [...SELF_ROLES, 'admin'] as const;
+// Staff roles (the ALT Portal): admin manages everything; moderators handle reports and flags,
+// support handles requests and disputes, auditors only read.
+export const ALL_ROLES = [...SELF_ROLES, 'admin', 'moderator', 'support', 'auditor'] as const;
 export type Role = (typeof ALL_ROLES)[number];

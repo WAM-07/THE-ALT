@@ -46,6 +46,25 @@ export function requireRole(ctx: Ctx, role: Role) {
   };
 }
 
+/**
+ * preHandler for the ALT Portal's /staff routes: a staff role, a session signed in to the portal
+ * itself (platform 'admin', so a token from a phone app can't be used here) and, when configured,
+ * 2FA on the account.
+ */
+export function requireStaff(ctx: Ctx) {
+  const user = requireUser(ctx);
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    await user(req, reply);
+    const a = req.auth!;
+    if (!a.roles.some((r) => r === 'admin' || r === 'moderator' || r === 'support' || r === 'auditor')) throw forbidden();
+    if (a.platform !== 'admin') throw forbidden('PORTAL_SESSION_REQUIRED', 'Sign in to the ALT Portal to do this.');
+    if (ctx.config.staffRequire2fa) {
+      const { rows } = await ctx.db.query<{ two_fa_enabled: boolean }>('SELECT two_fa_enabled FROM core.users WHERE id = $1', [a.userId]);
+      if (!rows[0]?.two_fa_enabled) throw forbidden('STAFF_2FA_REQUIRED', 'Turn on two-factor authentication to use the ALT Portal.');
+    }
+  };
+}
+
 /** preHandler for /internal routes: only other ALT services, identified by the shared service key. */
 export function requireService(ctx: Ctx) {
   return async (req: FastifyRequest) => {

@@ -676,7 +676,7 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
 | **M9 Training Manager** | A Python FastAPI `trainer` service, as the SDS planned. It runs these steps over consented datasets: <br>1. chunk; <br>2. embed into pgvector; <br>3. synthesise a "style guide" from the owner's chats; <br>4. run an evaluation set; <br>5. produce a version with a readiness score. <br>Retrieval is added to the persona engine. Training progress streams to ALTER. |
 | **M7 Health Score** | Computed from `interaction_log`: latency, moderation hits, user ratings, consistency against the version's evaluation set, and drift between versions. The score drives ranking and badges on ALTAR and ALTERA. It replaces ALTERA's "−10 per report" rule. |
 | **M18 Creator Control Panel** | Built on real data: earnings and royalties (from `altar`), engagement (from `altera`), health and versions (from `core`). It includes pricing and licensing management and CSV/PDF export. This replaces ALTERA's mocked panel. |
-| **M3 Admin & Governance** | `/admin` in `altar-web`. Admins can: <br>• review AIs (clearance approval); <br>• suspend or unsuspend AIs on-chain; <br>• moderate the reports queue; <br>• manage users and roles; <br>• manage disputes; <br>• edit policies. <br>A support channel is also included. |
+| **M3 Admin & Governance** | **The ALT Portal** (`apps/alt-portal`, a website at `/portal`; decision 2026-10-15). Staff can: <br>• review AIs (clearance approval); <br>• suspend or unsuspend AIs on-chain; <br>• moderate the reports queue; <br>• manage users and roles; <br>• manage disputes; <br>• edit policies. <br>A support channel is also included. |
 | **M12 completion** | Auctions and licence terms (subscriptions are done: `ALTMarketplace.subscribe`, 2026-10-15). |
 | **M5 completion** | Audit explorer UI, plus periodically anchoring the audit-log hash on-chain. |
 
@@ -715,6 +715,11 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
   - Record any change to section 4 as a short decision note at the bottom of this file, with its date.
 
 ## Decision log
+
+- **2026-10-15 (owner): the ALT Portal.** Admin, moderation, audit, support and policies move out of the user apps into one staff website, the **ALT Portal** (`apps/alt-portal`, Next.js, served by the gateway at `/portal`). It delivers M3 and the review screens of M5 and M16; it is not a new module and the scope is unchanged.
+  - **Why a website, not an app:** staff work at a desk with long tables, logs and side-by-side evidence; it updates without an app store; and staff tools never ship inside the public apps.
+  - **One account system still:** staff sign in with their ALT account; Core adds staff roles (`moderator`, `support`, `auditor`, beside `admin`). Staff routes (`/staff/...`) accept only sessions signed in to the portal (platform `admin`) and, in production, only accounts with 2FA.
+  - **One queue:** reports, automatic flags, support requests, disputes and appeals from all three platforms become **cases** in Core (`core.cases`). Services file them through `POST /internal/cases`; people through `/me/cases`. Each service still owns its data: removing an ALTERA post is ALTERA's job, asked for by Core.
 
 - **2026-10-11 (owner review after build day 4):**
   - Work proceeds one reviewed step at a time.

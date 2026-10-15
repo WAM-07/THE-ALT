@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 90 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 94 · gateway 9 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -477,6 +477,17 @@ Work one step at a time, then stop for the owner's review before starting the ne
     - **Core:** `core.push_devices` (migration `0007`); `PUT /me/push-devices` registers a phone, `POST /push-devices/forget` (the phone's own token) stops it after sign-out; every committed inbox item goes to the person's phones through FCM HTTP v1 (`lib/push.ts`, signed with `FCM_SERVICE_ACCOUNT`); phones Firebase reports gone are forgotten. Tests: `push.test.ts` with a stand-in Google.
     - **Apps:** `AltPush` (`alt_account`) starts Firebase only when the build has `google-services.json`, asks for permission (Android 13+), registers the phone for whoever is signed in and forgets it on sign-out; tapping a push opens the inbox (ALTER) or Notifications (ALTERA). The Google Services Gradle plugin is applied only when that file exists, so builds without it are unchanged.
     - **To switch it on:** (1) Firebase console → new project → add two Android apps, `com.altecosystem.alter` and `com.alteraapp.altera_app`; put each `google-services.json` in `apps/alter/android/app/` and `apps/altera/android/app/` (git-ignored). (2) Project settings → Service accounts → Generate new private key; save the JSON outside the repo and set `FCM_SERVICE_ACCOUNT=<path to it>` in `.env`. (3) Restart `npm run dev` and rebuild the apps.
+- **The ALT Portal (M3, with M5 and M16 review screens; owner's go 2026-10-15).** A staff website at `/portal`; see ROADMAP's decision log. One step at a time, each reviewed:
+  - [x] P1. Core: staff roles and the case queue (migration `0008`, `modules/cases/cases.ts`, `http/routes/cases.ts`).
+    - **Roles:** `moderator` (reports, flags, appeals), `support` (requests, disputes), `auditor` (reads everything, changes nothing), beside `admin` (everything). Only admins give or take them (`PUT /admin/users/:id/roles`); `PUT /me/roles` keeps them.
+    - **Staff routes** (`/staff/me`, `/staff/summary`, `/staff/cases`, `/staff/cases/:id`, `…/assign`, `…/notes`, `…/reply`, `PATCH …`, `…/resolve`) need a staff role **and a session signed in to the portal** (platform `admin`), and 2FA when `STAFF_REQUIRE_2FA` is on (default: production only). Staff can't handle a case they opened, reported or that is about them (`CONFLICT_OF_INTEREST`). Every change is in the case history and the audit log.
+    - **Filing:** people use `POST /me/cases` (support, report, dispute, appeal; 10 an hour), services `POST /internal/cases` (service key; reports for a person and automatic flags, with an evidence snapshot). Reports about the same post merge into one case (three or more make it high priority; the same person counts once); reports about a person or an AI merge across apps.
+    - **People** see their cases at `/me/cases` with their own messages and ALT's replies (signed "ALT", never a staff name, never another reporter's words), answer with `…/messages`, and get the reply and the outcome in their inbox.
+    - Tests: `cases.test.ts` (Core 94). Checked on the live demo: Hamza's help request from ALTERA reached the admin's queue.
+  - [ ] P2. The portal website (`apps/alt-portal`, Next.js): staff sign-in through the ALT window, dashboard, case queue and case page, people and roles, audit log with its hash-chain check.
+  - [ ] P3. Platforms report in: ALTERA's reports and AI anomaly flags, Core's moderation blocks, ALTAR review reports, and **Help & support** in the apps (shared screen in `alt_account`) and on ALTAR.
+  - [ ] P4. Actions from a case: suspend or unsuspend an AI on the chain, remove a post, comment or review (through its service), warn a person, lock an account; the reporter hears the outcome in their inbox.
+  - [ ] P5. Policies (versioned Terms, Privacy, AI content policy, with acceptance records), marketplace disputes and appeals.
 - **Later (owner, 2026-10-15), not now:**
   - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
   - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.

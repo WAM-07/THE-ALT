@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import type { Ctx } from '../../context.js';
+import { SELF_ROLES, type Ctx } from '../../context.js';
 import { tx } from '../../db.js';
 import { audit, publish } from '../../lib/audit.js';
 import { notify } from '../../lib/notify.js';
@@ -188,13 +188,15 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
       preHandler: authed,
       schema: {
         tags: ['account'],
-        summary: 'Choose creator / consumer / participant roles (admin is assigned by admins)',
+        summary: 'Choose creator / consumer / participant roles (staff roles are assigned by admins)',
         body: z.object({ roles: z.array(SelfRole).min(1).max(3) }),
       },
     },
     async (req) => {
       const user = await current(req.auth!.userId);
-      const next = [...new Set([...req.body.roles, ...(user.roles.includes('admin') ? (['admin'] as const) : [])])];
+      // Staff roles are kept: only an admin can give or take them.
+      const staff = user.roles.filter((r) => !(SELF_ROLES as readonly string[]).includes(r));
+      const next = [...new Set([...req.body.roles, ...staff])];
       await tx(ctx.db, async (client) => {
         await client.query('UPDATE core.users SET roles = $2::core.user_role[] WHERE id = $1', [user.id, next]);
         await audit(client, { action: 'account.roles_changed', actorUserId: user.id, entityType: 'user', entityId: user.id, ip: req.ip, data: { from: user.roles, to: next } });

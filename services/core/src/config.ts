@@ -38,6 +38,8 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  // Staff must have 2FA on to use the ALT Portal. Defaults to on in production.
+  STAFF_REQUIRE_2FA: z.enum(['true', 'false']).optional(),
   // Blockchain (Module 17). Leave CHAIN_RPC_URL blank to run without a chain.
   CHAIN_RPC_URL: z.string().optional(),
   CHAIN_ID: z.coerce.number().int().positive().optional(),
@@ -106,6 +108,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     corsOrigins: list(e.CORS_ORIGINS),
     storageDir: e.STORAGE_DIR,
     rateLimitEnabled: e.RATE_LIMIT_ENABLED,
+    staffRequire2fa: e.STAFF_REQUIRE_2FA ? e.STAFF_REQUIRE_2FA === 'true' : e.NODE_ENV === 'production',
     chain: chainOn
       ? {
           rpcUrl: e.CHAIN_RPC_URL!,

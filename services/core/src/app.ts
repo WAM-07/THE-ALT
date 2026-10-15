@@ -21,6 +21,7 @@ import { notificationRoutes } from './http/routes/notifications.js';
 import { accountPageRoutes } from './http/routes/account-page.js';
 import { avatarRoutes } from './http/routes/avatars.js';
 import { walletRoutes } from './http/routes/wallet.js';
+import { caseRoutes } from './http/routes/cases.js';
 import { conversationRoutes } from './http/routes/conversations.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
@@ -179,6 +180,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => avatarRoutes(i, ctx));
   await app.register(async (i) => walletRoutes(i, ctx));
   await app.register(async (i) => conversationRoutes(i, ctx));
+  await app.register(async (i) => caseRoutes(i, ctx));
 
   return app;
 }
