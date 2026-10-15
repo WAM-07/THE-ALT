@@ -1,7 +1,7 @@
-// The ALT Portal's only way to talk to ALT: ALT Core through the gateway, on the same origin.
+// The ALT Command Centre's only way to talk to ALT: ALT Core through the gateway, on the same origin.
 //
 // Staff sessions live in this tab's memory and nowhere else (no cookie, no storage): reloading or
-// closing the tab signs out. The portal signs in through the ALT Account window as platform
+// closing the tab signs out. The Command Centre signs in through the ALT Account window as platform
 // "admin", which is the only kind of session Core's /staff routes accept.
 
 let session = null; // { accessToken, refreshToken, sessionId, user }
@@ -95,7 +95,7 @@ export async function api(path, opts = {}) {
 const deviceName = () => {
   const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
   const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "browser";
-  return `ALT Portal (${browser})`;
+  return `ALT Command Centre (${browser})`;
 };
 
 /** Turns a one-time code from the ALT Account window into this tab's staff session. */
@@ -104,9 +104,9 @@ export async function redeemHandoff(code) {
 }
 
 /**
- * Opens the ALT Account window as a popup ("to continue to ALT Portal"): password and 2FA happen
+ * Opens the ALT Account window as a popup ("to continue to ALT Command Centre"): password and 2FA happen
  * there, and it posts back a one-time code. If popups are blocked, it opens full-page and returns
- * through /portal/handoff. Resolves to the session, or null if the window was closed.
+ * through /command/handoff. Resolves to the session, or null if the window was closed.
  */
 export function signIn() {
   const state = crypto.randomUUID();

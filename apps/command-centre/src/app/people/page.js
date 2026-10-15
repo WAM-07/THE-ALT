@@ -146,7 +146,7 @@ function RoleEditor({ u, self, locked, reload }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 4 }}>
         {ROLES.map((r) => (
           <label key={r} className="check" style={{ margin: 0 }}>
-            {/* An admin can't remove their own admin role here, so the portal is never left without one by accident. */}
+            {/* An admin can't remove their own admin role here, so the Command Centre is never left without one by accident. */}
             <input type="checkbox" checked={roles.includes(r)} disabled={busy || (self && r === "admin")} onChange={() => toggle(r)} />
             <span>
               <b className="mono" style={{ fontWeight: 500 }}>

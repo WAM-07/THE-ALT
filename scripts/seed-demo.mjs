@@ -328,9 +328,9 @@ export async function seedDemo({ gateway, log = console.log }) {
   log('an announcement from the ALT team to everyone…');
   await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
 
-  // The ALT Portal (/portal) opens on a queue with real work in it: two people report the same AI
+  // The ALT Command Centre (/command) opens on a queue with real work in it: two people report the same AI
   // (one case, two reports), a help request and an appeal. Sign in there as admin@demo.alt.
-  log('a few cases for the ALT Portal…');
+  log('a few cases for the ALT Command Centre…');
   const aiReport = { kind: 'report', category: 'impersonation', title: 'Muse said it was a real person', subject: { type: 'ai', id: museAi.id } };
   await call('POST', '/core/me/cases', t.sara, { ...aiReport, body: 'I asked if it was an AI and it said no, it is Ayesha herself.' });
   await call('POST', '/core/me/cases', t.hamza, { ...aiReport, body: 'Same here: it claimed to be human in our chat.' });

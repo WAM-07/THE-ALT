@@ -38,7 +38,7 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
-  // Staff must have 2FA on to use the ALT Portal. Defaults to on in production.
+  // Staff must have 2FA on to use the ALT Command Centre. Defaults to on in production.
   STAFF_REQUIRE_2FA: z.enum(['true', 'false']).optional(),
   // Blockchain (Module 17). Leave CHAIN_RPC_URL blank to run without a chain.
   CHAIN_RPC_URL: z.string().optional(),
@@ -149,7 +149,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       alter: e.DEEP_LINK_ALTER,
       altera: e.DEEP_LINK_ALTERA,
       altar: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/handoff`,
-      admin: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/portal/handoff`,
+      admin: `${e.ALT_PUBLIC_URL.replace(/\/$/, '')}/command/handoff`,
     },
   };
 }

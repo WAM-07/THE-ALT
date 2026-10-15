@@ -1,7 +1,7 @@
 export const KIND = { report: "Report", flag: "Flag", support: "Support", dispute: "Dispute", appeal: "Appeal" };
 export const STATUS = { open: "Open", in_progress: "In progress", waiting: "Waiting on person", resolved: "Resolved", dismissed: "Dismissed" };
 export const PRIORITY = { urgent: "Urgent", high: "High", normal: "Normal", low: "Low" };
-export const PLATFORM = { core: "ALT", alter: "ALTER", altera: "ALTERA", altar: "ALTAR", admin: "Portal" };
+export const PLATFORM = { core: "ALT", alter: "ALTER", altera: "ALTERA", altar: "ALTAR", admin: "Command Centre" };
 export const ROLES = ["admin", "moderator", "support", "auditor", "creator", "consumer", "participant"];
 export const STAFF_ROLES = ["admin", "moderator", "support", "auditor"];
 

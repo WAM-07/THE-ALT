@@ -73,7 +73,7 @@ const STAFF_SELECT = `
     LEFT JOIN core.users su ON su.id = c.subject_user_id
     LEFT JOIN core.users op ON op.id = c.opened_by`;
 
-/** The ALT Portal's case queue (M3): reports, flags, support, disputes and appeals from every platform. */
+/** The ALT Command Centre's case queue (M3): reports, flags, support, disputes and appeals from every platform. */
 export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const authed = requireUser(ctx);
@@ -224,11 +224,11 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
     },
   );
 
-  // ---------------------------------------------------------------- the ALT Portal (staff)
+  // ---------------------------------------------------------------- the ALT Command Centre (staff)
 
   const roles = (req: { auth?: { roles: Role[] } }) => req.auth!.roles;
 
-  r.get('/staff/summary', { preHandler: staff, schema: { tags: ['staff'], summary: 'Queue counts for the portal dashboard' } }, async (req) => {
+  r.get('/staff/summary', { preHandler: staff, schema: { tags: ['staff'], summary: 'Queue counts for the Command Centre dashboard' } }, async (req) => {
     const kinds = visibleKinds(roles(req));
     const { rows } = await ctx.db.query<{ kind: string; status: string; n: string; unassigned: string; mine: string; urgent: string; oldest: Date | null }>(
       `SELECT kind, status, count(*) AS n, count(*) FILTER (WHERE assignee_id IS NULL) AS unassigned,
@@ -459,7 +459,7 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
       }),
   );
 
-  // Kinds are fixed, so the portal can build its filters from this.
+  // Kinds are fixed, so the Command Centre can build its filters from this.
   r.get('/staff/me', { preHandler: staff, schema: { tags: ['staff'], summary: 'What this member of staff may see and do' } }, async (req) => ({
     roles: roles(req).filter((x) => ['admin', 'moderator', 'support', 'auditor'].includes(x)),
     sees: visibleKinds(roles(req)),

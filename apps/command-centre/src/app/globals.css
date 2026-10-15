@@ -1,5 +1,5 @@
 /*
- * ALT Portal: "control room". Flat, square and dense: cool graphite and paper-grey, 1px rules,
+ * ALT Command Centre: "control room". Flat, square and dense: cool graphite and paper-grey, 1px rules,
  * no shadows or rounded cards, IBM Plex Sans for words and IBM Plex Mono for every number, id and
  * label, one electric ultramarine for what you can act on, red and amber only for priority.
  */
@@ -122,7 +122,13 @@ kbd,
   font-size: 13px;
 }
 
-.wordmark span {
+.wordmark small {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   color: var(--rail-muted);
 }
 
@@ -940,8 +946,10 @@ pre.data {
 }
 
 .gate-art .big {
-  font: 600 clamp(48px, 9vw, 120px) / 0.9 var(--font-mono), monospace;
+  font: 600 clamp(40px, 8vw, 112px) / 0.92 var(--font-mono), monospace;
   letter-spacing: -0.04em;
+  text-transform: uppercase;
+  margin-top: 14px;
 }
 
 .gate-art .big span {

@@ -75,7 +75,7 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
   // ---------------------------------------------------------------- admin
 
   const admin = requireRole(ctx, 'admin');
-  // Auditors read the audit log too (the ALT Portal's audit page); only admins change anything.
+  // Auditors read the audit log too (the ALT Command Centre's audit page); only admins change anything.
   const auditReader = requireAnyRole(ctx, ['admin', 'auditor']);
 
   r.get(

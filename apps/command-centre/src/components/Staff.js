@@ -5,7 +5,7 @@ import { api, currentSession, onSession, signIn as openSignIn, signOut as endSes
 const StaffContext = createContext(null);
 
 /**
- * Who is using the portal: their ALT session (this tab only) and what their staff roles let them
+ * Who is using the Command Centre: their ALT session (this tab only) and what their staff roles let them
  * see and do, from Core's /staff/me. state: signedOut | checking | ready | notStaff | error.
  */
 export function StaffProvider({ children }) {

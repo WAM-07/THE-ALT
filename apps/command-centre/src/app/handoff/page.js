@@ -15,7 +15,7 @@ export default function Handoff() {
     started.current = true;
     const code = new URLSearchParams(window.location.search).get("code");
     // Drop the code from the address bar and history straight away.
-    window.history.replaceState(null, "", "/portal/handoff");
+    window.history.replaceState(null, "", "/command/handoff");
     if (!code) return setError("This link is missing its sign-in code.");
     redeemHandoff(code)
       .then(() => router.replace("/"))

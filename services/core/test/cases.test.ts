@@ -17,7 +17,7 @@ afterAll(async () => {
 const login = async (u: { email: string; password: string }, platform = 'admin') =>
   (await t.app.inject({ method: 'POST', url: '/auth/login', payload: { identifier: u.email, password: u.password, platform } })).json().accessToken as string;
 
-/** A person with a staff role, signed in to the portal. */
+/** A person with a staff role, signed in to the Command Centre. */
 async function staffMember(role: 'moderator' | 'support' | 'auditor') {
   const u = await signUp(t);
   const res = await t.app.inject({ method: 'PUT', url: `/admin/users/${u.user.id}/roles`, headers: auth(boss.accessToken), payload: { roles: ['participant', role] } });
@@ -27,7 +27,7 @@ async function staffMember(role: 'moderator' | 'support' | 'auditor') {
 
 const inbox = async (token: string) => (await t.app.inject({ method: 'GET', url: '/notifications', headers: auth(token) })).json().items as { type: string; title: string; body: string }[];
 
-describe('the ALT Portal case queue (M3)', () => {
+describe('the ALT Command Centre case queue (M3)', () => {
   it('merges reports about the same thing into one case, from people and from services', async () => {
     const [a, b, c] = [await signUp(t, { platform: 'altera' }), await signUp(t, { platform: 'altera' }), await signUp(t)];
     const post = `post-${uniq()}`;
@@ -62,7 +62,7 @@ describe('the ALT Portal case queue (M3)', () => {
     expect((await t.app.inject({ method: 'POST', url: '/internal/cases', payload: { kind: 'flag', platform: 'altera', category: 'x_y', title: 'nope' } })).statusCode).toBe(401);
   });
 
-  it('lets staff see only their queues, only from a portal session', async () => {
+  it('lets staff see only their queues, only from a Command Centre session', async () => {
     const someone = await signUp(t);
     const helpReq = await t.app.inject({ method: 'POST', url: '/me/cases', headers: auth(someone.accessToken), payload: { kind: 'support', category: 'billing', title: 'Charged twice', body: 'My rental was charged twice.' } });
     expect(helpReq.statusCode).toBe(201);
@@ -76,7 +76,7 @@ describe('the ALT Portal case queue (M3)', () => {
     expect((await t.app.inject({ method: 'GET', url: '/staff/summary', headers: auth(someone.accessToken) })).statusCode).toBe(403);
     // A staff member's token from a phone app is not enough.
     const fromApp = await t.app.inject({ method: 'GET', url: '/staff/summary', headers: auth(await login(mod, 'altera')) });
-    expect(fromApp.json().error.code).toBe('PORTAL_SESSION_REQUIRED');
+    expect(fromApp.json().error.code).toBe('COMMAND_SESSION_REQUIRED');
 
     expect((await t.app.inject({ method: 'GET', url: '/staff/me', headers: auth(mod.token) })).json()).toMatchObject({ roles: ['moderator'], handles: ['report', 'flag', 'appeal'] });
     expect((await t.app.inject({ method: 'GET', url: `/staff/cases/${helpId}`, headers: auth(mod.token) })).statusCode).toBe(404);
@@ -88,7 +88,7 @@ describe('the ALT Portal case queue (M3)', () => {
     expect((await t.app.inject({ method: 'GET', url: `/staff/cases/${helpId}`, headers: auth(aud.token) })).statusCode).toBe(200);
     const audAssign = await t.app.inject({ method: 'POST', url: `/staff/cases/${helpId}/assign`, headers: auth(aud.token), payload: {} });
     expect(audAssign.json().error.code).toBe('NOT_YOUR_QUEUE');
-    // The portal's audit page: auditors and admins read the log, nobody else.
+    // The Command Centre's audit page: auditors and admins read the log, nobody else.
     expect((await t.app.inject({ method: 'GET', url: '/admin/audit/verify', headers: auth(aud.token) })).json().ok).toBe(true);
     const caseLog = await t.app.inject({ method: 'GET', url: `/admin/audit?action=case.&entityId=${helpId}`, headers: auth(aud.token) });
     expect(caseLog.json()).toMatchObject([{ action: 'case.opened', entity_id: helpId, actor_handle: someone.handle }]);

@@ -1,8 +1,8 @@
 {
-  "name": "@alt/alt-portal",
+  "name": "@alt/command-centre",
   "version": "0.1.0",
   "private": true,
-  "description": "The ALT Portal: the staff website for moderation, support, people and the audit log. Runs behind the gateway at /portal.",
+  "description": "The ALT Command Centre: the staff website for moderation, support, people and the audit log. Runs behind the gateway at /command.",
   "scripts": {
     "dev": "next dev -p 4400",
     "build": "next build",

@@ -136,15 +136,15 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 - "Royalties are enforced by the token itself: when an AI is resold, rented or subscribed to by a later owner, its creator is paid automatically."
 - "Reviews come only from people the chain shows actually bought, rented or subscribed."
 
-### Scene 10: the ALT Portal, where staff work (1.5 minutes). Modules 3, 5 and 16
-**Show (browser, `localhost:8080/portal`):**
-1. **Continue with ALT** and sign in as `admin@demo.alt` in the ALT window ("to continue to ALT Portal"). The overview: open cases, unassigned, high priority, oldest open.
+### Scene 10: the ALT Command Centre, where staff work (1.5 minutes). Modules 3, 5 and 16
+**Show (browser, `localhost:8080/command`):**
+1. **Continue with ALT** and sign in as `admin@demo.alt` in the ALT window ("to continue to ALT Command Centre"). The overview: open cases, unassigned, high priority, oldest open.
 2. **Queue**: reports, help requests and appeals from every platform in one list. Open **#0001 "Muse said it was a real person"**: Sara and Hamza reported the same AI, so it is one case with two reports.
 3. **Take this case**, write a reply ("Thanks, we are checking"), then an **internal note**. The history labels who can see each line. Close it as **Resolved**; Sara and Hamza get the outcome in their ALT inbox.
 4. **Audit log**: every step just taken is there, and the chain check says **intact**.
 
 **Say:**
-- "Staff tools never ship inside the user apps. Reports from ALTER, ALTERA and ALTAR land in one queue, and staff sign in with the same ALT account, but only with a staff role, only in the portal, and with 2FA in production."
+- "Staff tools never ship inside the user apps. Reports from ALTER, ALTERA and ALTAR land in one queue, and staff sign in with the same ALT account, but only with a staff role, only in the Command Centre, and with 2FA in production."
 - "People see replies signed 'ALT', never a staff member's name, and never another reporter's words. Staff can't decide a case they are involved in."
 - "Every staff action is in the tamper-evident audit log: each entry hashes the one before it."
 

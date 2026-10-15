@@ -10,7 +10,7 @@
     "packages/*",
     "services/*",
     "apps/altar-web",
-    "apps/alt-portal"
+    "apps/command-centre"
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",

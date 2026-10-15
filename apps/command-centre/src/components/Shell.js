@@ -55,10 +55,11 @@ function Frame({ children }) {
             <i />
           </span>
           <span className="wordmark">
-            ALT<span>/</span>PORTAL
+            ALT
+            <small>Command Centre</small>
           </span>
         </Link>
-        <nav aria-label="Portal">
+        <nav aria-label="Command Centre">
           {nav.map((i) => {
             const on = i.href === "/" ? path === "/" : path.startsWith(i.href) || (i.href === "/queue" && path.startsWith("/cases"));
             return (
@@ -79,7 +80,7 @@ function Frame({ children }) {
       <div className="main">
         <div className="topbar">
           <div className="crumbs">
-            ALT / Portal / <b>{section(path)}</b>
+            Command Centre / <b>{section(path)}</b>
           </div>
           <Jump />
         </div>
@@ -160,10 +161,13 @@ function Gate() {
           <i />
           <i />
         </span>
-        <div className="big">
-          ALT<span>/</span>
-          <br />
-          PORTAL
+        <div>
+          <div className="legend">The ALT Ecosystem</div>
+          <div className="big">
+            Command
+            <br />
+            <span>Centre</span>
+          </div>
         </div>
         <div className="legend">
           Moderation · Support · People · Audit
@@ -175,7 +179,7 @@ function Gate() {
         <div className="eyebrow">
           <b>00</b> / Staff sign-in
         </div>
-        <h1 className="title">{notStaff ? "This account isn't staff" : "Sign in to the ALT Portal"}</h1>
+        <h1 className="title">{notStaff ? "This account isn't staff" : "Sign in to the ALT Command Centre"}</h1>
         <p className="lede">
           {notStaff
             ? `@${s.user?.handle ?? "you"} has no staff role. An admin can give one in People; then sign in again.`
