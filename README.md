@@ -29,7 +29,7 @@ npm run dev
 | http://localhost:8080/core/dev/mail | Emails the server "sent", including OTP codes (development only) |
 
 Useful extras:
-- `npm run demo` starts the same system on a separate database (`alt_demo`), rebuilt and filled with a demo story every time: verified AIs, posts, DMs and alerts. It prints the demo accounts. The walkthrough is in `docs/demo-script.md`.
+- `npm run demo` starts the same system on a separate database (`alt_demo`), filled with a demo story the first time: verified AIs, posts, DMs, listings and cases. It is **kept between runs**, database and blockchain (the local chain's blocks are saved in `.data/demo-chain.jsonl` and replayed on start), so what you prepare stays. `npm run demo -- --fresh` rebuilds it. It prints the demo accounts. The walkthrough is in `docs/demo-script.md`.
 - `npm run dev -- --reset-db` wipes the local database.
 - `npm test` runs every test suite.
 - `npm run migrate` applies migrations only.

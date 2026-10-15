@@ -3,6 +3,8 @@
 //
 //   npm run dev                 start database, migrations and every service behind http://localhost:8080
 //   npm run dev -- --reset-db   wipe the local database first
+//   npm run demo                the demo, as it was left last time (built from the demo story the first time)
+//   npm run demo -- --fresh     rebuild the demo from the demo story
 //
 // Works on Windows, macOS and Linux. Needs only Node.js 22+.
 import { ensureDatabase, dropDatabase, loadDevSecrets, loadEnvFile, runMigrations, startPostgres } from '@alt/devkit';
@@ -15,6 +17,9 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { DEMO_ADMIN_EMAIL, DEMO_PASSWORD, DEMO_PEOPLE, seedDemo } from './seed-demo.mjs';
+import { createHash } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { readJournal, recordBlocks, replayJournal, rpc as chainRpc, startJournal, updateMeta } from './chain/journal.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = path.join(root, '.data');
@@ -45,9 +50,23 @@ const blank = (k) => !process.env[k] || process.env[k].trim() === '';
 for (const [k, v] of Object.entries(loadDevSecrets(dataDir))) if (blank(k)) process.env[k] = v;
 process.env.NODE_ENV ||= 'development';
 
-// `npm run demo`: the same system on its own database (alt_demo), rebuilt and filled with the demo story
-// every time. Your everyday data in the `alt` database is never touched.
+// `npm run demo`: the same system on its own database (alt_demo), filled with the demo story the first
+// time. It keeps everything between runs, database and blockchain, so accounts, posts, reports and
+// decisions made while preparing an evaluation are still there; `--fresh` rebuilds it from the story.
+// Your everyday data in the `alt` database is never touched.
 const demo = args.has('--demo');
+const fresh = args.has('--fresh');
+const demoMeta = path.join(dataDir, 'demo-chain.json');
+const demoBlocks = path.join(dataDir, 'demo-chain.jsonl');
+const saved = demo && !fresh ? readJournal(demoMeta, demoBlocks) : null;
+// The contracts a saved demo chain was deployed from; if they change, the saved chain no longer fits.
+const contractsHash = () => {
+  const dir = path.join(root, 'packages', 'contracts', 'contracts');
+  const h = createHash('sha256');
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sol')).sort()) h.update(f).update(readFileSync(path.join(dir, f)));
+  return h.digest('hex');
+};
+let keepDemo = false;
 const dbName = demo ? 'alt_demo' : 'alt';
 if (demo) process.env.ADMIN_EMAILS = [process.env.ADMIN_EMAILS, DEMO_ADMIN_EMAIL].filter(Boolean).join(',');
 process.env.STORAGE_DIR ||= path.join(dataDir, 'uploads');
@@ -81,9 +100,25 @@ let postgres = null;
 if (blank('DATABASE_URL')) {
   say('starting embedded PostgreSQL (first run downloads nothing; binaries come from npm)…');
   postgres = await startPostgres({ dataDir: path.join(dataDir, 'postgres'), port: Number(process.env.DEV_POSTGRES_PORT || 54320) });
-  if (args.has('--reset-db') || demo) {
+  if (demo) {
+    const pg = (await import('pg')).default;
+    const admin = new pg.Client({ connectionString: postgres.adminUrl });
+    await admin.connect();
+    const exists = (await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName])).rowCount > 0;
+    await admin.end();
+    keepDemo = Boolean(saved?.meta.ready) && exists && (process.env.CHAIN_MODE || 'local').toLowerCase() === 'local';
+    if (keepDemo && saved.meta.contracts !== contractsHash()) {
+      await postgres.stop();
+      fail('The smart contracts changed since this demo was saved, so its saved chain no longer fits. Run `npm run demo -- --fresh` to rebuild the demo (this replaces it).');
+    }
+    if (keepDemo) say(`demo kept from last time (saved ${new Date(saved.meta.readyAt ?? saved.meta.createdAt).toLocaleString()}); \`npm run demo -- --fresh\` rebuilds it`);
+    else {
+      await dropDatabase(postgres.adminUrl, dbName);
+      say(fresh ? 'demo database (alt_demo) rebuilt from scratch' : 'no saved demo yet: building one (alt_demo)');
+    }
+  } else if (args.has('--reset-db')) {
     await dropDatabase(postgres.adminUrl, dbName);
-    say(demo ? 'demo database (alt_demo) rebuilt from scratch' : 'local database wiped');
+    say('local database wiped');
   }
   await ensureDatabase(postgres.adminUrl, dbName);
   process.env.DATABASE_URL = postgres.urlFor(dbName);
@@ -110,6 +145,7 @@ const hardhatCli = path.join(root, 'node_modules', 'hardhat', 'dist', 'src', 'cl
 // Hardhat's well-known development account #1. It only ever exists on the local chain.
 const LOCAL_RELAYER_KEY = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
 let chainProcess = null;
+let recorder = null;
 
 async function rpcReady(url) {
   try {
@@ -140,24 +176,55 @@ if (chainMode === 'local') {
   }
   const rpc = 'http://127.0.0.1:8545';
   if (await rpcReady(rpc)) {
+    if (demo) fail('Another blockchain is already running on :8545. Stop it: the demo starts its own, from where it was saved.');
     say('a local chain is already running on :8545; reusing it');
   } else {
     say('starting local blockchain (Hardhat) on :8545…');
-    chainProcess = spawn(process.execPath, [hardhatCli, 'node'], { cwd: contractsDir, stdio: ['ignore', 'ignore', 'pipe'] });
+    // The demo's chain can start on its saved date (scripts/chain/hardhat.config.mjs), so its blocks replay at their original times.
+    const cmd = demo ? [hardhatCli, '--config', path.join(root, 'scripts', 'chain', 'hardhat.config.mjs'), 'node'] : [hardhatCli, 'node'];
+    chainProcess = spawn(process.execPath, cmd, {
+      cwd: contractsDir,
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: { ...process.env, ...(keepDemo ? { ALT_CHAIN_INITIAL_DATE: String(saved.meta.genesisTs) } : {}) },
+    });
     readline.createInterface({ input: chainProcess.stderr }).on('line', (l) => console.log(`${tag('chain')} ${l}`));
     for (let i = 0; i < 120 && !(await rpcReady(rpc)); i++) await new Promise((r) => setTimeout(r, 500));
     if (!(await rpcReady(rpc))) fail('The local blockchain did not start.');
   }
-  say('deploying AITRegistry and ALTMarketplace…');
-  const deploy = spawnSync(process.execPath, [hardhatCli, 'run', 'scripts/deploy.ts', '--network', 'localhost'], {
-    cwd: contractsDir,
-    encoding: 'utf8',
-  });
-  const line = (deploy.stdout || '').split(/\r?\n/).find((l) => l.startsWith('ALT_DEPLOYMENT '));
-  if (deploy.status !== 0 || !line) fail(`Contract deployment failed:
+  let d;
+  if (keepDemo) {
+    say(`replaying the saved demo chain (${saved.blocks.length} blocks)…`);
+    try {
+      await replayJournal(rpc, saved.blocks, say);
+    } catch (err) {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(chainProcess.pid), '/T', '/F'], { stdio: 'ignore' });
+      else chainProcess.kill('SIGTERM');
+      await postgres?.stop().catch(() => {});
+      fail(`The saved demo chain could not be replayed: ${err.message}. Run \`npm run demo -- --fresh\` to rebuild the demo.`);
+    }
+    d = saved.meta.deployment;
+    recorder = recordBlocks(rpc, demoBlocks, saved.blocks.length + 1, say);
+    // Bring the chain's clock from the last saved block to now (this block is saved too).
+    const last = saved.blocks.at(-1)?.ts ?? saved.meta.genesisTs;
+    await chainRpc(rpc, 'evm_mine', [Math.max(Math.floor(Date.now() / 1000), last + 1)]);
+  } else {
+    say('deploying AITRegistry and ALTMarketplace…');
+    const deploy = spawnSync(process.execPath, [hardhatCli, 'run', 'scripts/deploy.ts', '--network', 'localhost'], {
+      cwd: contractsDir,
+      encoding: 'utf8',
+    });
+    const line = (deploy.stdout || '').split(/\r?\n/).find((l) => l.startsWith('ALT_DEPLOYMENT '));
+    if (deploy.status !== 0 || !line) fail(`Contract deployment failed:
 ${deploy.stdout}
 ${deploy.stderr}`);
-  const d = JSON.parse(line.slice('ALT_DEPLOYMENT '.length));
+    d = JSON.parse(line.slice('ALT_DEPLOYMENT '.length));
+    if (demo) {
+      // A new saved demo: every block from here on is written down as it is mined.
+      const genesis = await chainRpc(rpc, 'eth_getBlockByNumber', ['0x0', false]);
+      startJournal(demoMeta, demoBlocks, { version: 1, genesisTs: Number(genesis.timestamp), contracts: contractsHash(), deployment: d, createdAt: new Date().toISOString(), ready: false });
+      recorder = recordBlocks(rpc, demoBlocks, 1, say);
+    }
+  }
   process.env.CHAIN_RPC_URL = rpc;
   process.env.CHAIN_NAME = 'ALT local chain';
   process.env.CHAIN_EXPLORER_URL = ''; // no public explorer for a local chain
@@ -301,6 +368,8 @@ async function shutdown() {
     if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(c.pid), '/T', '/F'], { stdio: 'ignore' });
     else c.kill('SIGTERM');
   }
+  // Write the demo chain's last blocks before the chain stops.
+  await recorder?.flush();
   if (chainProcess && chainProcess.exitCode === null) {
     if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(chainProcess.pid), '/T', '/F'], { stdio: 'ignore' });
     else chainProcess.kill('SIGTERM');
@@ -341,16 +410,22 @@ console.log(`
 `);
 
 if (demo) {
-  say('filling the demo story (a few minutes: real sign-ups, AI chats, on-chain mints and listings; it waits out sign-up limits)…');
   try {
-    await seedDemo({ gateway: url, log: (m) => say(m) });
+    if (keepDemo) {
+      say('the demo is as you left it.');
+    } else {
+      say('filling the demo story (a few minutes: real sign-ups, AI chats, on-chain mints and listings; it waits out sign-up limits)…');
+      await seedDemo({ gateway: url, log: (m) => say(m) });
+      // From now on `npm run demo` keeps this demo, and everything done in it.
+      updateMeta(demoMeta, { ready: true, readyAt: new Date().toISOString() });
+    }
     const rows = DEMO_PEOPLE.map((p) => `    ${p.email.padEnd(20)} ${p.role}`).join('\n');
     console.log(`
 \x1b[1m  Demo accounts\x1b[0m (password for all: "${DEMO_PASSWORD}")
 ${rows}
     ${DEMO_ADMIN_EMAIL.padEnd(20)} Admin (sent the welcome announcement)
     bilal, zainab, omar  @demo.alt: creators of the AIs listed on ALTAR
-  The walkthrough is in docs/demo-script.md.
+  The walkthrough is in docs/demo-script.md. The demo is kept between runs; \`npm run demo -- --fresh\` rebuilds it.
 `);
   } catch (err) {
     say(`\x1b[31mthe demo story could not be created: ${err.message}\x1b[0m`);

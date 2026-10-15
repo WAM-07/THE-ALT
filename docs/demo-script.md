@@ -11,8 +11,9 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
    ```
    npm run demo
    ```
-   - It runs on its own database (`alt_demo`), rebuilt from scratch every time, so your everyday data is safe.
-   - Wait for the **Demo accounts** table (about two minutes: it signs everyone up, mints nine AIs and lists six on ALTAR). If it says "the demo story could not be created", see "If something goes wrong" below.
+   - It runs on its own database (`alt_demo`), so your everyday data is safe.
+   - **The demo is kept between runs**: database and blockchain, so the accounts, posts, reports, cases and decisions you prepare are all still there on the day. The first run builds it from the demo story (about two minutes: it signs everyone up, mints nine AIs and lists six on ALTAR); later runs say "the demo is as you left it" in a few seconds. `npm run demo -- --fresh` throws it away and builds it again.
+   - Wait for the **Demo accounts** table. If it says "the demo story could not be created", see "If something goes wrong" below.
    - Keep this terminal visible: evaluators like seeing one command start everything.
 2. **Open the apps.** Pick one setup and stay with it:
    - **Android emulator (best, shows the one-tap handoff between apps):** start the emulator, then install and open both apps:
@@ -156,7 +157,7 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 | Problem | What to do |
 |---|---|
 | `npm run demo` says THE ALT is already running | Close the other terminal running `npm run dev` (Ctrl+C), then run `npm run demo` again. |
-| "The demo story could not be created" | Read the reason it prints. Ctrl+C and run `npm run demo` again: it rebuilds from scratch each time. Don't edit code while it runs (the services reload and the story stops part-way). |
+| "The demo story could not be created" | Read the reason it prints. Ctrl+C and run `npm run demo` again: a demo that was never finished is rebuilt. Don't edit code while it runs (the services reload and the story stops part-way). |
 | ALTAR shows no prices | The ALTAR service isn't running. Check `localhost:8080/health` shows `altar` as ok, then refresh. |
 | AI replies say `[mock]` | No LLM key is set, or there's no internet. The flow still works. Say so honestly: "Offline, it falls back to a labelled stand-in." Check `GROQ_API_KEY` in `.env`. |
 | An app shows *Can’t reach ALT right now* | The server isn't running, or the address is wrong. Tap **Try again** after starting `npm run demo`. |
