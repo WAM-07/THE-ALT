@@ -28,7 +28,19 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-line">
-        <p className="mx-auto max-w-[1320px] px-4 py-5 text-xs text-ink-3 sm:px-6">© {new Date().getFullYear()} THE ALT ECOSYSTEM. One account for ALTER, ALTERA and ALTAR.</p>
+        <p className="mx-auto max-w-[1320px] px-4 py-5 text-xs text-ink-3 sm:px-6">© {new Date().getFullYear()} THE ALT ECOSYSTEM. One account for ALTER, ALTERA and ALTAR. ·{" "}
+          <Link href="/legal/terms" className="hover:text-ink">
+            Terms
+          </Link>{" "}
+          ·{" "}
+          <Link href="/legal/privacy" className="hover:text-ink">
+            Privacy
+          </Link>{" "}
+          ·{" "}
+          <Link href="/legal/ai-content" className="hover:text-ink">
+            AI content policy
+          </Link>
+        </p>
       </div>
     </footer>
   );

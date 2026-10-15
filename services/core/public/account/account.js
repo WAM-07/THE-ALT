@@ -68,7 +68,19 @@
   // A short window session (client "app", so no cookie is set) is enough to ask for a handoff code.
   const device = () => ({ platform, client: 'app', deviceName: `ALT sign-in window (${PLATFORMS[platform]})` });
 
+  // Someone who just created their account agreed to the policies the sign-up form showed them.
+  let justSignedUp = false;
+  async function recordAgreement(token) {
+    try {
+      const { pending } = await call('/me/policies', { method: 'GET', token });
+      for (const p of pending) await call('/me/policies/accept', { body: { slug: p.slug, version: p.version }, token });
+    } catch {
+      // The apps ask again if this didn't go through.
+    }
+  }
+
   async function finish(tokens) {
+    if (justSignedUp) await recordAgreement(tokens.accessToken);
     const { code, url } = await call('/auth/handoff', { body: { target: platform }, token: tokens.accessToken });
     // End the window session at once: the platform gets its own session from the code.
     try {
@@ -160,6 +172,7 @@
   });
 
   guard($('#verify'), async (f) => {
+    justSignedUp = true;
     await signedIn(await call('/auth/email/verify', { body: { email, code: String(f.get('code')).trim(), ...device() } }));
   });
 

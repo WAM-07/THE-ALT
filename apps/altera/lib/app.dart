@@ -57,8 +57,11 @@ class _AlteraAppState extends ConsumerState<AlteraApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
-      // Biometric unlock, when turned on in the Account Center.
-      builder: (context, child) => AltAppLockGate(client: ref.read(authServiceProvider).alt, child: child ?? const SizedBox.shrink()),
+      // Biometric unlock, when turned on in the Account Center; then ALT's policies, when there is one to agree to.
+      builder: (context, child) => AltAppLockGate(
+        client: ref.read(authServiceProvider).alt,
+        child: AltPolicyGate(client: ref.read(authServiceProvider).alt, child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

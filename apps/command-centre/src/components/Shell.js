@@ -10,6 +10,7 @@ const NAV = [
   { href: "/queue", n: "02", label: "Queue" },
   { href: "/people", n: "03", label: "People", roles: ["admin"] },
   { href: "/audit", n: "04", label: "Audit log", roles: ["admin", "auditor"] },
+  { href: "/policies", n: "05", label: "Policies" },
 ];
 
 const section = (path) => (path.startsWith("/cases") ? "Case" : NAV.find((i) => i.href !== "/" && path.startsWith(i.href))?.label ?? "Overview");

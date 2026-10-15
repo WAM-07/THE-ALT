@@ -219,6 +219,14 @@ export const support = {
   reply: (id, body) => api(`/core/me/cases/${id}/messages`, { method: "POST", body: { body } }),
 };
 
+/** ALT's policies (Terms, Privacy, AI content): versioned by ALT staff; people agree to the current one. */
+export const policies = {
+  list: () => publicApi("/core/policies"),
+  get: (slug, version) => publicApi(`/core/policies/${slug}${version ? `?version=${version}` : ""}`),
+  mine: () => api("/core/me/policies"),
+  accept: (slug, version) => api("/core/me/policies/accept", { method: "POST", body: { slug, version } }),
+};
+
 /** ALT file links name the server's public address; serve them from wherever ALTAR is open. */
 export function mediaUrl(url) {
   if (!url) return null;

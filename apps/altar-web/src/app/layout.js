@@ -2,6 +2,7 @@ import "./globals.css";
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import PolicyBanner from "../components/PolicyBanner";
 import { AuthProvider } from "../contexts/AuthContext";
 import { AIProvider } from "../contexts/AIContext";
 import { RegionProvider } from "../contexts/RegionContext";
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
                   <WishlistProvider>
                     <div className="flex min-h-screen flex-col">
                       <Header />
+                      <PolicyBanner />
                       <main className="flex-1">{children}</main>
                       <Footer />
                     </div>
