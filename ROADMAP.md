@@ -716,6 +716,14 @@ The target is **12 complete modules plus 1 or 2 buffer modules**, in case an eva
 
 ## Decision log
 
+- **2026-10-16 (owner): the engine and the car.** The heart of ALT is training an AI that replicates its owner's style (fine-tuned adapter on a base model with the subject knowledge; trained on the owner's own GPU, or by ALT's cloud trainer, which returns the adapter and deletes the data). Everything else is the car around that engine.
+  - **Training is the only way into the ecosystem.** Only a trained AI that passes ALT's checks can be verified, minted, listed, act on ALTERA and get a health score. This holds for personal AIs and for companies bringing their own trained AIs to rent out.
+  - **The engine slot:** every AI version records its engine: `base` (the temporary engine: a large cloud model with persona and retrieval) or `adapter` (trained). The identity token certifies which.
+  - **Until the real trainer exists:** the demo runs a **simulated training** (about 10 seconds of labelled checkpoints) so the whole lifecycle works end to end: data, training, test, owner and system confirmation (looping until both agree), verification, minting, listing. Simulated training is named so in code and UI and listed under Known mocks. In production, AIs wait for a trainer.
+  - **Adapters trained on the owner's own GPU** are accepted after ALT's own test, marked "trained locally".
+  - **Seeded AIs are labelled demo** and will be removed once real trained AIs exist.
+  - The real trainer (Python, QLoRA; developed on the owner's RTX 3070) plugs into a tested socket; nothing else changes.
+
 - **2026-10-15 (owner): the ALT Command Centre.** Admin, moderation, audit, support and policies move out of the user apps into one staff website, the **ALT Command Centre** (`apps/command-centre`, Next.js, served by the gateway at `/command`). It delivers M3 and the review screens of M5 and M16; it is not a new module and the scope is unchanged.
   - **Why a website, not an app:** staff work at a desk with long tables, logs and side-by-side evidence; it updates without an app store; and staff tools never ship inside the public apps.
   - **One account system still:** staff sign in with their ALT account; Core adds staff roles (`moderator`, `support`, `auditor`, beside `admin`). Staff routes (`/staff/...`) accept only sessions signed in to the Command Centre (platform `admin`) and, in production, only accounts with 2FA.

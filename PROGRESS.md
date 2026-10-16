@@ -523,6 +523,15 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - [x] **The Command Centre stays signed in after a reload:** its refresh token is now Core's httpOnly cookie of its own (`alt_rt_cmd`, beside ALTAR's `alt_rt`, so the two never replace each other); signing out clears only it. `auth.ts` (cookie per platform). Test: "web sessions keep their own cookies". Checked in a browser on the demo: signed in, reloaded (still signed in), signed out, reloaded (signed out).
   - [x] **ALTERA answers a malformed id with 400**, not a server error (`middleware/ids.js` on its routers; `/profiles/:id` keeps accepting usernames). Test.
   - Decided: **Sapphire** (navy and gold) stays ALTER's default theme.
+- **The engine and the car (owner's plan, 2026-10-16; see ROADMAP's decision log).** Complete everything except the real trainer, which plugs in later. One step at a time, each reviewed:
+  - [ ] E1. Engine slot and training gate (Core): versions record their engine (`base` or `adapter`, training mode `cloud`/`local`/`simulated`, adapter hash, readiness); the manifest and token certify it; verification needs a completed training. `TRAINING_MODE=simulated` (demo, development) runs a labelled ~10-second training with checkpoints; otherwise AIs wait for a trainer. The trainer socket (claim a job, fetch the consented data export, report checkpoints, return the adapter and scores, data deleted) and the inference socket for adapter engines, both tested with stand-ins. Seeded AIs labelled demo.
+  - [ ] E2. Readiness and the approval loop (M9 FE-2/FE-4): an evaluation set (the owner's questions with their own answers), a readiness score per training, the owner approves or trains again, then ALT's system check (readiness and safety) before verification.
+  - [ ] E3. ALTER: Train (data checklist, cloud or local, live checkpoints), Test and compare, Approve; the lifecycle shown everywhere.
+  - [ ] E4. Bring a trained AI (companies and local training): upload an adapter, or connect a trained AI's endpoint; the same system check, then verification and listing.
+  - [ ] E5. M7 Health Score: one score per AI from behaviour (speed, moderation hits, reports, ratings, readiness, drift between versions), shown in ALTER, ALTERA and ALTAR (replaces "Health 100%"), with inbox alerts.
+  - [ ] E6. M18 Creator Control Panel: earnings, royalties, engagement, health and versions in one place, with CSV/PDF export (replaces ALTERA's mocked panel).
+  - [ ] E7. M5 completion: the audit log's hash recorded on-chain regularly, and an AI's behaviour over time in the Command Centre.
+  - Later: the real trainer (Python, QLoRA, RTX 3070), Polygon Amoy and deployment, removing the demo AIs.
 - **Later (owner, 2026-10-15), not now:**
   - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
   - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.
