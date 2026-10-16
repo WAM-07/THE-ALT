@@ -18,7 +18,7 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 100 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
+npm test                        # contracts 36 · core 101 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
 cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
@@ -518,6 +518,11 @@ Work one step at a time, then stop for the owner's review before starting the ne
       - **Disputes name the payment:** a dispute picks one of the person's ALTAR payments; ALTAR confirms it (`POST /internal/transactions/lookup`, service key) and its details become the case's evidence; the case is about the other side of the payment, so staff can act on them. On-chain payments are final: ALT cannot refund them automatically; staff mediate and can act on the seller or the AI.
       - Help & support on ALTAR and in the apps offers "Which decision?" and "Which payment?" pickers.
       - Tests: Core `case-actions.test.ts` (appeal once, by the person affected, judged by someone else, upheld; dispute only on your own payment, with its evidence), `altar-api` (the lookup needs the key), `alt_account` (pickers' requests). Core 100, `alt_account` 19.
+- **Small fixes before the evaluation (owner, 2026-10-16)** ✅
+  - [x] **Phone sign-in links can't swap accounts:** a handoff link an app asked for (the ALT window, "Continue with ALTER") carries a one-time `state` it recognises; any other link (`Open in ALTERA`, or one someone crafted) first shows "Sign in to ALTERA as …?" (`showAltHandoffConfirmSheet`), using Core's new read-only `POST /auth/handoff/peek`, unless that account is already signed in. `alt_account` `handoff.dart`, `client.dart`; the ALT window returns the state. Tests: `handoff_test.dart`, auth test.
+  - [x] **The Command Centre stays signed in after a reload:** its refresh token is now Core's httpOnly cookie of its own (`alt_rt_cmd`, beside ALTAR's `alt_rt`, so the two never replace each other); signing out clears only it. `auth.ts` (cookie per platform). Test: "web sessions keep their own cookies".
+  - [x] **ALTERA answers a malformed id with 400**, not a server error (`middleware/ids.js` on its routers; `/profiles/:id` keeps accepting usernames). Test.
+  - Decided: **Sapphire** (navy and gold) stays ALTER's default theme.
 - **Later (owner, 2026-10-15), not now:**
   - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
   - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.
@@ -526,7 +531,6 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Waiting on the owner:**
   - **Push notifications:** a Firebase project (the steps are under C3 above).
   - **Biometric unlock:** try it with a real fingerprint (Account Center → Security).
-  - **ALTER themes:** which one stays the default after trying them (Sapphire for now).
   - Amoy, deployment and Google sign-in are under **Later** above.
 - **Next, after the 60% evaluation** (`ROADMAP.md` §9, in this order): M9 Training Manager (embeddings, style guide, evaluation set and readiness score; text and PDF reading with BM25 is done), M7 Health Score, M18 Creator Control Panel (replaces the mocked one), M3 Admin & Governance, M12 completion (auctions and licence terms), M5 completion (audit explorer, audit hash anchored on-chain).
 
@@ -542,7 +546,6 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **The ALT sign-in card:** "Continue with ALTER/ALTERA" can't show the other app's account name before you tap it (apps can't read each other's data); it says which app, and that app shows the account when it asks you to confirm. Remembered accounts are per app (name, handle, email, picture in encrypted storage). The apps target Android only (owner, 2026-10-15); iOS is out of scope.
 - **Push notifications need the owner's Firebase project** (see C3: `google-services.json` for each app and `FCM_SERVICE_ACCOUNT`). Until then the ALT inbox is live only while an app is open. One Core instance sends the pushes (each instance listens, so several would send duplicates).
-- **The ALT Command Centre's session ends when its tab is reloaded or closed** (memory only, on purpose for now; see P2).
 - **"Training" means building a version:** persona, consented data and approved memories, frozen and hashed. Text files and PDFs are read, with BM25 retrieval over passages; embeddings and evaluation come later. Images, voice notes and scanned PDFs (no text layer) are stored but not read yet. PDFs uploaded before 2026-10-15 need uploading again to be read.
 - **The demo keeps its chain; `npm run dev` doesn't.** `npm run demo` saves every block of its local chain (`.data/demo-chain.json` + `.jsonl`, `scripts/chain/journal.mjs`) and replays them on the next start, on the original dates, so tokens, balances, listings, rentals and subscriptions survive with the database (checked: all 47 blocks replayed with identical state roots). Changing the smart contracts needs `npm run demo -- --fresh`. **The local chain resets on every `npm run dev`.** Core re-mints the tokens recorded in the database onto it, so verified AIs stay verified. Token transfers and rentals on the old chain are not replayed. Use `npm run dev -- --reset-db` for a clean slate, or `CHAIN_MODE=amoy` for a persistent chain.
 - **Google sign-in** works in Core but the apps hide the button until `GOOGLE_CLIENT_IDS` (Core) and `GOOGLE_SERVER_CLIENT_ID` (app) are configured and the `google_sign_in` plugin is added.
