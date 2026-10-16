@@ -1,8 +1,10 @@
 const express = require('express');
+const { uuidParams } = require('../middleware/ids');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 
 const router = express.Router();
+uuidParams(router, 'conversationId', 'messageId');
 
 // ─── GET /messages/share-targets — Prioritized users for sharing ─────────────
 router.get('/share-targets', authMiddleware, async (req, res) => {

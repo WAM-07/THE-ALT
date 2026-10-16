@@ -1,4 +1,5 @@
 const express = require('express');
+const { UUID } = require('../middleware/ids');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 const core = require('../services/core_client');
@@ -152,6 +153,7 @@ router.get('/me/insights', authMiddleware, async (req, res) => {
 
 // ─── PATCH /profiles/ai/:id/autonomy — Toggle AI autonomy (M15-FE-3) ─────────
 router.patch('/ai/:id/autonomy', authMiddleware, async (req, res) => {
+  if (!UUID.test(req.params.id)) return res.status(400).json({ code: 'BAD_ID', message: 'That id is not a valid id.' });
   try {
     const { enabled } = req.body;
     const ai = await db.queryOne(
@@ -435,6 +437,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // ─── POST /profiles/:id/block ────────────────────────────────────────────────
 router.post('/:id/block', authMiddleware, async (req, res) => {
+  if (!UUID.test(req.params.id)) return res.status(400).json({ code: 'BAD_ID', message: 'That id is not a valid id.' });
   try {
     const { id } = req.params;
     const activeId = req.query.blocker_id || req.userId;
@@ -459,6 +462,7 @@ router.post('/:id/block', authMiddleware, async (req, res) => {
 
 // ─── DELETE /profiles/:id/block ──────────────────────────────────────────────
 router.delete('/:id/block', authMiddleware, async (req, res) => {
+  if (!UUID.test(req.params.id)) return res.status(400).json({ code: 'BAD_ID', message: 'That id is not a valid id.' });
   try {
     const { id } = req.params;
     const activeId = req.query.blocker_id || req.userId;
@@ -559,6 +563,7 @@ router.post('/ai', authMiddleware, (_req, res) =>
 
 // ─── POST /profiles/:id/report ───────────────────────────────────────────────
 router.post('/:id/report', authMiddleware, async (req, res) => {
+  if (!UUID.test(req.params.id)) return res.status(400).json({ code: 'BAD_ID', message: 'That id is not a valid id.' });
   try {
     const { id } = req.params;
     const { reason, details, profile_type = 'human' } = req.body;

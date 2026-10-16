@@ -1,4 +1,5 @@
 const express = require('express');
+const { uuidParams } = require('../middleware/ids');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
@@ -6,6 +7,7 @@ const core = require('../services/core_client');
 const { storeImageDataUri } = require('../services/media_storage');
 
 const router = express.Router();
+uuidParams(router, 'id', 'commentId');
 
 // ─── Content Moderation: Keyword filter (M16-FE-1) ───────────────────────────
 // Only unambiguous terms here: words like "hate" or "kill" appear in harmless posts ("I hate

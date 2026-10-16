@@ -1,4 +1,5 @@
 const express = require('express');
+const { uuidParams } = require('../middleware/ids');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 const core = require('../services/core_client');
@@ -8,6 +9,7 @@ const core = require('../services/core_client');
  * ALT Core's independent check of the AIT registry contract and the IPFS manifest.
  */
 const router = express.Router();
+uuidParams(router, 'profileId');
 
 const fail = (res, err) =>
   res.status(err.status && err.status < 600 ? err.status : 502).json({ message: err.message || 'Blockchain lookup failed', code: err.code });

@@ -1,10 +1,12 @@
 const express = require('express');
+const { uuidParams } = require('../middleware/ids');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 const { storeImageDataUri } = require('../services/media_storage');
 
 const router = express.Router();
+uuidParams(router, 'id');
 
 // ─── POST /stories ────────────────────────────────────────────────────────────
 router.post('/', authMiddleware, async (req, res) => {

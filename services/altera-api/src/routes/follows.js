@@ -1,9 +1,11 @@
 const express = require('express');
+const { uuidParams } = require('../middleware/ids');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 
 const router = express.Router();
+uuidParams(router, 'profileId');
 
 async function emitNotification(io, recipientUserId, notificationId) {
   if (!io || !recipientUserId || !notificationId) return;

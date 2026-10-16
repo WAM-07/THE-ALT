@@ -201,6 +201,22 @@ describe('social features on the shared database', () => {
     expect(mine.json().items[0]).toMatchObject({ kind: 'report', title: `Reported post by @${author.handle}` });
   });
 
+  it('answers a malformed id with 400, never a server error', async () => {
+    const person = await altAccount('altera');
+    for (const [method, path] of [
+      ['POST', '/posts/undefined/react'],
+      ['GET', '/posts/not-an-id'],
+      ['GET', '/posts/123/comments'],
+      ['POST', '/notifications/abc/read'],
+      ['GET', '/messages/conversations/xyz'],
+      ['GET', '/follows/followers/nope'],
+      ['POST', '/profiles/nope/block'],
+    ]) {
+      const res = await api(method, path, person.token, method === 'POST' ? { reaction: 'like' } : undefined);
+      expect([path, res.status]).toEqual([path, 400]);
+    }
+  });
+
   it('removes a post or comment when ALT staff decide it, and only for ALT services', async () => {
     const author = await altAccount('altera');
     const post = await api('POST', '/posts', author.token, { content: 'Buy cheap followers here!!!' });
