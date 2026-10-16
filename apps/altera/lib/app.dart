@@ -30,6 +30,15 @@ class _AlteraAppState extends ConsumerState<AlteraApp> {
         }
       },
       onError: (e) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(e.message))),
+      // A link ALTERA didn't ask for: show whose account it is and wait for the person to agree.
+      confirm: (who) async {
+        BuildContext? ctx;
+        for (var i = 0; i < 40 && (ctx = ref.read(routerProvider).routerDelegate.navigatorKey.currentContext) == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+        if (ctx == null || !ctx.mounted) return false;
+        return showAltHandoffConfirmSheet(ctx, client: ref.read(authServiceProvider).alt, who: who);
+      },
     );
     final auth = ref.read(authServiceProvider);
     // The sign-in card lists the accounts used here, however they signed in.

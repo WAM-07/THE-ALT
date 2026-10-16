@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../client.dart';
+import '../handoff.dart';
 
 /// "Continue with ALT", like "Continue with Google": opens the ALT Account window (served by ALT
 /// Core at `/core/account/`) over the app. The person signs in or registers there; the window then
@@ -15,10 +16,12 @@ class AltAccountWindow {
   /// web and desktop the app keeps its built-in form.
   static bool get supported => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
 
+  /// The window hands back `<app>://handoff?code=…&state=…`; the state tells the app it asked for it.
   static Uri url(AltAccountClient client, {bool signUp = false}) => Uri.parse('${client.apiUrl}/core/account/').replace(queryParameters: {
         'platform': client.platform.name,
         'mode': signUp ? 'signup' : 'signin',
         'return': 'app',
+        'state': AltHandoff.expectHandoff(),
       });
 
   /// Opens the window in an in-app browser tab. False if no browser could open it.

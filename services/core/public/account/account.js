@@ -93,6 +93,8 @@
 
   function deliver(code, url) {
     const name = PLATFORMS[platform];
+    // A phone app checks that the answer carries the state it sent, so it knows it asked for this sign-in.
+    if (returnMode === 'app' && state) url += `${url.includes('?') ? '&' : '?'}state=${encodeURIComponent(state)}`;
     show('done');
     $('#done-title').textContent = 'You’re signed in';
     if (returnMode === 'popup' && window.opener) {

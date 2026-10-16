@@ -66,6 +66,39 @@ Future<bool> showAltShareSignInSheet(BuildContext context, {required AltAccountC
   return ok == true;
 }
 
+/// A handoff link this app didn't ask for ("Open in ALTERA" from the other app, or a link from
+/// somewhere else): "Sign in to ALTERA as Wamiq?". True if the person agreed.
+Future<bool> showAltHandoffConfirmSheet(BuildContext context, {required AltAccountClient client, required AltHandoffPreview who}) async {
+  final app = client.platform.label;
+  final ok = await showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    isDismissible: false,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => _Card(
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _Brand(),
+        const SizedBox(height: 18),
+        Text('Sign in to $app?', style: _title),
+        const SizedBox(height: 6),
+        Text(
+          client.currentUser.value == null
+              ? 'A link asked to sign $app in to this ALT account. Continue only if you opened it yourself.'
+              : 'A link asked to switch $app to this ALT account, signing @${client.currentUser.value!.handle} out here. Continue only if you opened it yourself.',
+          style: _body,
+        ),
+        const SizedBox(height: 18),
+        _AccountTile(name: who.displayName, detail: '@${who.handle}', avatar: _avatar(client, who.avatarUrl)),
+        const SizedBox(height: 18),
+        _Primary(label: 'Continue as ${who.displayName.split(' ').first}', onTap: () => Navigator.pop(ctx, true)),
+        const SizedBox(height: 8),
+        _Quiet(label: 'Cancel', onTap: () => Navigator.pop(ctx, false)),
+      ]),
+    ),
+  );
+  return ok == true;
+}
+
 String? _avatar(AltAccountClient client, String? url) => url == null ? null : altMediaUrl(url, client.apiUrl);
 
 const _title = TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w700, letterSpacing: -0.3, height: 1.2);
@@ -611,7 +644,7 @@ class _IconButton extends StatelessWidget {
 /// [context] gives a context under the app's navigator; [onMessage] shows a short note.
 void answerAltSignInRequests(AltHandoff handoff, {required BuildContext? Function() context, required void Function(String message) onMessage}) {
   final client = handoff.client;
-  handoff.listenForSignInRequests((target) async {
+  handoff.listenForSignInRequests((target, state) async {
     for (var i = 0; i < 40 && client.currentUser.value == null; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 250));
     }
@@ -625,7 +658,7 @@ void answerAltSignInRequests(AltHandoff handoff, {required BuildContext? Functio
     if (ctx == null || !ctx.mounted) return;
     if (!await showAltShareSignInSheet(ctx, client: client, target: target)) return;
     try {
-      if (!await handoff.open(target)) onMessage('${target.label} could not be opened.');
+      if (!await handoff.open(target, state: state)) onMessage('${target.label} could not be opened.');
     } on AltApiException catch (e) {
       onMessage(e.message);
     }

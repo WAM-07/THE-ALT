@@ -307,9 +307,18 @@ class AltAccountClient {
   // ------------------------------------------------------------------ moving between ALT apps
 
   /// A one-time link (valid 60 s) that opens [target] already signed in as this person.
-  Future<Uri> handoffLink(AltPlatform target) async {
+  /// [state] echoes the receiving app's own request (see [AltHandoff.requestFrom]), so it can tell the
+  /// link is the answer it asked for.
+  Future<Uri> handoffLink(AltPlatform target, {String? state}) async {
     final body = await _call('POST', '/auth/handoff', auth: true, body: {'target': target.name});
-    return Uri.parse(body['url'] as String);
+    final url = Uri.parse(body['url'] as String);
+    return state == null ? url : url.replace(queryParameters: {...url.queryParameters, 'state': state});
+  }
+
+  /// Whose ALT account a handoff code would sign this app into, without using the code up.
+  Future<({String handle, String displayName, String? avatarUrl})> peekHandoff(String code) async {
+    final body = await _call('POST', '/auth/handoff/peek', body: {'code': code, 'platform': platform.name});
+    return (handle: body['handle'] as String, displayName: body['displayName'] as String, avatarUrl: body['avatarUrl'] as String?);
   }
 
   /// Called when this app is opened through a handoff link.

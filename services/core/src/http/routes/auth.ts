@@ -31,6 +31,10 @@ const LOCKOUT_MS = 30 * 60_000;
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_ROUNDS);
 
 export const REFRESH_COOKIE = 'alt_rt';
+// The ALT Command Centre (platform "admin") keeps its own cookie on the same origin, so a staff
+// session and an ALTAR session in one browser never replace each other.
+export const COMMAND_REFRESH_COOKIE = 'alt_rt_cmd';
+const cookieFor = (platform: string | undefined) => (platform === 'admin' ? COMMAND_REFRESH_COOKIE : REFRESH_COOKIE);
 const COOKIE_PATH = '/core/auth';
 
 const loginLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
@@ -48,10 +52,10 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
   const authed = requireUser(ctx);
 
   /** Web clients keep the refresh token in an httpOnly cookie; apps keep it in secure storage. */
-  async function sendTokens(reply: FastifyReply, pair: TokenPair, user: UserRow, client: 'app' | 'web', status = 200) {
+  async function sendTokens(reply: FastifyReply, pair: TokenPair, user: UserRow, client: 'app' | 'web', status = 200, platform?: string) {
     const me = await loadMe(ctx.db, user);
     if (client === 'web') {
-      reply.setCookie(REFRESH_COOKIE, pair.refreshToken, {
+      reply.setCookie(cookieFor(platform), pair.refreshToken, {
         httpOnly: true,
         secure: ctx.config.isProd,
         sameSite: 'lax',
@@ -122,7 +126,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
       return reply.send({ mfaRequired: true, mfaToken, methods: ['totp', 'recovery_code'] });
     }
     const pair = await tx(ctx.db, (client) => startSession(ctx, client, user, deviceOf(req, body.platform, body.deviceName), method));
-    return sendTokens(reply, pair, user, body.client);
+    return sendTokens(reply, pair, user, body.client, 200, body.platform);
   }
 
   // ---------------------------------------------------------------- registration & email
@@ -295,7 +299,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
       const pair = await tx(ctx.db, (client) =>
         startSession(ctx, client, user, deviceOf(req, mfa.platform as PlatformT, mfa.device), b.code ? 'password+totp' : 'password+recovery'),
       );
-      return sendTokens(reply, pair, user, b.client);
+      return sendTokens(reply, pair, user, b.client, 200, mfa.platform);
     },
   );
 
@@ -307,15 +311,16 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
       schema: {
         tags: ['auth'],
         summary: 'Swap a refresh token for a new token pair (the old one stops working)',
-        body: z.object({ refreshToken: z.string().optional() }).optional(),
+        // platform "admin": the ALT Command Centre's own cookie.
+        body: z.object({ refreshToken: z.string().optional(), platform: z.literal('admin').optional() }).optional(),
       },
     },
     async (req, reply) => {
-      const fromCookie = req.cookies[REFRESH_COOKIE];
+      const fromCookie = req.cookies[cookieFor(req.body?.platform)];
       const token = req.body?.refreshToken ?? fromCookie;
       if (!token) throw unauthorized('INVALID_REFRESH_TOKEN', 'Sign in again.');
       const { pair, user } = await rotateSession(ctx, token, req.ip);
-      return sendTokens(reply, pair, user, req.body?.refreshToken ? 'app' : 'web');
+      return sendTokens(reply, pair, user, req.body?.refreshToken ? 'app' : 'web', 200, req.body?.platform);
     },
   );
 
@@ -324,7 +329,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
       await revokeSession(client, req.auth!.userId, req.auth!.sessionId, 'logout');
       await audit(client, { action: 'auth.logout', actorUserId: req.auth!.userId, entityType: 'session', entityId: req.auth!.sessionId, ip: req.ip });
     });
-    reply.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
+    reply.clearCookie(cookieFor(req.auth!.platform), { path: COOKIE_PATH });
     return reply.send({ ok: true });
   });
 
@@ -338,6 +343,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         return n;
       });
       reply.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
+      reply.clearCookie(COMMAND_REFRESH_COOKIE, { path: COOKIE_PATH });
       return reply.send({ ok: true, sessionsRevoked: count });
     },
   );
@@ -649,6 +655,32 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
     },
   );
 
+  // Whose account a handoff link would sign the app into, without using it up: a phone app asks the
+  // person to confirm ("Sign in as Wamiq?") before redeeming a link it didn't ask for, so a crafted
+  // link can't quietly sign someone into another account.
+  r.post(
+    '/auth/handoff/peek',
+    {
+      config: loginLimit,
+      schema: {
+        tags: ['auth'],
+        summary: 'Who a handoff code belongs to (the code stays unused)',
+        body: z.object({ code: z.string().min(20).max(100), platform: Platform }),
+      },
+    },
+    async (req) => {
+      const { rows } = await ctx.db.query<{ handle: string; display_name: string; avatar_url: string | null }>(
+        `SELECT u.handle, u.display_name, COALESCE(pa.avatar_url, u.avatar_url) AS avatar_url
+           FROM core.handoff_codes h JOIN core.users u ON u.id = h.user_id
+           LEFT JOIN core.platform_avatars pa ON pa.user_id = u.id AND pa.platform = h.target
+          WHERE h.code_hash = $1 AND h.used_at IS NULL AND h.expires_at > now() AND h.target = $2 AND u.deleted_at IS NULL`,
+        [sha256(req.body.code), req.body.platform],
+      );
+      if (!rows[0]) throw unauthorized('HANDOFF_INVALID', 'This link has expired or was already used. Open it again from the other app.');
+      return { handle: rows[0].handle, displayName: rows[0].display_name, avatarUrl: rows[0].avatar_url };
+    },
+  );
+
   r.post(
     '/auth/handoff/redeem',
     {
@@ -675,7 +707,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
         const pair = await startSession(ctx, client, user, deviceOf(req, b.platform, b.deviceName), 'handoff');
         return { user, pair };
       });
-      return sendTokens(reply, pair, user, b.client);
+      return sendTokens(reply, pair, user, b.client, 200, b.platform);
     },
   );
 }

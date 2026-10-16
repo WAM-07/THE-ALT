@@ -61,6 +61,15 @@ class _AlterAppState extends State<AlterApp> {
         _messengerKey.currentState?.showSnackBar(SnackBar(content: Text('Signed in as @${user.handle}')));
       },
       onError: (e) => _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(e.message))),
+      // A link ALTER didn't ask for: show whose account it is and wait for the person to agree.
+      confirm: (who) async {
+        BuildContext? ctx;
+        for (var i = 0; i < 40 && (ctx = goRouter.routerDelegate.navigatorKey.currentContext) == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+        if (ctx == null || !ctx.mounted) return false;
+        return showAltHandoffConfirmSheet(ctx, client: altAccount, who: who);
+      },
     );
     // The sign-in card lists the accounts used here, however they signed in.
     AltKnownAccounts.instance.track(altAccount);

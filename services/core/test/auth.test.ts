@@ -157,12 +157,53 @@ describe('moving between ALT apps (handoff)', () => {
     const wrongApp = await post('/auth/handoff/redeem', { code: h.json().code, platform: 'altar' });
     expect(wrongApp.statusCode).toBe(401);
 
+    // The receiving app can ask whose account it is before using the code (the code stays valid).
+    expect((await post('/auth/handoff/peek', { code: h.json().code, platform: 'altar' })).statusCode).toBe(401);
+    const peek = await post('/auth/handoff/peek', { code: h.json().code, platform: 'altera' });
+    expect(peek.json()).toMatchObject({ handle: u.handle, displayName: expect.any(String) });
     const ok = await post('/auth/handoff/redeem', { code: h.json().code, platform: 'altera', deviceName: 'Phone' });
     expect(ok.statusCode).toBe(200);
     expect(ok.json().user.id).toBe(u.user.id);
 
     const again = await post('/auth/handoff/redeem', { code: h.json().code, platform: 'altera' });
     expect(again.json().error.code).toBe('HANDOFF_INVALID');
+  });
+});
+
+describe('web sessions keep their own cookies', () => {
+  it('gives the ALT Command Centre a cookie of its own, so it never replaces an ALTAR session in the same browser', async () => {
+    const u = await signUp(t, { platform: 'altar' });
+    const cookieOf = (res: { headers: Record<string, unknown> }, name: string) => {
+      const all = ([] as string[]).concat((res.headers['set-cookie'] as string | string[] | undefined) ?? []);
+      return all.find((c) => c.startsWith(`${name}=`))?.split(';')[0]?.split('=')[1];
+    };
+    // ALTAR (the site) and the Command Centre sign in through handoffs, as web clients.
+    const handoff = async (target: string) => (await post('/auth/handoff', { target }, auth(u.accessToken))).json().code;
+    const altar = await post('/auth/handoff/redeem', { code: await handoff('altar'), platform: 'altar', client: 'web' });
+    const cmd = await post('/auth/handoff/redeem', { code: await handoff('admin'), platform: 'admin', client: 'web' });
+    const altarCookie = cookieOf(altar, 'alt_rt');
+    const cmdCookie = cookieOf(cmd, 'alt_rt_cmd');
+    expect(altarCookie).toBeTruthy();
+    expect(cmdCookie).toBeTruthy();
+    expect(cookieOf(cmd, 'alt_rt')).toBeUndefined();
+    expect(cmd.json().refreshToken).toBeUndefined();
+
+    // Each refreshes from its own cookie, and stays its own platform.
+    const refreshCmd = await t.app.inject({ method: 'POST', url: '/auth/refresh', payload: { platform: 'admin' }, cookies: { alt_rt: altarCookie!, alt_rt_cmd: cmdCookie! } });
+    expect(refreshCmd.statusCode).toBe(200);
+    const nextCmd = cookieOf(refreshCmd, 'alt_rt_cmd');
+    expect(nextCmd).toBeTruthy();
+    const refreshAltar = await t.app.inject({ method: 'POST', url: '/auth/refresh', payload: {}, cookies: { alt_rt: altarCookie!, alt_rt_cmd: nextCmd! } });
+    expect(refreshAltar.statusCode).toBe(200);
+    expect(cookieOf(refreshAltar, 'alt_rt')).toBeTruthy();
+    // The Command Centre's cookie alone doesn't refresh ALTAR.
+    expect((await t.app.inject({ method: 'POST', url: '/auth/refresh', payload: {}, cookies: { alt_rt_cmd: nextCmd! } })).statusCode).toBe(401);
+
+    // Signing out of the Command Centre clears only its cookie.
+    const out = await t.app.inject({ method: 'POST', url: '/auth/logout', headers: auth(refreshCmd.json().accessToken) });
+    const cleared = ([] as string[]).concat((out.headers['set-cookie'] as string | string[]) ?? []);
+    expect(cleared.some((c) => c.startsWith('alt_rt_cmd=;'))).toBe(true);
+    expect(cleared.some((c) => c.startsWith('alt_rt=;'))).toBe(false);
   });
 });
 
