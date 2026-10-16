@@ -138,7 +138,7 @@ function StatusBar() {
       <span className="live">Connected</span>
       <span>@{s.user?.handle}</span>
       <span>{s.staff?.roles.join(" · ")}</span>
-      <span>Session: this tab only</span>
+      <span>Session: this browser</span>
       <span className="end num">UTC {utc}</span>
     </footer>
   );
@@ -201,7 +201,7 @@ function Gate() {
             <span>01</span>Your password and 2FA code go to the ALT Account window, never to this page.
           </li>
           <li>
-            <span>02</span>The session lives in this tab only: closing or reloading it signs you out.
+            <span>02</span>You stay signed in on this browser until you sign out, so sign out on shared computers.
           </li>
           <li>
             <span>03</span>Everything you do here is written to ALT&apos;s tamper-evident audit log.

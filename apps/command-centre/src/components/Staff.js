@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, currentSession, onSession, signIn as openSignIn, signOut as endSession } from "../lib/alt";
+import { api, currentSession, onSession, restore, signIn as openSignIn, signOut as endSession } from "../lib/alt";
 
 const StaffContext = createContext(null);
 
@@ -11,13 +11,21 @@ const StaffContext = createContext(null);
 export function StaffProvider({ children }) {
   const [session, setSession] = useState(currentSession);
   const [staff, setStaff] = useState(null);
-  const [state, setState] = useState(() => (currentSession() ? "checking" : "signedOut"));
+  // Starts by looking for a session kept from before (Core's cookie), so a reload stays signed in.
+  const [state, setState] = useState("checking");
+  const [restored, setRestored] = useState(false);
   const [error, setError] = useState(null);
   const sid = session?.sessionId ?? null;
 
   useEffect(() => onSession(setSession), []);
 
   useEffect(() => {
+    if (currentSession()) return setRestored(true);
+    restore().finally(() => setRestored(true));
+  }, []);
+
+  useEffect(() => {
+    if (!restored) return;
     if (!sid) {
       setStaff(null);
       setState("signedOut");
@@ -40,7 +48,7 @@ export function StaffProvider({ children }) {
     return () => {
       live = false;
     };
-  }, [sid]);
+  }, [sid, restored]);
 
   const signIn = useCallback(async () => {
     setError(null);

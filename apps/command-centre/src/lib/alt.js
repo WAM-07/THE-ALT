@@ -1,10 +1,11 @@
 // The ALT Command Centre's only way to talk to ALT: ALT Core through the gateway, on the same origin.
 //
-// Staff sessions live in this tab's memory and nowhere else (no cookie, no storage): reloading or
-// closing the tab signs out. The Command Centre signs in through the ALT Account window as platform
-// "admin", which is the only kind of session Core's /staff routes accept.
+// The access token lives in this tab's memory only. The refresh token is Core's httpOnly cookie for
+// the Command Centre (alt_rt_cmd, never readable by this page), so a reload keeps the staff member
+// signed in until they sign out. It signs in through the ALT Account window as platform "admin",
+// the only kind of session Core's /staff routes accept.
 
-let session = null; // { accessToken, refreshToken, sessionId, user }
+let session = null; // { accessToken, sessionId, user }
 const listeners = new Set();
 const emit = () => listeners.forEach((fn) => fn(session));
 
@@ -30,7 +31,7 @@ async function send(path, { method = "GET", body, token } = {}) {
       method,
       headers: { ...(body !== undefined ? { "content-type": "application/json" } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      credentials: "omit",
+      credentials: "same-origin",
       cache: "no-store",
     });
   } catch {
@@ -51,7 +52,7 @@ async function send(path, { method = "GET", body, token } = {}) {
 }
 
 function adopt(p) {
-  session = { accessToken: p.accessToken, refreshToken: p.refreshToken, sessionId: p.sessionId ?? session?.sessionId, user: p.user ?? session?.user };
+  session = { accessToken: p.accessToken, sessionId: p.sessionId ?? session?.sessionId, user: p.user ?? session?.user };
   emit();
   return session;
 }
@@ -63,8 +64,7 @@ function drop() {
 
 let refreshing = null;
 function refresh() {
-  if (!session) return Promise.reject(new AltError(401, "SIGNED_OUT", "Sign in again."));
-  refreshing ??= send("/core/auth/refresh", { method: "POST", body: { refreshToken: session.refreshToken } })
+  refreshing ??= send("/core/auth/refresh", { method: "POST", body: { platform: "admin" } })
     .then(adopt)
     .catch((e) => {
       drop();
@@ -100,7 +100,16 @@ const deviceName = () => {
 
 /** Turns a one-time code from the ALT Account window into this tab's staff session. */
 export async function redeemHandoff(code) {
-  return adopt(await send("/core/auth/handoff/redeem", { method: "POST", body: { code, platform: "admin", client: "app", deviceName: deviceName() } }));
+  return adopt(await send("/core/auth/handoff/redeem", { method: "POST", body: { code, platform: "admin", client: "web", deviceName: deviceName() } }));
+}
+
+/** On load: picks the staff session back up from Core's cookie. Resolves to the session, or null. */
+export async function restore() {
+  try {
+    return await refresh();
+  } catch {
+    return null;
+  }
 }
 
 /**
