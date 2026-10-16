@@ -99,7 +99,12 @@ if (busy.length) {
 let postgres = null;
 if (blank('DATABASE_URL')) {
   say('starting embedded PostgreSQL (first run downloads nothing; binaries come from npm)…');
-  postgres = await startPostgres({ dataDir: path.join(dataDir, 'postgres'), port: Number(process.env.DEV_POSTGRES_PORT || 54320) });
+  try {
+    postgres = await startPostgres({ dataDir: path.join(dataDir, 'postgres'), port: Number(process.env.DEV_POSTGRES_PORT || 54320) });
+  } catch (err) {
+    // Usually an earlier run that didn't shut down cleanly still holds the database files.
+    fail(`The embedded database did not start${err?.message ? ` (${err.message})` : ''}. An earlier run may still be open: close its window, or end the leftover "postgres.exe" and "node scripts/dev.mjs" processes in Task Manager, then run it again.`);
+  }
   if (demo) {
     const pg = (await import('pg')).default;
     const admin = new pg.Client({ connectionString: postgres.adminUrl });
