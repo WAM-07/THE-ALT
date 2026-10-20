@@ -537,8 +537,14 @@ Work one step at a time, then stop for the owner's review before starting the ne
   - [ ] E6. M18 Creator Control Panel: earnings, royalties, engagement, health and versions in one place, with CSV/PDF export (replaces ALTERA's mocked panel).
   - [ ] E7. M5 completion: the audit log's hash recorded on-chain regularly, and an AI's behaviour over time in the Command Centre.
   - Later: the real trainer (Python, QLoRA, RTX 3070), Polygon Amoy and deployment, removing the demo AIs.
+- **Beta server (owner, 2026-10-20), in progress:** a public test copy for the team on one Ubuntu server (`deploy/beta/`, see its README): the four services and both websites in production mode behind Caddy (HTTPS), the server's PostgreSQL, a private test chain (31337) saved and replayed like the demo, Gmail for email codes, and the demo story built with its own password (`ALT_DEMO_PASSWORD`). The ALTER and ALTERA APKs are built against it.
+  - [x] `STARTER_TEST_POL` (Core, new env var, default 0): every new account gets that much test POL on ALT's own test chain (31337 only), sent by a `starter_funds` job, audited (`wallet.starter_funds`) and announced in the inbox. **Handle-with-care change:** `modules/accounts/users.ts` `createUser` queues the job in the account's transaction; it grants nothing on a public network and touches no sign-in or session code. Tests: `wallet.test.ts` (Core 103).
+  - [x] `deploy/beta/start.mjs` (launcher), `setup.sh` (server), `deploy.sh` (from a PC); rehearsed locally end to end (seed, then production mode with the chain replayed).
+  - [x] **Live (2026-10-20):** https://13-207-216-40.sslip.io on a friend's AWS account for one week (EC2 c7i-flex.large, Mumbai, user `ubuntu`). Seeded with the demo story (password from `.env.beta`); checked over HTTPS: health, ALTAR, the Command Centre, the ALT Account window, sign-in, the wallet's starter POL, an email code sent through Gmail; `/core/dev/mail` answers 404. When the friend terminates the instance, the beta and its data are gone (the scripts redeploy anywhere).
+  - [x] APKs: `deploy/beta/build-apks.ps1` builds `ALTER-beta.apk` and `ALTERA-beta.apk` against the beta URL (through a temporary drive letter, since the space in the repo path breaks ALTERA's release build); ALTERA is signed with a beta key in `apps/altera/android` (git-ignored).
+  - Seeding runs in development mode (it reads the development mailbox), so `deploy.sh --seed` stops Caddy meanwhile. The first seed, before that fix, was reachable for about 90 seconds; only demo codes already used were in the mailbox.
 - **Later (owner, 2026-10-15), not now:**
-  - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`).
+  - **Deployment** (Vercel for ALTAR web, Railway/Render for the services; Core's spend approvals would need a shared store with several instances; fix the leaked Groq key in `_archive/`). The single-server beta above replaces this for now.
   - **Google sign-in buttons**: Core supports it; needs `GOOGLE_CLIENT_IDS` (Core), `GOOGLE_SERVER_CLIENT_ID` (apps) and the `google_sign_in` plugin.
   - **C1 Polygon Amoy**: needs an RPC URL (e.g. Alchemy) and a faucet-funded key in `.env`; `CHAIN_MODE=amoy` is already supported.
 - **ALTAR is complete** (all 4 steps). Run `npm run demo` and walk Scene 9 of `docs/demo-script.md`.
@@ -549,6 +555,7 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Next, after the 60% evaluation** (`ROADMAP.md` §9, in this order): M9 Training Manager (embeddings, style guide, evaluation set and readiness score; text and PDF reading with BM25 is done), M7 Health Score, M18 Creator Control Panel (replaces the mocked one), M3 Admin & Governance, M12 completion (auctions and licence terms), M5 completion (audit explorer, audit hash anchored on-chain).
 
 ## Known mocks / not real yet
+- **Beta server:** its blockchain is ALT's private test chain (31337), not Polygon Amoy, and the 100 POL each account starts with is test POL on it (real transactions, no value, not on polygonscan).
 - **ALTAR:**
   - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, comments and replies (DM replies stay the person's own).
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).

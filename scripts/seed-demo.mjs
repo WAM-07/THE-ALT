@@ -10,7 +10,8 @@ import { deflateSync } from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 
-export const DEMO_PASSWORD = 'demo pass 123';
+// The beta server sets its own (ALT_DEMO_PASSWORD), since it is reachable from the internet.
+export const DEMO_PASSWORD = process.env.ALT_DEMO_PASSWORD || 'demo pass 123';
 export const DEMO_ADMIN_EMAIL = 'admin@demo.alt';
 
 export const DEMO_PEOPLE = [
