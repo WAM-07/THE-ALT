@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -592,33 +593,17 @@ void toast(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
-/// ALTER's mark: an aurora ring around a glowing core, the "twin" inside you.
+/// ALTER's logo from the logo pack (docs/brand/logo-pack): the A inside the sapphire app square.
 class AlterMark extends StatelessWidget {
-  const AlterMark({super.key, this.size = 56});
+  const AlterMark({super.key, this.size = 56, this.animated = false});
   final double size;
 
+  /// Plays the logo pack's loop (loading screens); still when the phone asks for less motion.
+  final bool animated;
+
   @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: Ds.aurora,
-          boxShadow: [BoxShadow(color: Ds.iris.withValues(alpha: 0.45), blurRadius: size * 0.6, spreadRadius: -size * 0.1)],
-        ),
-        padding: EdgeInsets.all(size * 0.12),
-        child: Container(
-          decoration: BoxDecoration(shape: BoxShape.circle, color: Ds.bg),
-          padding: EdgeInsets.all(size * 0.2),
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(begin: Alignment.bottomLeft, end: Alignment.topRight, colors: [Ds.palette.signature.first, Ds.palette.signature.last]),
-              boxShadow: [BoxShadow(color: Ds.palette.signature.last.withValues(alpha: 0.5), blurRadius: size * 0.25)],
-            ),
-          ),
-        ),
-      );
+  Widget build(BuildContext context) =>
+      AltLogo(AltLogoKind.alter, size: size, animated: animated, brightness: Ds.isLight ? Brightness.light : Brightness.dark);
 }
 
 /// Renders the light markdown LLMs write (**bold**, *italic*, `code`) as styled text.

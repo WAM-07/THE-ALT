@@ -10,6 +10,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useAI } from "../../contexts/AIContext";
 import { altar, continueWithAlt, mediaUrl, wallet as altWallet } from "../../lib/alt";
 import { networkName, percent, polText, shortAddress, timeAgo } from "../../lib/format";
+import { PageLoader } from "../../components/BrandLogo";
 
 const FAUCET = "https://faucet.polygon.technology/";
 
@@ -97,9 +98,7 @@ export default function WalletPage() {
   }
   if (!w) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner />
-      </div>
+      <PageLoader />
     );
   }
 

@@ -7,6 +7,7 @@ import '../handoff.dart';
 import '../known_accounts.dart';
 import '../media.dart';
 import '../models.dart';
+import 'alt_logo.dart';
 import 'continue_with_alt.dart';
 
 // ALT's own look, the same in every app (it belongs to ALT, not to the app it opens over).

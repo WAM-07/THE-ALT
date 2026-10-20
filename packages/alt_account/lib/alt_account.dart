@@ -19,6 +19,7 @@ export 'src/support.dart';
 export 'src/models.dart';
 export 'src/token_store.dart';
 export 'src/ui/account_center.dart';
+export 'src/ui/alt_logo.dart';
 export 'src/ui/app_lock.dart';
 export 'src/ui/code_dialog.dart';
 export 'src/ui/continue_with_alt.dart';

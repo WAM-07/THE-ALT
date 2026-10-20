@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../client.dart';
 import '../handoff.dart';
+import 'alt_logo.dart';
 
 /// "Continue with ALT", like "Continue with Google": opens the ALT Account window (served by ALT
 /// Core at `/core/account/`) over the app. The person signs in or registers there; the window then
@@ -31,26 +32,6 @@ class AltAccountWindow {
     } catch (_) {
       return false;
     }
-  }
-}
-
-/// ALT's mark: three bars in the platforms' colours (ALTAR green, ALTERA orange, ink).
-class AltMark extends StatelessWidget {
-  const AltMark({super.key, this.height = 18, this.ink = const Color(0xFF15171A)});
-
-  final double height;
-  final Color ink;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget bar(Color c) => Container(width: height * 0.32, height: height, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(height * 0.15)));
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      bar(const Color(0xFF1F9A5C)),
-      SizedBox(width: height * 0.14),
-      bar(const Color(0xFFF0802A)),
-      SizedBox(width: height * 0.14),
-      bar(ink),
-    ]);
   }
 }
 

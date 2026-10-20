@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { redeemHandoff } from "../../lib/alt";
+import { Waiting } from "../../components/AltLogo";
 
 // When the browser blocks the sign-in popup, the ALT Account window opens full-page and comes back
 // here with a one-time code.
@@ -32,7 +33,7 @@ export default function Handoff() {
           </button>
         </div>
       ) : (
-        <span className="loader">Signing you in</span>
+        <Waiting>Signing you in</Waiting>
       )}
     </div>
   );

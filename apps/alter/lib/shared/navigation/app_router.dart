@@ -1,6 +1,5 @@
 import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/alt/alt_photo.dart';
@@ -61,9 +60,7 @@ final goRouter = GoRouter(
       builder: (context, state) => Backdrop(
         intensity: 0.9,
         child: Center(
-          child: const AlterMark(size: 72)
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .scale(begin: const Offset(0.94, 0.94), end: const Offset(1.04, 1.04), duration: 1100.ms, curve: Curves.easeInOut),
+          child: const AlterMark(size: 96, animated: true),
         ),
       ),
     ),

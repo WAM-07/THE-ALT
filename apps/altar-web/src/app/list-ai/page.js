@@ -11,6 +11,7 @@ import { toModel, useAI } from "../../contexts/AIContext";
 import { useModal } from "../../contexts/ModalContext";
 import { altar, api, auth, continueWithAlt, wallet } from "../../lib/alt";
 import { percent, polText } from "../../lib/format";
+import { PageLoader } from "../../components/BrandLogo";
 
 const STEPS = [
   ["Create it in ALTER", "Give your AI a personality, add what it should know, and chat with it until it sounds like you.", "In ALTER"],
@@ -76,9 +77,7 @@ function ListAI() {
   }
   if (!mine) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner />
-      </div>
+      <PageLoader />
     );
   }
 

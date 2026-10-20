@@ -7,7 +7,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useWishlist } from "../../../contexts/WishlistContext";
 import { useModal } from "../../../contexts/ModalContext";
 import AitArt from "../../../components/AitArt";
-import { Avatar, Button, Card, Chip, Spinner, VerifiedTick } from "../../../components/ui";
+import { Avatar, Button, Card, Chip, VerifiedTick } from "../../../components/ui";
 import { useTilt } from "../../../components/motion";
 import { altar, auth, continueWithAlt, conversations, mediaUrl, pictures, publicApi, support, wallet } from "../../../lib/alt";
 import ConfirmSpend from "../../../components/ConfirmSpend";
@@ -16,6 +16,7 @@ import ReportForm, { REPORT_REASONS } from "../../../components/ReportForm";
 import PicturePicker from "../../../components/PicturePicker";
 import { useAI } from "../../../contexts/AIContext";
 import { networkName, percent, polText, shortAddress, timeAgo } from "../../../lib/format";
+import { PageLoader } from "../../../components/BrandLogo";
 
 const OFFERS = [
   ["own", "Own", "The AIT moves to your wallet, with every right."],
@@ -99,9 +100,7 @@ export default function AgentDetails() {
   }
   if (!model) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner />
-      </div>
+      <PageLoader />
     );
   }
 

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../lib/alt";
 import { useStaff } from "./Staff";
+import { AltLogo, Waiting } from "./AltLogo";
 
 const NAV = [
   { href: "/", n: "01", label: "Overview" },
@@ -25,7 +26,7 @@ export function Shell({ children }) {
   if (s.state === "checking")
     return (
       <div className="center">
-        <span className="loader">Checking staff access</span>
+        <Waiting>Checking staff access</Waiting>
       </div>
     );
   if (s.state === "error")
@@ -50,11 +51,7 @@ function Frame({ children }) {
     <div className="frame">
       <aside className="rail">
         <Link href="/" className="rail-brand">
-          <span className="mark" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+          <AltLogo />
           <span className="wordmark">
             ALT
             <small>Command Centre</small>
@@ -157,11 +154,7 @@ function Gate() {
   return (
     <div className="gate">
       <section className="gate-art" aria-hidden="true">
-        <span className="mark">
-          <i />
-          <i />
-          <i />
-        </span>
+        <AltLogo className="mark mark-big" />
         <div>
           <div className="legend">The ALT Ecosystem</div>
           <div className="big">

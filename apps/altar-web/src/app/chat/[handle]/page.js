@@ -7,6 +7,7 @@ import { Avatar, Button, Spinner, VerifiedTick } from "../../../components/ui";
 import { useAuth } from "../../../contexts/AuthContext";
 import { toModel } from "../../../contexts/AIContext";
 import { api, continueWithAlt, conversations, publicApi } from "../../../lib/alt";
+import { PageLoader } from "../../../components/BrandLogo";
 
 /** "2 days 3 h", "45 min": how long a rental or subscription still runs. */
 function timeLeft(until, now) {
@@ -143,9 +144,7 @@ function Chat({ handle }) {
   if (error && !ai) return <p className="mx-auto max-w-md px-4 py-24 text-center text-ink-2">{error}</p>;
   if (!ai || !state) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner />
-      </div>
+      <PageLoader />
     );
   }
 

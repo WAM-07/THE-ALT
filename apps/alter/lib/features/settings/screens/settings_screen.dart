@@ -120,11 +120,21 @@ class SettingsScreen extends StatelessWidget {
       const SectionLabel('Advanced'),
       Group(children: [
         ListRow(icon: Icons.palette_outlined, color: Ds.iris, title: 'Theme', subtitle: Ds.palette.name, onTap: () => showThemePicker(context)),
+        ValueListenableBuilder<bool>(
+          valueListenable: AltBrand.classic,
+          builder: (context, classic, _) => ListRow(
+            icon: Icons.hexagon_outlined,
+            title: 'ALT mark',
+            subtitle: classic ? 'Classic: three bars' : 'Logo: the hexagon',
+            trailing: Switch.adaptive(value: classic, onChanged: AltBrand.setClassic),
+            onTap: () => AltBrand.setClassic(!classic),
+          ),
+        ),
       ]),
       const SizedBox(height: 24),
       Group(children: [ListRow(icon: Icons.logout_rounded, title: 'Sign out', danger: true, onTap: () => _signOut(context))]),
       const SizedBox(height: 22),
-      Center(child: Text('ALTER · part of THE ALT ecosystem', style: Ds.caption.copyWith(color: Ds.textTertiary))),
+      Center(child: Text('ALTER · part of The ALT Ecosystem', style: Ds.caption.copyWith(color: Ds.textTertiary))),
     ]);
   }
 }

@@ -12,6 +12,8 @@ void main() async {
   await HiveSetup.init();
   // The theme chosen on this phone (Profile → Advanced → Theme), before the first frame.
   await AlterThemeController.load();
+  // Which ALT mark to show (Profile → Advanced): the logo pack's hexagon or the classic bars.
+  await AltBrand.load();
   // Loads the person's AI whenever someone signs in (and forgets it on sign-out).
   watchAltSession();
   runApp(const ProviderScope(child: AlterApp()));

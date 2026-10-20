@@ -1,4 +1,6 @@
-# THE ALT ECOSYSTEM
+<img src="docs/brand/logo-pack/svg/alt-light.svg" alt="ALT" width="72" />
+
+# The ALT Ecosystem
 
 One ALT account and one AI identity across three apps:
 

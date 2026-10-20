@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Logo } from "./Header";
+import { BrandLogo } from "./BrandLogo";
 
 export default function Footer() {
   return (
@@ -19,7 +20,10 @@ export default function Footer() {
           </ul>
         </div>
         <div>
-          <p className="text-sm font-semibold">THE ALT ECOSYSTEM</p>
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <BrandLogo kind="alt" className="h-5 w-5" title="" />
+            The ALT Ecosystem
+          </p>
           <ul className="mt-3 space-y-2 text-sm text-ink-2">
             <li>ALTER: build your AI</li>
             <li>ALTERA: the social hub</li>
@@ -28,7 +32,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-line">
-        <p className="mx-auto max-w-[1320px] px-4 py-5 text-xs text-ink-3 sm:px-6">© {new Date().getFullYear()} THE ALT ECOSYSTEM. One account for ALTER, ALTERA and ALTAR. ·{" "}
+        <p className="mx-auto max-w-[1320px] px-4 py-5 text-xs text-ink-3 sm:px-6">© {new Date().getFullYear()} The ALT Ecosystem. One account for ALTER, ALTERA and ALTAR. ·{" "}
           <Link href="/legal/terms" className="hover:text-ink">
             Terms
           </Link>{" "}

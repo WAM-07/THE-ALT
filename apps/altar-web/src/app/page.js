@@ -6,10 +6,11 @@ import { useAI } from "../contexts/AIContext";
 import { useTheme } from "../contexts/ThemeContext";
 import AICard from "../components/AICard";
 import AitArt from "../components/AitArt";
-import { Avatar, Button, Chip, Empty, SectionHead, Shape, Spinner, VerifiedTick } from "../components/ui";
+import { Avatar, Button, Chip, Empty, SectionHead, Shape, VerifiedTick } from "../components/ui";
 import { CountUp, Reveal, useParallax } from "../components/motion";
 import { mediaUrl } from "../lib/alt";
 import { networkName, timeAgo } from "../lib/format";
+import { PageLoader } from "../components/BrandLogo";
 
 const SORTS = {
   newest: ["Newest", (a, b) => new Date(b.token?.mintedAt ?? b.createdAt) - new Date(a.token?.mintedAt ?? a.createdAt)],
@@ -76,9 +77,7 @@ function Home() {
       <Ticker models={byNewest} />
 
       {aiModels === null ? (
-        <div className="flex justify-center py-24">
-          <Spinner />
-        </div>
+        <PageLoader className="py-24" />
       ) : (
         <>
           {byNewest.length > 0 && <NewlyMinted models={byNewest.slice(0, 5)} />}

@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import AICard from "../../../components/AICard";
 import AitArt from "../../../components/AitArt";
-import { Avatar, Button, Chip, Empty, SectionHead, Spinner } from "../../../components/ui";
+import { Avatar, Button, Chip, Empty, SectionHead } from "../../../components/ui";
 import { Reveal } from "../../../components/motion";
 import { useAI } from "../../../contexts/AIContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import { mediaUrl, publicApi } from "../../../lib/alt";
 import { shortAddress } from "../../../lib/format";
+import { PageLoader } from "../../../components/BrandLogo";
 
 // A person's page on ALTAR: who they are (their public ALT profile) and their verified AIs, the ones
 // they made and any others they now own.
@@ -53,9 +54,7 @@ export default function CreatorPage() {
   }
   if (!person || !aiModels) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner />
-      </div>
+      <PageLoader />
     );
   }
 

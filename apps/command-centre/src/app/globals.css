@@ -132,29 +132,29 @@ kbd,
   color: var(--rail-muted);
 }
 
-/* The ALT mark, squared off: three platforms, one system. */
+/* ALT's logo (components/AltLogo.js): hexagon and A in the text colour, the dot in the accent. */
 .mark {
-  display: inline-grid;
-  grid-template-columns: repeat(3, 6px);
-  gap: 2px;
-}
-
-.mark i {
-  width: 6px;
-  height: 16px;
+  width: 26px;
+  height: 26px;
+  flex: none;
   display: block;
 }
 
-.mark i:nth-child(1) {
-  background: #1f9a5c;
+.mark-big {
+  width: 56px;
+  height: 56px;
 }
 
-.mark i:nth-child(2) {
-  background: #f0802a;
+.waiting {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
 }
 
-.mark i:nth-child(3) {
-  background: var(--accent);
+.waiting-logo {
+  width: 72px;
+  height: 72px;
+  color: var(--ink);
 }
 
 .rail nav {
@@ -1195,4 +1195,53 @@ button.stat-pick.on {
   .jump input {
     width: 70px;
   }
+}
+
+/* The logo pack's 5-second loop (docs/brand/logo-pack/animated), on <svg class="brand-anim">. */
+.brand-anim .len-hex { --len: 258; }
+.brand-anim .len-a { --len: 88; }
+.brand-anim .len-sq { --len: 272; }
+.brand-anim .len-coin { --len: 264; }
+.brand-anim .len-ring { --len: 220; }
+.brand-anim .len-in { --len: 37; }
+.brand-anim .len-out { --len: 55; }
+.brand-anim .draw,
+.brand-anim .drawa,
+.brand-anim .drawb { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); }
+.brand-anim .draw { animation: brand-d 5s cubic-bezier(.6, 0, .2, 1) infinite; }
+.brand-anim .drawa { animation: brand-da 5s cubic-bezier(.6, 0, .2, 1) infinite; }
+.brand-anim .drawb { animation: brand-db 5s cubic-bezier(.6, 0, .2, 1) infinite; }
+.brand-anim .pop,
+.brand-anim .ping,
+.brand-anim .twinkle,
+.brand-anim .flip,
+.brand-anim .type { transform-box: fill-box; transform-origin: center; }
+.brand-anim .pop { animation: brand-pop 5s ease-out infinite; }
+.brand-anim .ping { opacity: 0; animation: brand-ping 5s ease-out infinite; }
+.brand-anim .twinkle { animation: brand-tw 5s ease-in-out infinite; }
+.brand-anim .flip { animation: brand-flip 5s ease-in-out infinite; }
+.brand-anim .type { animation: brand-type 5s ease-in-out infinite; }
+.brand-anim .d2 { animation-delay: .15s; }
+.brand-anim .d3 { animation-delay: .3s; }
+.brand-anim .wave { animation: brand-wave 5s ease-in-out infinite; }
+.brand-anim .late { animation-delay: .25s; }
+@keyframes brand-d { 0% { stroke-dashoffset: var(--len); opacity: 1; } 28% { stroke-dashoffset: 0; } 86% { stroke-dashoffset: 0; opacity: 1; } 96% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: var(--len); opacity: 0; } }
+@keyframes brand-da { 0%, 16% { stroke-dashoffset: var(--len); opacity: 1; } 38% { stroke-dashoffset: 0; } 86% { stroke-dashoffset: 0; opacity: 1; } 96% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: var(--len); opacity: 0; } }
+@keyframes brand-db { 0%, 10% { stroke-dashoffset: var(--len); opacity: 1; } 34% { stroke-dashoffset: 0; } 86% { stroke-dashoffset: 0; opacity: 1; } 96% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: var(--len); opacity: 0; } }
+@keyframes brand-pop { 0%, 36% { transform: scale(0); opacity: 0; } 44% { transform: scale(1.3); opacity: 1; } 50% { transform: scale(1); } 86% { transform: scale(1); opacity: 1; } 96%, 100% { transform: scale(0); opacity: 0; } }
+@keyframes brand-ping { 0%, 50% { transform: scale(1); opacity: 0; } 52% { opacity: .9; } 76%, 100% { transform: scale(3.4); opacity: 0; } }
+@keyframes brand-tw { 0%, 36% { transform: scale(0) rotate(-90deg); opacity: 0; } 46% { transform: scale(1.25) rotate(0); opacity: 1; } 52% { transform: scale(1) rotate(0); } 62% { transform: scale(1.3) rotate(45deg); } 70% { transform: scale(1) rotate(90deg); } 86% { transform: scale(1) rotate(90deg); opacity: 1; } 96%, 100% { transform: scale(0) rotate(90deg); opacity: 0; } }
+@keyframes brand-flip { 0%, 52% { transform: scaleX(1); } 60% { transform: scaleX(.06); } 68%, 100% { transform: scaleX(1); } }
+@keyframes brand-type { 0%, 38% { transform: translateY(0); opacity: 0; } 42% { opacity: 1; } 48% { transform: translateY(-5px); } 54% { transform: translateY(0); } 62% { transform: translateY(-5px); } 68% { transform: translateY(0); } 86% { transform: translateY(0); opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes brand-wave { 0%, 50% { opacity: 1; } 57% { opacity: .25; } 64% { opacity: 1; } 71% { opacity: .25; } 78%, 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .brand-anim .draw,
+  .brand-anim .drawa,
+  .brand-anim .drawb { animation: none; stroke-dashoffset: 0; }
+  .brand-anim .pop,
+  .brand-anim .twinkle,
+  .brand-anim .flip,
+  .brand-anim .type,
+  .brand-anim .wave { animation: none; }
+  .brand-anim .ping { animation: none; opacity: 0; }
 }

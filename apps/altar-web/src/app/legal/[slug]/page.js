@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Markdown from "../../../components/Markdown";
-import { Card, Chip, Spinner } from "../../../components/ui";
+import { Card, Chip } from "../../../components/ui";
 import { useAuth } from "../../../contexts/AuthContext";
 import { policies } from "../../../lib/alt";
+import { PageLoader } from "../../../components/BrandLogo";
 
 const NAMES = { terms: "Terms of use", privacy: "Privacy policy", "ai-content": "AI content policy" };
 
@@ -38,9 +39,7 @@ export default function PolicyPage() {
   if (error) return <p className="mx-auto max-w-3xl px-4 py-16 text-ink-2">{error}</p>;
   if (!policy)
     return (
-      <div className="flex justify-center py-24">
-        <Spinner />
-      </div>
+      <PageLoader className="py-24" />
     );
 
   const current = policy.versions[0]?.version === policy.version;

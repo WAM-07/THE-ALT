@@ -276,6 +276,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   SizedBox(height: MediaQuery.of(context).size.height * 0.08),
 
                   // Logo/Branding
+                  AltLogo(AltLogoKind.altera, size: 84, brightness: isDark ? Brightness.dark : Brightness.light),
+                  const SizedBox(height: 14),
                   ShaderMask(
                     shaderCallback: (bounds) => LinearGradient(
                       colors: AppColors.primaryGradient,

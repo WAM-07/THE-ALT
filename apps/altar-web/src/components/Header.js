@@ -6,15 +6,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
 import { continueWithAlt } from "../lib/alt";
 import { Avatar, btnClass } from "./ui";
+import { BrandLogo } from "./BrandLogo";
 
 export function Logo({ className = "" }) {
   return (
     <Link href="/" className={`flex items-center gap-2 ${className}`} aria-label="ALTAR home">
-      <svg viewBox="0 0 32 32" className="h-8 w-8" aria-hidden="true">
-        <rect width="32" height="32" rx="10" fill="var(--accent)" />
-        <path d="M9 23 L16 8 L23 23" fill="none" stroke="var(--accent-ink)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M12 18h8" stroke="var(--accent-ink)" strokeWidth="3.2" strokeLinecap="round" />
-      </svg>
+      <BrandLogo kind="altar" className="h-9 w-9" title="" />
       <span className="font-display text-[22px] font-extrabold tracking-tight">altar</span>
     </Link>
   );

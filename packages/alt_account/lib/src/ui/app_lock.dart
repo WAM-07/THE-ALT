@@ -4,7 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../client.dart';
-import 'continue_with_alt.dart';
+import 'alt_logo.dart';
 
 /// Biometric unlock for an ALT app on this phone: when it is on, the app asks for a fingerprint or
 /// face (or the phone's PIN) when it opens and when you come back after a while away. It guards
@@ -124,7 +124,7 @@ class _AltAppLockGateState extends State<AltAppLockGate> with WidgetsBindingObse
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const AltMark(height: 26, ink: Color(0xFFF4F3EF)),
+                    const AltMark(height: 40, ink: Color(0xFFF4F3EF)),
                     const SizedBox(height: 22),
                     Text('${widget.client.platform.label} is locked',
                         style: const TextStyle(color: Color(0xFFF4F3EF), fontSize: 22, fontWeight: FontWeight.w700)),

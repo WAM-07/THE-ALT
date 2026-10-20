@@ -1,3 +1,4 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
@@ -69,14 +70,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'ALTERA',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: AppColors.primary,
-                      letterSpacing: 4,
+                  Row(children: [
+                    AltLogo(AltLogoKind.altera, size: 28, brightness: Theme.of(context).brightness),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'ALTERA',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: AppColors.primary,
+                        letterSpacing: 4,
+                      ),
                     ),
-                  ),
+                  ]),
                   TextButton(
                     onPressed: () => context.go('/login'),
                     child: const Text('Skip', style: TextStyle(color: AppColors.textSecondary)),

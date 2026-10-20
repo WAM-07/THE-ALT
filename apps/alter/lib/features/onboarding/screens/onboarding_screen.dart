@@ -170,7 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// STAGE 1: BOOT SPLASH (Spinning/Zooming Logo)
+// STAGE 1: BOOT SPLASH (the animated ALTER logo, then a zoom)
 // -----------------------------------------------------------------------------
 class _Stage1BootSplash extends StatefulWidget {
   final VoidCallback onComplete;
@@ -188,20 +188,13 @@ class _Stage1BootSplashState extends State<_Stage1BootSplash> {
 
   @override
   Widget build(BuildContext context) {
+    // The logo draws itself in (the pack's loop reaches the full logo at about 2.3 s), then zooms away.
     return Center(
-      child: Container(
-        width: 150,
-        height: 150,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: ALTGradients.heroAILight,
-        ),
-      ).animate()
-       .scale(begin: const Offset(0.5, 0.5), end: const Offset(1, 1), duration: 1000.ms, curve: Curves.easeOutBack)
-       .rotate(begin: 0, end: 1, duration: 1500.ms, curve: Curves.easeInOut)
-       .then(delay: 500.ms)
-       .scale(begin: const Offset(1, 1), end: const Offset(5, 5), duration: 500.ms)
-       .fadeOut(duration: 300.ms),
+      child: const AlterMark(size: 150, animated: true)
+          .animate()
+          .then(delay: 2000.ms)
+          .scale(begin: const Offset(1, 1), end: const Offset(5, 5), duration: 500.ms)
+          .fadeOut(duration: 300.ms),
     );
   }
 }

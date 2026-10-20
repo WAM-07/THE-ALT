@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { continueWithAlt, nextPath } from "../lib/alt";
 import { AuthCard, ErrorText, OneAccountNote } from "./AuthCard";
+import { AltMark } from "./BrandLogo";
 
 // ALTAR has no sign-in form of its own: "Continue with ALT" opens the ALT Account window.
 export default function AltContinue({ mode }) {
@@ -36,11 +37,7 @@ export default function AltContinue({ mode }) {
         disabled={busy}
         className="flex h-13 items-center justify-center gap-3 rounded-full bg-pop text-[15px] font-semibold text-pop-ink transition hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
       >
-        <span className="inline-grid grid-cols-3 gap-[3px]" aria-hidden="true">
-          <i className="block h-4 w-[5px] rounded-sm bg-[#1f9a5c]" />
-          <i className="block h-4 w-[5px] rounded-sm bg-[#f0802a]" />
-          <i className="block h-4 w-[5px] rounded-sm bg-pop-ink" />
-        </span>
+        <AltMark className="h-6 w-6" />
         {busy ? "Waiting for ALT…" : signup ? "Create an ALT account" : "Continue with ALT"}
       </button>
       <OneAccountNote />

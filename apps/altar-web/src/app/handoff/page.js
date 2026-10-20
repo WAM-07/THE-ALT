@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth, takeNextPath } from "../../lib/alt";
 import { AuthCard } from "../../components/AuthCard";
-import { Spinner } from "../../components/ui";
+import { PageLoader } from "../../components/BrandLogo";
 
 // "Open ALTAR" in ALTER or ALTERA, and the ALT Account window when popups are blocked, land here
 // with a one-time code: no password needed.
@@ -36,9 +36,7 @@ export default function Handoff() {
           </Link>
         </>
       ) : (
-        <div className="flex justify-center py-6">
-          <Spinner />
-        </div>
+        <PageLoader kind="alt" className="py-6" />
       )}
     </AuthCard>
   );

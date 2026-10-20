@@ -1,8 +1,8 @@
+import 'package:alt_account/alt_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/app_theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -53,7 +53,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: AltBrandColors.ink,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -62,31 +62,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'A',
-                      style: TextStyle(
-                        fontSize: 52,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                // ALTERA's logo from the logo pack, animated while the session is restored.
+                const AltLogo(AltLogoKind.altera, size: 120, animated: true, brightness: Brightness.dark),
+                const SizedBox(height: 22),
                 const Text(
                   'ALTERA',
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: AltBrandColors.paper,
                     letterSpacing: 6,
                   ),
                 ),
@@ -95,7 +79,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   'Hybrid AI Social Hub',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.8),
+                    color: AltBrandColors.paper.withValues(alpha: 0.7),
                     letterSpacing: 2,
                     fontWeight: FontWeight.w400,
                   ),
