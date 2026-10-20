@@ -55,6 +55,9 @@ const EnvSchema = z.object({
   ALTAR_SERVICE_URL: z.string().optional(),
   CHAIN_EXPLORER_URL: z.string().optional(),
   CHAIN_CONFIRMATIONS: z.coerce.number().int().min(1).default(1),
+  // Test POL every new account receives on ALT's own test chain (chain 31337 only; never on a public
+  // network). 0 = off. The beta server sets it so people can try buying, renting and subscribing.
+  STARTER_TEST_POL: z.coerce.number().min(0).max(1000).default(0),
   // IPFS (Module 6): local = content-addressed files under STORAGE_DIR; pinata = pinned for real.
   IPFS_MODE: z.enum(['local', 'pinata']).default('local'),
   PINATA_JWT: z.string().optional(),
@@ -129,6 +132,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
           confirmations: e.CHAIN_CONFIRMATIONS,
         }
       : null,
+    starterTestPol: e.STARTER_TEST_POL,
     ipfs: { mode: e.IPFS_MODE, pinataJwt: e.PINATA_JWT, gatewayUrl: e.IPFS_GATEWAY_URL },
     llm: {
       // Default: Groq when a key is present, always with the mock as a last resort in development.

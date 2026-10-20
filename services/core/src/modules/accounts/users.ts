@@ -128,6 +128,13 @@ export async function createUser(ctx: Ctx, client: pg.PoolClient, input: NewUser
      VALUES ($1, $2, 'custodial', $3, true, 'ALT wallet')`,
     [user.id, address, encrypt(ctx.config.encryptionKey, privateKey)],
   );
+  // Starter test POL on ALT's own test chain (beta and development only), sent by the job worker.
+  if (ctx.config.starterTestPol > 0 && ctx.chain?.isLocalDevChain) {
+    const { rows: job } = await client.query<{ id: string }>(`INSERT INTO core.jobs (kind, payload) VALUES ('starter_funds', $1) RETURNING id`, [
+      { userId: user.id, address },
+    ]);
+    await client.query(`SELECT pg_notify('alt_jobs', $1)`, [job[0]!.id]);
+  }
   return user;
 }
 

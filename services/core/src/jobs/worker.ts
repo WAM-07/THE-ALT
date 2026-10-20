@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { parseEther } from 'viem';
 import type { Ctx } from '../context.js';
 import { tx } from '../db.js';
 import { audit, publish } from '../lib/audit.js';
@@ -150,9 +151,39 @@ const publishVersion: Handler = async (ctx, job, save) => {
   return { txHash, onchainVersion: Number(after.version) };
 };
 
+// ---------------------------------------------------------------- starter_funds
+
+/** Sends a new account its starter test POL on ALT's own test chain (STARTER_TEST_POL; never a public network). */
+const starterFunds: Handler = async (ctx, job) => {
+  const chain = ctx.chain;
+  if (!chain?.isLocalDevChain) throw new AppError(409, 'NOT_A_TEST_CHAIN', 'Starter funds are only given on the ALT test chain.');
+  const amount = parseEther(String(ctx.config.starterTestPol));
+  const hash = await chain.giveTestFunds(job.payload.address!, amount);
+  await tx(ctx.db, async (client) => {
+    await audit(client, {
+      action: 'wallet.starter_funds',
+      actorService: 'core.jobs',
+      entityType: 'wallet',
+      entityId: job.payload.userId!,
+      data: { hash, address: job.payload.address, amountWei: amount.toString() },
+    });
+    await notify(client, {
+      userId: job.payload.userId!,
+      category: 'transaction',
+      type: 'wallet.starter_funds',
+      title: `${ctx.config.starterTestPol} test POL added to your ALT wallet`,
+      body: 'Test POL on the ALT test chain, so you can try buying, renting and subscribing. It has no real value.',
+      data: { hash },
+      link: '/wallet',
+    });
+  });
+  return { hash };
+};
+
 const HANDLERS: Record<string, { run: Handler; failed?: FailureHandler }> = {
   mint_ait: { run: mintAit, failed: mintFailed },
   publish_version: { run: publishVersion },
+  starter_funds: { run: starterFunds },
 };
 
 /**

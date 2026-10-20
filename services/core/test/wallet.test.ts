@@ -116,3 +116,29 @@ describe('listing an AI on ALTAR', () => {
     expect(JSON.stringify(inbox)).toContain('is listed');
   });
 });
+
+describe('starter test POL (beta)', () => {
+  it('gives every new account its starter test POL once, with an inbox notice and an audit entry', async () => {
+    const beta = await makeApp({ STARTER_TEST_POL: '100' });
+    try {
+      const get = (url: string, token: string) => beta.app.inject({ method: 'GET', url, headers: auth(token) });
+      const u = await signUp(beta);
+      expect((await get('/me/wallet', u.accessToken)).json().balance.wei).toBe('0'); // sent by the job worker
+      await beta.app.jobs.drain();
+      expect((await get('/me/wallet', u.accessToken)).json().balance.pol).toBe('100');
+      expect(JSON.stringify((await get('/notifications', u.accessToken)).json())).toContain('100 test POL added to your ALT wallet');
+      const { rows } = await beta.app.ctx.db.query(`SELECT data FROM core.audit_log WHERE action = 'wallet.starter_funds' AND entity_id = $1`, [u.user.id]);
+      expect(rows).toHaveLength(1);
+      await beta.app.jobs.drain(); // nothing left to send
+      expect((await get('/me/wallet', u.accessToken)).json().balance.pol).toBe('100');
+    } finally {
+      await beta.app.close();
+    }
+  });
+
+  it('gives nothing when it is not configured', async () => {
+    const u = await signUp(t);
+    await t.app.jobs.drain();
+    expect((await call('GET', '/me/wallet', u.accessToken)).json().balance.wei).toBe('0');
+  });
+});
