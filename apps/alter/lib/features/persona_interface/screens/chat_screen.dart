@@ -392,6 +392,11 @@ class _Bubble extends StatelessWidget {
         mine
             ? Text(msg.content, style: Ds.body.copyWith(fontSize: 14.5, color: Ds.bg, height: 1.45))
             : RichMessage(msg.content, style: Ds.body.copyWith(fontSize: 14.5, color: Ds.text, height: 1.45)),
+        if (!mine && msg.styleScore != null) ...[
+          const SizedBox(height: 6),
+          Text('Sounds like you · ${(msg.styleScore! * 100).round()}%',
+              style: Ds.caption.copyWith(color: Ds.textTertiary, fontSize: 11.5)),
+        ],
       ]),
     );
     return Padding(

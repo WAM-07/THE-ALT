@@ -61,3 +61,9 @@ apps/*/android/app/google-services.json
 # beta APKs (deploy/beta/build-apks.sh)
 deploy/beta/apk/
 deploy/beta/apk-logs/
+
+# ML service: its virtualenv and downloaded models
+services/ml/.venv/
+services/ml/.models/
+services/ml/.data/
+services/ml/__pycache__/

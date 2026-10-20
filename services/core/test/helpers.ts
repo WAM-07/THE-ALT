@@ -6,6 +6,7 @@ import { createMailer } from '../src/lib/mailer.js';
 import type { GoogleIdentity } from '../src/modules/auth/google.js';
 import { AppError } from '../src/lib/errors.js';
 import type { LlmProvider } from '../src/modules/ai/llm.js';
+import type { MlClient } from '../src/lib/ml.js';
 
 const privateKey = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -26,7 +27,7 @@ export const fakeGoogle = {
   },
 };
 
-export async function makeApp(env: Record<string, string> = {}, opts: { llmProviders?: LlmProvider[] } = {}) {
+export async function makeApp(env: Record<string, string> = {}, opts: { llmProviders?: LlmProvider[]; ml?: MlClient | null } = {}) {
   const config = loadConfig({
     NODE_ENV: 'test',
     DATABASE_URL: inject('databaseUrl'),
@@ -46,7 +47,7 @@ export async function makeApp(env: Record<string, string> = {}, opts: { llmProvi
     ...env,
   });
   const mailer = createMailer(config, () => {});
-  const app = await buildApp({ config, logger: false, google: fakeGoogle, mailer, jobs: false, ...(opts.llmProviders ? { llmProviders: opts.llmProviders } : {}) });
+  const app = await buildApp({ config, logger: false, google: fakeGoogle, mailer, jobs: false, ...(opts.llmProviders ? { llmProviders: opts.llmProviders } : {}), ...(opts.ml !== undefined ? { ml: opts.ml } : {}) });
   await app.ready();
   return { app, mailer, config };
 }

@@ -101,6 +101,9 @@ class ChatMsg {
   String get content => j['content'] as String;
   bool get flagged => j['flagged'] == true;
   bool get mine => role == 'user';
+
+  /// "Sounds like you" (0..1) from ALT's style-match model, on replies just written; null when not measured.
+  double? get styleScore => ((j['style'] as Map?)?['score'] as num?)?.toDouble();
 }
 
 class ClearanceCheck {
@@ -257,7 +260,7 @@ class AiApi {
         body: {'content': content, 'version': current ? 'current' : 'draft'}) as Map);
     return (
       ChatMsg(Map<String, dynamic>.from(body['message'] as Map)),
-      ChatMsg(Map<String, dynamic>.from(body['reply'] as Map)),
+      ChatMsg({...Map<String, dynamic>.from(body['reply'] as Map), 'style': body['style']}),
       body['proposedMemory'] == null ? null : Map<String, dynamic>.from(body['proposedMemory'] as Map),
     );
   }

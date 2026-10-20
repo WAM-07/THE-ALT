@@ -48,7 +48,21 @@ beforeAll(async () => {
       return { text: `[${channel}] ${name} says hi about ${messages[messages.length - 1].content.slice(0, 30)} #alt`, provider: 'test-llm', model: 't-1' };
     },
   };
-  core = await buildApp({ config, logger: false, mailer: mails, jobs: false, llmProviders: [persona] });
+  // A stand-in for ALT's toxicity model (services/ml): marker words decide the level, so tests are predictable.
+  const ml = {
+    model: 'test-ml',
+    async toxicity(texts) {
+      return texts.map((t) =>
+        /zzsevere/.test(t) ? { level: 'severe', categories: ['hate'], scores: {} }
+        : /zztoxic/.test(t) ? { level: 'toxic', categories: ['insult'], scores: {} }
+        : /zzmild/.test(t) ? { level: 'mild', categories: ['toxicity'], scores: {} }
+        : { level: 'none', categories: [], scores: {} });
+    },
+    async embed() {
+      return null;
+    },
+  };
+  core = await buildApp({ config, logger: false, mailer: mails, jobs: false, llmProviders: [persona], ml });
   await core.listen({ port: 0, host: '127.0.0.1' });
 
   // ALTERA reads its configuration when its modules load, so set it first.
@@ -340,6 +354,66 @@ describe('real-time direct messages over Socket.IO', () => {
       const bad = connect(url, { auth: { token: 'not-a-token' }, transports: ['websocket'] });
       await expect(new Promise((ok, fail) => { bad.on('connect', ok); bad.on('connect_error', (e) => fail(e)); })).rejects.toThrow();
       bad.close();
+    } finally {
+      sa.close();
+      sb.close();
+      ioServer.close();
+      await new Promise((r) => http.close(r));
+    }
+  });
+});
+
+describe('hate speech (Module 16, with the toxicity model)', () => {
+  it('blocks toxic posts and comments, and in DMs blocks severe, asks first for milder, never blocks self-harm', async () => {
+    const author = await altAccount('altera');
+    const post = await api('POST', '/posts', author.token, { content: 'you are a zztoxic idiot' });
+    expect(post.status).toBe(422);
+    expect(post.body).toMatchObject({ code: 'CONTENT_BLOCKED', categories: ['insult'] });
+    const ok = await api('POST', '/posts', author.token, { content: 'a calm post about zzmild weather' });
+    expect(ok.status).toBe(201); // borderline posts are allowed; only toxic and severe are blocked
+    const comment = await api('POST', `/posts/${ok.body.id ?? ok.body.post?.id}/comments`, author.token, { content: 'zzsevere words' });
+    expect(comment.status).toBe(422);
+
+    const { createServer } = require('node:http');
+    const { Server } = require('socket.io');
+    const { io: connect } = await import('socket.io-client');
+    const { createApp } = require('../src/app.js');
+    const { setupSocketIO } = require('../src/socket/realtime.js');
+    const http = createServer();
+    const ioServer = new Server(http);
+    http.on('request', createApp({ io: ioServer, logRequests: false }));
+    setupSocketIO(ioServer);
+    await new Promise((r) => http.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${http.address().port}`;
+    const a = await altAccount('altera');
+    const b = await altAccount('altera');
+    const sa = connect(url, { auth: { token: a.token }, transports: ['websocket'] });
+    const sb = connect(url, { auth: { token: b.token }, transports: ['websocket'] });
+    const next = (s, ev) => new Promise((done) => s.once(ev, done));
+    const send = (content, extra = {}) => sa.emit('dm:send', { content, sender_profile_id: a.id, sender_type: 'human', receiver_id: b.id, receiver_type: 'human', ...extra });
+    try {
+      await Promise.all([sa, sb].map((s) => new Promise((done, fail) => { s.on('connect', done); s.on('connect_error', fail); })));
+      const delivered = [];
+      sb.on('dm:receive', (m) => delivered.push(m.content));
+
+      // Severe: not sent.
+      let reply = next(sa, 'dm:error');
+      send('zzsevere message', { client_id: 'c1' });
+      expect(await reply).toMatchObject({ code: 'CONTENT_BLOCKED', client_id: 'c1' });
+
+      // Toxic or mild: the sender is asked first; nothing is sent until they confirm.
+      reply = next(sa, 'dm:warn');
+      send('you zztoxic person', { client_id: 'c2' });
+      expect(await reply).toMatchObject({ code: 'MAY_BE_HURTFUL', client_id: 'c2' });
+      const got = next(sb, 'dm:receive');
+      send('you zztoxic person', { client_id: 'c3', confirmed: true });
+      expect((await got).content).toBe('you zztoxic person');
+
+      // Someone writing privately about self-harm is never blocked.
+      const help = next(sb, 'dm:receive');
+      send('some days I want to hurt myself');
+      expect((await help).content).toBe('some days I want to hurt myself');
+      expect(delivered).toEqual(['you zztoxic person', 'some days I want to hurt myself']);
     } finally {
       sa.close();
       sb.close();

@@ -1,0 +1,2 @@
+# Evaluation only (not needed on the server)
+pyarrow==18.1.0

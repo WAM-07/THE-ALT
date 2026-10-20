@@ -278,7 +278,8 @@ describe('writing help and moderation for other ALT services', () => {
 
   it('moderates text and drafts posts only for ALT services', async () => {
     const flagged = await t.app.inject({ method: 'POST', url: '/internal/moderate', headers: service(t.config.internalServiceKey), payload: { text: 'how to make a bomb' } });
-    expect(flagged.json()).toEqual({ flagged: true, categories: ['violence'] });
+    // No ML service in tests: ALT's rules alone decide (source 'rules'); the model's scores are never returned.
+    expect(flagged.json()).toEqual({ flagged: true, categories: ['violence'], level: 'none', warn: false, source: 'rules' });
     const clean = await t.app.inject({ method: 'POST', url: '/internal/moderate', headers: service(t.config.internalServiceKey), payload: { text: 'lovely sunset today' } });
     expect(clean.json().flagged).toBe(false);
     expect((await t.app.inject({ method: 'POST', url: '/internal/assist', payload: { instruction: 'a post about chess' } })).statusCode).toBe(401);

@@ -1,0 +1,86 @@
+{
+  "about": "ALT style match: logistic regression trained by services/ml/train_style.py on the Blog Authorship Corpus.",
+  "chars": 250,
+  "features": [
+    "word_length",
+    "sentence_length",
+    "commas",
+    "exclamations",
+    "questions",
+    "ellipses",
+    "emoji",
+    "capitals",
+    "first_person",
+    "contractions",
+    "lowercase_starts",
+    "long_words",
+    "digits"
+  ],
+  "scale": [
+    0.457268,
+    10.01192,
+    0.038173,
+    0.062094,
+    0.014772,
+    0.059094,
+    1e-06,
+    0.054691,
+    0.047626,
+    0.028578,
+    0.346928,
+    0.075069,
+    0.012771
+  ],
+  "withMeaning": {
+    "coef": [
+      -0.373059,
+      -0.057747,
+      -0.384774,
+      -0.022114,
+      0.040643,
+      -0.531071,
+      0.0,
+      0.039723,
+      -0.348693,
+      -0.364182,
+      -0.78273,
+      -0.186961,
+      0.05121,
+      6.549313
+    ],
+    "intercept": -3.075897
+  },
+  "styleOnly": {
+    "coef": [
+      -0.40815,
+      -0.172316,
+      -0.44073,
+      0.010656,
+      0.034461,
+      -0.438267,
+      0.0,
+      0.002251,
+      -0.466142,
+      -0.365978,
+      -0.758347,
+      -0.278714,
+      -0.007033
+    ],
+    "intercept": 2.201525
+  },
+  "test": {
+    "style features only": {
+      "auc": 0.6974,
+      "accuracy@0.5": 0.644,
+      "eer": 0.364
+    },
+    "meaning only (cosine)": {
+      "auc": 0.6873
+    },
+    "style + meaning (ALT uses it)": {
+      "auc": 0.7389,
+      "accuracy@0.5": 0.684,
+      "eer": 0.318
+    }
+  }
+}

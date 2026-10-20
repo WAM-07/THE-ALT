@@ -5,7 +5,7 @@ import { audit, canonical } from '../../lib/audit.js';
 import { sha256 } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
-import { moderate } from './moderation.js';
+import { checkSafety } from './moderation.js';
 import { parsePersona } from './persona.js';
 import { approvedMemories, consentState, latestVersion, loadAi, requireConsent, type AiRow, type VersionRow } from './repo.js';
 
@@ -126,7 +126,7 @@ export async function clearance(ctx: Ctx, ai: AiRow) {
   const { rows: wallet } = await ctx.db.query('SELECT 1 FROM core.wallets WHERE user_id = $1 AND is_primary', [ai.owner_id]);
   const persona = parsePersona(latest?.persona_config ?? ai.draft_config);
   const personaText = [persona.about, ...persona.traits, ...persona.interests, ...persona.boundaries, persona.instructions ?? '', ai.name, ai.description ?? ''].join('\n');
-  const mod = moderate(personaText);
+  const mod = await checkSafety(ctx.ml, personaText);
   const minChats = ctx.config.clearance.minTestMessages;
 
   const checks: ClearanceCheck[] = [

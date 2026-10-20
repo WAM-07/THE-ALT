@@ -15,7 +15,7 @@ tar czf /tmp/alt-beta.tgz \
   --exclude=node_modules --exclude=.git --exclude=.data --exclude=_archive --exclude=docs --exclude=artifacts \
   --exclude=.next --exclude='.env' --exclude='.env.*' --exclude='apps/alter' --exclude='apps/altera' \
   --exclude='packages/alt_account' --exclude='packages/contracts/artifacts' --exclude='packages/contracts/cache' \
-  --exclude='*.log' \
+  --exclude='*.log' --exclude=.venv --exclude=.models --exclude=__pycache__ \
   package.json package-lock.json packages services apps scripts deploy
 echo "uploading ($(du -h /tmp/alt-beta.tgz | cut -f1))…"
 scp -i "$HOME/.ssh/alt_beta" -q /tmp/alt-beta.tgz "$USR@$IP:/tmp/alt-beta.tgz"
@@ -32,6 +32,11 @@ echo "building the contracts and the two websites…"
 (cd packages/contracts && sudo -u alt node ../../node_modules/hardhat/dist/src/cli.js build >/dev/null)
 (cd apps/altar-web && sudo -u alt NEXT_TELEMETRY_DISABLED=1 npx next build >/dev/null)
 (cd apps/command-centre && sudo -u alt NEXT_TELEMETRY_DISABLED=1 npx next build >/dev/null)
+echo "setting up the ML service (packages and pinned models, kept between deployments)…"
+dpkg -s python3-venv >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3-venv >/dev/null
+[ -x /var/lib/alt/ml-venv/bin/python ] || sudo -u alt python3 -m venv /var/lib/alt/ml-venv
+(cd services/ml && sudo -u alt /var/lib/alt/ml-venv/bin/python -m pip install --quiet --disable-pip-version-check -r requirements.txt \
+  && sudo -u alt env ML_MODEL_DIR=/var/lib/alt/models /var/lib/alt/ml-venv/bin/python models.py >/dev/null)
 systemctl stop alt-beta 2>/dev/null || true
 rm -rf /opt/alt/app.old
 [ -d /opt/alt/app ] && mv /opt/alt/app /opt/alt/app.old

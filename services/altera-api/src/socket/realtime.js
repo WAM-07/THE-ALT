@@ -85,6 +85,26 @@ function isAudioUrl(mediaUrl) {
  * Saves a direct message, keeps its conversation up to date, tells the receiver, and returns the
  * message as the app expects it. Used for people and for AI replies alike.
  */
+// Categories of ALT's rules that block a person's private message outright. Self-harm is not among them: someone
+// writing about it privately may be reaching out for help, and blocking that would do harm.
+const DM_BLOCKING_RULES = ['violence', 'hate', 'sexual_minors'];
+
+/** ALT Core's safety check (rules and the toxicity model) applied with the direct-message policy. */
+async function dmSafety(content, senderIsAi) {
+  let r;
+  try {
+    r = await core.moderate(content);
+  } catch {
+    return { block: false, warn: false, categories: [] }; // Core unreachable: deliver, as before
+  }
+  const categories = (r.categories || []).filter((c) => senderIsAi || !['private_data', 'impersonation', 'self_harm'].includes(c));
+  // An AI's messages follow the rules for everything an AI says: anything flagged is blocked.
+  if (senderIsAi) return { block: categories.length > 0, warn: false, categories };
+  if (r.level === 'severe' || categories.some((c) => DM_BLOCKING_RULES.includes(c))) return { block: true, warn: false, categories };
+  if (r.level === 'toxic' || r.level === 'mild') return { block: false, warn: true, categories: categories.length ? categories : ['toxicity'] };
+  return { block: false, warn: false, categories: [] };
+}
+
 async function deliverDm(io, { senderUserId, senderProfileId, senderType, senderInfo, receiverId, receiverType, receiverInfo, content, mediaUrl, mediaType }) {
   const conversationId = getConversationId(
     senderProfileId,
@@ -316,7 +336,8 @@ function setupSocketIO(io) {
           return socket.emit('dm:error', { message: 'Message content or media is required' });
         }
 
-        console.log(`[Socket DM] From ${socket.userId} to ${data?.receiver_id} (${data?.receiver_type}): ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`);
+        // Never log what a private message says.
+        console.log(`[Socket DM] From ${socket.userId} to ${data?.receiver_id} (${data?.receiver_type})`);
         if (content.startsWith('[[POST_SHARE]]')) {
           console.log('[Socket DM] SHARED POST DETECTED');
         }
@@ -355,6 +376,18 @@ function setupSocketIO(io) {
 
         if (!receiverInfo) {
           return socket.emit('dm:error', { message: 'Receiver not found' });
+        }
+
+        // M16: hate speech in direct messages (owner, 2026-10-20). Blocked: severe (hate, threats) and ALT's
+        // serious rules; asked first ("Send anyway?"): toxic or mild. Staff see nothing unless it is reported.
+        if (content) {
+          const verdict = await dmSafety(content, senderType === 'ai');
+          if (verdict.block) {
+            return socket.emit('dm:error', { message: 'This message breaks ALT’s content rules, so it was not sent.', code: 'CONTENT_BLOCKED', categories: verdict.categories, client_id: data?.client_id });
+          }
+          if (verdict.warn && data?.confirmed !== true) {
+            return socket.emit('dm:warn', { message: 'This message may be hurtful. Send it anyway?', code: 'MAY_BE_HURTFUL', categories: verdict.categories, client_id: data?.client_id });
+          }
         }
 
         const messageResponse = await deliverDm(io, {

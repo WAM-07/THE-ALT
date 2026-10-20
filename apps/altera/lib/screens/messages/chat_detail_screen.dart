@@ -490,6 +490,28 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Module 16: ALT's safety check on a message just sent (not delivered; the person decides).
+    ref.listen<MessagingState>(messagingProvider, (prev, next) {
+      final notice = next.safetyNotice;
+      if (notice == null || identical(notice, prev?.safetyNotice) || !mounted) return;
+      final notifier = ref.read(messagingProvider.notifier);
+      if (notice.blocked) {
+        notifier.dismissSafetyNotice();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(notice.message)));
+        return;
+      }
+      showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Before you send'),
+          content: Text(notice.message),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Edit message')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send anyway')),
+          ],
+        ),
+      ).then((send) => send == true ? notifier.confirmSafetyNotice() : notifier.dismissSafetyNotice());
+    });
     final messagingState = ref.watch(messagingProvider);
     final messages =
         messagingState.messagesByConversation[widget.conversation.id] ?? [];

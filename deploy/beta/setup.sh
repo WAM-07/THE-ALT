@@ -7,7 +7,7 @@ HOST="${1:?usage: setup.sh <public-host>}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -y -q ca-certificates curl gnupg ufw postgresql debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y -q ca-certificates curl gnupg ufw postgresql debian-keyring debian-archive-keyring apt-transport-https python3-venv
 
 # Node.js 22 (NodeSource)
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then

@@ -221,48 +221,64 @@ export function chunk(text: string, size = 600, overlap = 120) {
   return chunks;
 }
 
+/** The passages of an AI's items, as retrieval sees them ("Title: passage"), item by item. */
+export function passagesOf(docs: { title: string; text: string }[]) {
+  return docs.map((d) => chunk(d.text).map((text) => `${d.title}: ${text}`));
+}
+
+/** Okapi BM25 score of each passage for the query (k1 1.2, b 0.75); 0 when it shares no word with it. */
+export function bm25(passages: string[], query: string): number[] {
+  const docs = passages.map((p) => terms(p));
+  const q = [...new Set(terms(query))];
+  if (!docs.length || !q.length) return docs.map(() => 0);
+  const N = docs.length;
+  const avgLen = docs.reduce((n, d) => n + d.length, 0) / N || 1;
+  const df = new Map<string, number>();
+  for (const d of docs) for (const t of new Set(d)) df.set(t, (df.get(t) ?? 0) + 1);
+  const k1 = 1.2;
+  const b = 0.75;
+  return docs.map((d) => {
+    const tf = new Map<string, number>();
+    for (const t of d) tf.set(t, (tf.get(t) ?? 0) + 1);
+    let score = 0;
+    for (const t of q) {
+      const f = tf.get(t);
+      if (!f) continue;
+      const idf = Math.log(1 + (N - (df.get(t) ?? 0) + 0.5) / ((df.get(t) ?? 0) + 0.5));
+      score += (idf * f * (k1 + 1)) / (f + k1 * (1 - b + (b * d.length) / avgLen));
+    }
+    return score;
+  });
+}
+
+/** Takes passages in the given order until the character budget is used. */
+export function withinBudget(passages: string[], maxChars: number) {
+  const picked: string[] = [];
+  let used = 0;
+  for (const p of passages) {
+    if (used + p.length > maxChars) break;
+    picked.push(p);
+    used += p.length;
+  }
+  return picked;
+}
+
 /**
  * Picks the passages of the owner's documents most related to the question, ranked with BM25 (the
  * scoring search engines use: rare words count more, long passages are not favoured). Everything
  * is sent when it fits, since a question may share no word with the answer ("What do I enjoy?" vs
- * "I love Flutter"). Embeddings could replace the scoring later without changing callers.
+ * "I love Flutter"). With ALT's ML service, `retrieveSemantic` (semantic.ts) adds meaning to the ranking.
  */
 export function retrieve(docs: { title: string; text: string }[], query: string, maxChars = 2400) {
   const whole = docs.map((d) => `${d.title}: ${d.text.trim()}`);
   if (whole.reduce((n, t) => n + t.length, 0) <= maxChars) return whole;
-
-  const passages = docs.flatMap((d) => chunk(d.text).map((text) => ({ text: `${d.title}: ${text}`, terms: terms(`${d.title} ${text}`) })));
-  const q = [...new Set(terms(query))];
-  if (!passages.length || !q.length) return [];
-  const N = passages.length;
-  const avgLen = passages.reduce((n, p) => n + p.terms.length, 0) / N;
-  const df = new Map<string, number>();
-  for (const p of passages) for (const t of new Set(p.terms)) df.set(t, (df.get(t) ?? 0) + 1);
-  const k1 = 1.2;
-  const b = 0.75;
-  const scored = passages
-    .map((p) => {
-      const tf = new Map<string, number>();
-      for (const t of p.terms) tf.set(t, (tf.get(t) ?? 0) + 1);
-      let score = 0;
-      for (const t of q) {
-        const f = tf.get(t);
-        if (!f) continue;
-        const idf = Math.log(1 + (N - (df.get(t) ?? 0) + 0.5) / ((df.get(t) ?? 0) + 0.5));
-        score += (idf * f * (k1 + 1)) / (f + k1 * (1 - b + (b * p.terms.length) / avgLen));
-      }
-      return { text: p.text, score };
-    })
+  const passages = passagesOf(docs).flat();
+  const scores = bm25(passages, query);
+  const ranked = passages
+    .map((text, i) => ({ text, score: scores[i]! }))
     .filter((p) => p.score > 0)
     .sort((x, y) => y.score - x.score);
-  const picked: string[] = [];
-  let used = 0;
-  for (const p of scored) {
-    if (used + p.text.length > maxChars) break;
-    picked.push(p.text);
-    used += p.text.length;
-  }
-  return picked;
+  return withinBudget(ranked.map((p) => p.text), maxChars);
 }
 
 export function assertMutable(ai: AiRow) {

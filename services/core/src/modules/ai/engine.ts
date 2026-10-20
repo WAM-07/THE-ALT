@@ -1,11 +1,12 @@
 import type { Ctx } from '../../context.js';
 import { AppError } from '../../lib/errors.js';
 import type { LlmMessage } from './llm.js';
-import { FLAGGED_REPLY, moderate } from './moderation.js';
+import { checkSafety, FLAGGED_REPLY } from './moderation.js';
 import { tx } from '../../db.js';
 import { fileCase } from '../cases/cases.js';
 import { buildSystemPrompt, parsePersona, temperatureFor, type Channel } from './persona.js';
-import { approvedMemories, consentState, datasetTexts, loadVersion, retrieve, type AiRow } from './repo.js';
+import { approvedMemories, consentState, datasetTexts, loadVersion, type AiRow } from './repo.js';
+import { retrieveSemantic } from './semantic.js';
 
 export interface RespondInput {
   ai: AiRow;
@@ -71,7 +72,7 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
     ownerName: ownerRows[0]?.display_name ?? 'their owner',
     persona,
     memories: memories.map((m) => m.content),
-    knowledge: retrieve(docs, lastUser),
+    knowledge: await retrieveSemantic(ctx, docs, lastUser),
     channel: input.channel,
   });
   const messages: LlmMessage[] = [{ role: 'system', content: system }, ...input.messages.slice(-12)];
@@ -79,7 +80,7 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
   const started = Date.now();
   const result = await ctx.llm.complete(messages, { temperature: temperatureFor(persona), maxTokens: MAX_TOKENS[persona.style.verbosity] });
   const latencyMs = Date.now() - started;
-  const check = moderate(result.text);
+  const check = await checkSafety(ctx.ml, result.text);
 
   await ctx.db.query(
     `INSERT INTO core.interaction_log (ai_id, version_id, channel, caller_user_id, caller_service, provider, model, latency_ms, tokens_in, tokens_out, flagged)

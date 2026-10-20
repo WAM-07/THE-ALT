@@ -1,11 +1,37 @@
+import type { MlClient, ToxicityLevel } from '../../lib/ml.js';
+
 /**
- * First line of the ethics layer (Module 16): fast rule-based checks on everything an AI says and on
- * personas before they are deployed. A model-based classifier is layered on top later; these rules
- * stay as a cheap, predictable floor.
+ * The ethics layer (Module 16), in two parts. Fast rule-based checks (below) are a cheap, predictable floor and
+ * catch what models miss (an AI claiming to be human, private data, dehumanising wording). On top, the toxicity
+ * model in ALT's ML service (`checkSafety`) scores insults, obscenity, threats and identity-based hate.
  */
 export interface ModerationResult {
   flagged: boolean;
   categories: string[];
+}
+
+export interface SafetyCheck extends ModerationResult {
+  /** The model's level ("none" when it was not consulted or found nothing). */
+  level: ToxicityLevel;
+  /** Borderline: not blocked, but a person sending it privately is asked to confirm. */
+  warn: boolean;
+  /** What decided: ALT's rules alone (model unavailable) or rules and the toxicity model. */
+  source: 'rules' | 'rules+model';
+  scores?: Record<string, number>;
+}
+
+/**
+ * Rules plus the toxicity model. `flagged` (blocked) when a rule hits or the model says "toxic" or "severe";
+ * `warn` when the model says "mild". Without the ML service it is exactly `moderate()`.
+ */
+export async function checkSafety(ml: MlClient | null, text: string): Promise<SafetyCheck> {
+  const rules = moderate(text);
+  const model = ml && text.trim() ? (await ml.toxicity([text]))?.[0] ?? null : null;
+  if (!model) return { ...rules, level: 'none', warn: false, source: 'rules' };
+  const blocking = model.level === 'toxic' || model.level === 'severe';
+  const categories = [...new Set([...rules.categories, ...(blocking ? model.categories : [])])];
+  const flagged = rules.flagged || blocking;
+  return { flagged, categories, level: model.level, warn: !flagged && model.level === 'mild', source: 'rules+model', scores: model.scores };
 }
 
 const RULES: { category: string; patterns: RegExp[] }[] = [

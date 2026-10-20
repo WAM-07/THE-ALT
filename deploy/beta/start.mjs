@@ -118,6 +118,10 @@ process.env.GOVERNOR_PRIVATE_KEY ||= LOCAL_GOVERNOR_KEY;
 // ---------------------------------------------------------------- services
 const tsx = require.resolve('tsx/cli');
 const next = require.resolve('next/dist/bin/next');
+// ALT's ML service (toxicity model, embeddings) from its virtualenv; without it, moderation uses the rules alone.
+const mlPython = path.join(process.env.ALT_ML_VENV || path.join(state, 'ml-venv'), 'bin', 'python');
+const mlOn = existsSync(mlPython);
+if (mlOn) process.env.ML_URL ||= `http://${local}:4500`;
 const services = [
   { name: 'core', cwd: 'services/core', cmd: [tsx, 'src/index.ts'], health: ports.core,
     env: { CORE_HOST: local, CORE_PORT: String(ports.core), ALTERA_SERVICE_URL: `http://${local}:${ports.altera}`, ALTAR_SERVICE_URL: `http://${local}:${ports.altar}` } },
@@ -128,6 +132,10 @@ const services = [
   { name: 'altar', cwd: 'services/altar-api', cmd: [tsx, 'src/index.ts'], health: ports.altar,
     env: { ALTAR_HOST: local, ALTAR_PORT: String(ports.altar), CORE_URL: `http://${local}:${ports.core}` } },
 ];
+if (mlOn) {
+  services.push({ name: 'ml', cwd: 'services/ml', exe: mlPython, cmd: ['-m', 'uvicorn', 'app:app', '--host', local, '--port', '4500', '--log-level', 'warning'],
+    health: 4500, env: { ML_MODEL_DIR: path.join(state, 'models'), ML_THREADS: '2' } });
+}
 if (!seed) {
   services.push(
     { name: 'altar-web', cwd: 'apps/altar-web', cmd: [next, 'start', '-p', String(ports.altarWeb), '-H', local], health: ports.altarWeb, path: '/', env: { NEXT_TELEMETRY_DISABLED: '1' } },
@@ -156,7 +164,7 @@ chainProcess.on('exit', () => {
 });
 
 for (const s of services) {
-  const child = spawn(process.execPath, s.cmd, { cwd: path.join(root, s.cwd), env: { ...process.env, ...s.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(s.exe ?? process.execPath, s.cmd, { cwd: path.join(root, s.cwd), env: { ...process.env, ...s.env }, stdio: ['ignore', 'pipe', 'pipe'] });
   children.push(child);
   for (const stream of [child.stdout, child.stderr]) readline.createInterface({ input: stream }).on('line', (l) => console.log(`[${s.name}] ${l}`));
   // One service down means the beta is broken: systemd restarts the whole set (the chain is replayed).

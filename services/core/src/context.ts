@@ -4,6 +4,7 @@ import type { GoogleVerifier } from './modules/auth/google.js';
 import type { ChainService } from './lib/chain.js';
 import type { IpfsStore } from './lib/ipfs.js';
 import type { LlmRouter } from './modules/ai/llm.js';
+import type { MlClient } from './lib/ml.js';
 import type { NotificationHub } from './lib/notify.js';
 import type { PushSender } from './lib/push.js';
 import type { Mailer } from './lib/mailer.js';
@@ -20,6 +21,8 @@ export interface Ctx {
   chain: ChainService | null;
   ipfs: IpfsStore;
   llm: LlmRouter;
+  /** ALT's ML service (toxicity model, embeddings); null when not configured, then the rules decide alone. */
+  ml: MlClient | null;
   /** Pushes committed notifications to people's open streams. */
   hub: NotificationHub;
   /** Sends them to closed apps through Firebase Cloud Messaging (off until configured). */

@@ -9,6 +9,7 @@ import { tx } from '../../db.js';
 import { audit, verifyAuditChain } from '../../lib/audit.js';
 import { notFound } from '../../lib/errors.js';
 import { findUserByHandle, findUserById, handleTaken, parseRoles, publicProfile, type UserRow } from '../../modules/accounts/users.js';
+import { BEHAVIOUR_FEATURES, MIN_TRAINING_DAYS, scanBehaviour } from '../../modules/accounts/behaviour.js';
 import { requireAnyRole, requireRole, requireService } from '../auth-guard.js';
 import { Handle } from '../schemas.js';
 
@@ -77,6 +78,46 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
   const admin = requireRole(ctx, 'admin');
   // Auditors read the audit log too (the ALT Command Centre's audit page); only admins change anything.
   const auditReader = requireAnyRole(ctx, ['admin', 'auditor']);
+  const behaviourReader = requireAnyRole(ctx, ['admin', 'moderator', 'auditor']);
+
+  // Abnormal-behaviour scans (Module 16 FE-3): what ALT's behaviour model saw, newest first.
+  r.get(
+    '/admin/behaviour',
+    { preHandler: behaviourReader, schema: { tags: ['admin'], summary: 'Abnormal-behaviour scans (behaviour model) and the accounts they found unusual' } },
+    async () => {
+      const { rows } = await ctx.db.query(`SELECT * FROM core.behaviour_scans ORDER BY ran_at DESC LIMIT 10`);
+      const ids = [...new Set(rows.flatMap((s) => (s.results as { userId: string }[]).map((x) => x.userId)))];
+      const { rows: people } = ids.length
+        ? await ctx.db.query<{ id: string; handle: string; display_name: string }>('SELECT id, handle, display_name FROM core.users WHERE id = ANY($1::uuid[])', [ids])
+        : { rows: [] };
+      const who = new Map(people.map((p) => [p.id, { handle: p.handle, displayName: p.display_name }]));
+      return {
+        features: BEHAVIOUR_FEATURES,
+        minTrainingDays: MIN_TRAINING_DAYS,
+        scans: rows.map((s) => ({
+          id: String(s.id),
+          ranAt: s.ran_at,
+          status: s.status,
+          model: s.model,
+          trainedRows: s.trained_rows,
+          scored: s.scored,
+          flagged: s.flagged,
+          thresholds: s.thresholds,
+          results: (s.results as { userId: string }[]).map((x) => ({ ...x, user: who.get(x.userId) ?? null })),
+        })),
+      };
+    },
+  );
+
+  r.post(
+    '/admin/behaviour/scan',
+    { preHandler: admin, schema: { tags: ['admin'], summary: 'Run the abnormal-behaviour scan now' } },
+    async (req) => {
+      const scan = await scanBehaviour(ctx);
+      await tx(ctx.db, (client) => audit(client, { action: 'admin.behaviour_scan', actorUserId: req.auth!.userId, entityType: 'behaviour_scan', entityId: String(scan.id), ip: req.ip, data: { status: scan.status } }));
+      return { id: String(scan.id), status: scan.status, trainedRows: scan.trained ?? 0, scored: scan.scored ?? 0, flagged: scan.flagged ?? 0 };
+    },
+  );
 
   r.get(
     '/admin/users',

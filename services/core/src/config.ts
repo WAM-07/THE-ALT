@@ -63,6 +63,8 @@ const EnvSchema = z.object({
   PINATA_JWT: z.string().optional(),
   IPFS_GATEWAY_URL: z.string().default('https://gateway.pinata.cloud'),
   // Persona engine (Module 10). Providers are tried in order; "mock" needs no key and is for development.
+  // ALT's ML service (services/ml): the toxicity model and embeddings. Blank = ALT's rules alone.
+  ML_URL: z.string().optional(),
   LLM_PROVIDERS: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
@@ -133,6 +135,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         }
       : null,
     starterTestPol: e.STARTER_TEST_POL,
+    mlUrl: e.ML_URL?.trim() || null,
     ipfs: { mode: e.IPFS_MODE, pinataJwt: e.PINATA_JWT, gatewayUrl: e.IPFS_GATEWAY_URL },
     llm: {
       // Default: Groq when a key is present, always with the mock as a last resort in development.

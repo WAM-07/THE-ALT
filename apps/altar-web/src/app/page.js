@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAI } from "../contexts/AIContext";
@@ -8,7 +8,7 @@ import AICard from "../components/AICard";
 import AitArt from "../components/AitArt";
 import { Avatar, Button, Chip, Empty, SectionHead, Shape, VerifiedTick } from "../components/ui";
 import { CountUp, Reveal, useParallax } from "../components/motion";
-import { mediaUrl } from "../lib/alt";
+import { mediaUrl, publicApi } from "../lib/alt";
 import { networkName, timeAgo } from "../lib/format";
 import { PageLoader } from "../components/BrandLogo";
 
@@ -57,13 +57,29 @@ function Home() {
     return [...map.values()].sort((a, b) => b.ais.length - a.ais.length);
   }, [byNewest]);
 
-  const shown = useMemo(() => {
+  // ALT's embedding model also finds AIs by what they are about ("help with maths"), not only by name.
+  const [byMeaning, setByMeaning] = useState({ q: "", ids: new Set() });
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) return;
+    const timer = setTimeout(() => {
+      publicApi(`/core/public/search/ais?q=${encodeURIComponent(q)}&platform=altar`)
+        .then((r) => setByMeaning({ q, ids: new Set(r.by === "meaning" ? r.results.map((x) => x.id) : []) }))
+        .catch(() => {});
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const { shown, matchedByMeaning } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return models
+    const meaning = byMeaning.q.toLowerCase() === q ? byMeaning.ids : new Set();
+    const byText = (m) => [m.name, m.handle, m.category, m.description, m.creatorName, m.ownerName, m.creator?.handle].some((v) => String(v ?? "").toLowerCase().includes(q));
+    const list = models
       .filter((m) => category === "All" || m.category === category)
-      .filter((m) => !q || [m.name, m.handle, m.category, m.description, m.creatorName, m.ownerName, m.creator?.handle].some((v) => String(v ?? "").toLowerCase().includes(q)))
+      .filter((m) => !q || byText(m) || meaning.has(m.id))
       .sort(SORTS[sort][1]);
-  }, [models, category, query, sort]);
+    return { shown: list, matchedByMeaning: q ? list.filter((m) => !byText(m)).length : 0 };
+  }, [models, category, query, sort, byMeaning]);
 
   const network = models.find((m) => m.token)?.token.chainId;
   const clearSearch = () => {
@@ -104,8 +120,8 @@ function Home() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Filter by name or creator"
-                  aria-label="Filter AIs"
+                  placeholder="Search by name, or describe an AI"
+                  aria-label="Search AIs"
                   className="h-10 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-sm outline-none placeholder:text-ink-3 focus:border-ink/30 lg:w-64"
                 />
                 <select
@@ -123,6 +139,11 @@ function Home() {
               </div>
             </div>
 
+            {matchedByMeaning > 0 && (
+              <p className="-mt-4 mb-6 text-sm text-ink-3">
+                {matchedByMeaning === 1 ? "1 AI matches" : `${matchedByMeaning} AIs match`} by meaning (ALT&apos;s search model), not by name.
+              </p>
+            )}
             {error && models.length === 0 ? (
               <Empty title="Couldn't reach ALT">Check that the ALT services are running, then refresh the page.</Empty>
             ) : shown.length === 0 ? (

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { Ctx } from '../../context.js';
 import { AppError, notFound } from '../../lib/errors.js';
 import { respond } from '../../modules/ai/engine.js';
-import { moderate } from '../../modules/ai/moderation.js';
+import { checkSafety } from '../../modules/ai/moderation.js';
 import { loadAi } from '../../modules/ai/repo.js';
 import { requireService, requireUser } from '../auth-guard.js';
 
@@ -126,7 +126,7 @@ export async function conversationRoutes(app: FastifyInstance, ctx: Ctx) {
       const { rows: saved } = await ctx.db.query(`INSERT INTO core.chat_messages (session_id, role, content, flagged) VALUES ($1, 'user', $2, $3) RETURNING *`, [
         req.params.sessionId,
         req.body.content,
-        moderate(req.body.content).flagged,
+        (await checkSafety(ctx.ml, req.body.content)).flagged,
       ]);
       const result = await respond(ctx, {
         ai: a.ai,

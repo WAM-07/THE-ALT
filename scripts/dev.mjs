@@ -26,7 +26,7 @@ const dataDir = path.join(root, '.data');
 const args = new Set(process.argv.slice(2));
 const require = createRequire(import.meta.url);
 
-const colors = { core: 36, gateway: 35, altera: 33, altar: 32, 'altar-web': 92, command: 96, postgres: 34, chain: 94, dev: 37 };
+const colors = { ml: 93, core: 36, gateway: 35, altera: 33, altar: 32, 'altar-web': 92, command: 96, postgres: 34, chain: 94, dev: 37 };
 const tag = (name) => `\x1b[${colors[name] ?? 37}m${name.padEnd(8)}\x1b[0m`;
 const say = (msg) => console.log(`${tag('dev')} ${msg}`);
 const fail = (msg) => {
@@ -276,6 +276,12 @@ for (const app of ['alter', 'altera']) {
 }
 
 // ---------------------------------------------------------------- 5. services
+// ALT's ML service (toxicity model, embeddings), when `npm run ml:setup` has been run; otherwise ALT's rules alone.
+const mlPython = path.join(root, 'services', 'ml', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+const mlOn = existsSync(mlPython) && !args.has('--no-ml');
+if (mlOn) process.env.ML_URL ||= 'http://127.0.0.1:4500';
+else say('ML service not set up (`npm run ml:setup`): moderation uses the ALT rules alone');
+
 const tsx = require.resolve('tsx/cli');
 const services = [
   {
@@ -308,6 +314,16 @@ if (existsSync(path.join(root, 'services', 'altera-api', 'migrations'))) {
     cmd: [process.execPath, '--watch-path=src', 'src/server.js'],
     env: { PORT: String(ports.altera) },
     health: `http://127.0.0.1:${ports.altera}/health`,
+  });
+}
+
+if (mlOn) {
+  services.push({
+    name: 'ml',
+    cwd: path.join(root, 'services', 'ml'),
+    cmd: [mlPython, '-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '4500', '--log-level', 'warning'],
+    env: {},
+    health: 'http://127.0.0.1:4500/health',
   });
 }
 

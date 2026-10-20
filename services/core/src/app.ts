@@ -27,7 +27,9 @@ import { conversationRoutes } from './http/routes/conversations.js';
 import { TokenService } from './lib/tokens.js';
 import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google.js';
 import { createLlmRouter, type LlmProvider, LlmRouter } from './modules/ai/llm.js';
+import { createMlClient, type MlClient } from './lib/ml.js';
 import { JobRunner } from './jobs/worker.js';
+import { scanIfDue } from './modules/accounts/behaviour.js';
 import { aiRoutes } from './http/routes/ais.js';
 import { authRoutes } from './http/routes/auth.js';
 import { directoryRoutes } from './http/routes/directory.js';
@@ -41,6 +43,7 @@ export interface BuildOptions {
   mailer?: Mailer;
   ipfs?: IpfsStore;
   llmProviders?: LlmProvider[];
+  ml?: MlClient | null;
   /** Start the background job loop (default: config.jobsEnabled). Tests drain jobs by hand. */
   jobs?: boolean;
   logger?: boolean;
@@ -81,6 +84,7 @@ export async function buildApp(opts: BuildOptions) {
       opts.ipfs ??
       (config.ipfs.mode === 'pinata' ? pinataIpfs(config.ipfs.pinataJwt!, config.ipfs.gatewayUrl) : localIpfs(config.storageDir, config.publicUrl)),
     llm: opts.llmProviders ? new LlmRouter(opts.llmProviders) : createLlmRouter(config.llm),
+    ml: opts.ml !== undefined ? opts.ml : config.mlUrl ? createMlClient(config.mlUrl, config.internalServiceKey, (m) => app.log.warn(m)) : null,
     hub: new NotificationHub(config.databaseUrl),
     push: new PushSender(db, config.push, (m) => app.log.warn(m)),
   };
@@ -95,13 +99,21 @@ export async function buildApp(opts: BuildOptions) {
   }
   const jobs = new JobRunner(ctx);
   app.decorate('jobs', jobs);
+  // The daily abnormal-behaviour scan (Module 16 FE-3): checked hourly, run when the last is a day old.
+  let behaviourTimer: NodeJS.Timeout | null = null;
   if (opts.jobs ?? config.jobsEnabled) {
     app.addHook('onReady', async () => {
       await jobs.start();
+      if (ctx.ml) {
+        const check = () => void scanIfDue(ctx).catch((err: Error) => app.log.warn(`behaviour scan: ${err.message}`));
+        behaviourTimer = setInterval(check, 3600_000);
+        setTimeout(check, 60_000).unref();
+      }
     });
   }
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => {
+    if (behaviourTimer) clearInterval(behaviourTimer);
     await jobs.stop();
     await ctx.hub.stop();
     await db.end();

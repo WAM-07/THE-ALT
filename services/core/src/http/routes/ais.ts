@@ -10,7 +10,9 @@ import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media
 import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
-import { moderate } from '../../modules/ai/moderation.js';
+import { checkSafety } from '../../modules/ai/moderation.js';
+import { indexItems, searchAis } from '../../modules/ai/semantic.js';
+import { describe as describeStyle, profileFor, STYLE_CHARS, STYLE_MIN_SAMPLES, styleFeatures, styleMatch, styleScore } from '../../modules/ai/style.js';
 import { CHANNELS, PersonaConfig, parsePersona, personaFromOnboarding } from '../../modules/ai/persona.js';
 import {
   assertMutable,
@@ -408,6 +410,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       await audit(client, { action: 'dataset.added', actorUserId: userId, entityType: 'ai', entityId: ai.id, data: { datasetId: id, kind: item.kind, bytes: item.bytes.length } });
       return res;
     });
+    const text = item.isText ? item.bytes.toString('utf8') : extracted;
+    if (text) void indexItems(ctx, [{ id, title: item.title, text }]);
     return datasetOut(rows[0]);
   }
 
@@ -666,6 +670,42 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   r.get(
+    '/ais/:id/style',
+    { preHandler: authed, schema: { tags: ['ai'], summary: 'Sounds like you: how the AI writes compared with the person it represents (style-match model)', params: AiId } },
+    async (req) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      const profile = await profileFor(ctx, ai);
+      const { rows } = await ctx.db.query<{ content: string }>(
+        `SELECT m.content FROM core.chat_messages m JOIN core.chat_sessions s ON s.id = m.session_id
+          WHERE s.ai_id = $1 AND m.role = 'assistant' AND NOT m.flagged ORDER BY m.id DESC LIMIT 10`,
+        [ai.id],
+      );
+      const ready = profile.samples >= STYLE_MIN_SAMPLES;
+      let score: number | null = null;
+      let basis: string | null = null;
+      if (ready && rows.length) {
+        const vectors = profile.centroid && ctx.ml ? await ctx.ml.embed(rows.map((r) => r.content.slice(0, STYLE_CHARS)), 'passage') : null;
+        const scored = rows.map((r, i) => styleScore(profile, r.content, vectors?.[i] ?? null));
+        score = Number((scored.reduce((n, s) => n + s.score, 0) / scored.length).toFixed(3));
+        basis = scored[0]!.withMeaning ? 'style+meaning' : 'style';
+      }
+      const aiFeatures = rows.map((r) => styleFeatures(r.content));
+      const aiMean = aiFeatures[0]?.map((_, i) => aiFeatures.reduce((n, f) => n + f[i]!, 0) / aiFeatures.length);
+      return {
+        ready,
+        samples: profile.samples,
+        needed: STYLE_MIN_SAMPLES,
+        score,
+        basis,
+        repliesScored: ready ? rows.length : 0,
+        you: profile.samples ? describeStyle(profile.mean) : null,
+        ai: aiMean ? describeStyle(aiMean) : null,
+        model: 'ALT style-match baseline: logistic regression on writing-style features and embedding similarity',
+      };
+    },
+  );
+
+  r.get(
     '/ais/:id/chat/sessions/:sessionId/messages',
     { preHandler: authed, schema: { tags: ['chat'], summary: 'Messages in a conversation', params: SessionParams } },
     async (req) => {
@@ -695,7 +735,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
         `SELECT role, content FROM (SELECT id, role, content FROM core.chat_messages WHERE session_id = $1 ORDER BY id DESC LIMIT 12) h ORDER BY id`,
         [req.params.sessionId],
       );
-      const userCheck = moderate(req.body.content);
+      const userCheck = await checkSafety(ctx.ml, req.body.content);
       const { rows: saved } = await ctx.db.query(
         `INSERT INTO core.chat_messages (session_id, role, content, flagged) VALUES ($1, 'user', $2, $3) RETURNING *`,
         [req.params.sessionId, req.body.content, userCheck.flagged],
@@ -726,7 +766,9 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
         );
         proposedMemory = rows[0];
       }
-      return { message: messageOut(saved[0]), reply: messageOut(replyRows[0]), provider: result.provider, proposedMemory };
+      // "Sounds like you": the style-match model's score for this reply (null until enough of the person's writing).
+      const style = result.flagged ? null : await styleMatch(ctx, ai, result.text).catch(() => null);
+      return { message: messageOut(saved[0]), reply: messageOut(replyRows[0]), provider: result.provider, proposedMemory, style };
     },
   );
 
@@ -869,6 +911,30 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     },
   );
 
+  r.get(
+    '/public/search/ais',
+    {
+      schema: {
+        tags: ['directory'],
+        summary: 'Verified AIs that match a description, by meaning (the ALT embedding model); falls back to text search',
+        querystring: z.object({ q: z.string().trim().min(2).max(200), limit: z.coerce.number().int().min(1).max(50).default(20), platform: PictureOn.optional() }),
+      },
+    },
+    async (req) => {
+      const matches = await searchAis(ctx, req.query.q, req.query.limit);
+      const found = matches ?? (await ctx.db.query<AiRow>(
+        `SELECT * FROM core.personal_ais WHERE status = 'verified' AND deleted_at IS NULL
+           AND (name ILIKE $1 OR handle ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2`,
+        [`%${req.query.q}%`, req.query.limit],
+      )).rows.map((ai) => ({ ai, score: null as number | null }));
+      const person = await peopleById(found.flatMap((m) => [m.ai.owner_id, m.ai.creator_id]), req.query.platform);
+      return {
+        by: matches ? 'meaning' : 'text',
+        results: await Promise.all(found.map(async (m) => ({ ...(await summary(m.ai)), owner: person(m.ai.owner_id), creator: person(m.ai.creator_id), score: m.score === null ? null : Number(m.score.toFixed(3)) }))),
+      };
+    },
+  );
+
   // ---------------------------------------------------------------- for other ALT services
 
   r.get(
@@ -885,9 +951,16 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     '/internal/moderate',
     {
       preHandler: requireService(ctx),
-      schema: { tags: ['internal'], summary: 'Module 16: check text against ALT’s safety rules', body: z.object({ text: z.string().max(20_000) }) },
+      schema: {
+        tags: ['internal'],
+        summary: 'Module 16: check text against ALT’s safety rules and the toxicity model (flagged = block; warn = ask a private sender to confirm)',
+        body: z.object({ text: z.string().max(20_000) }),
+      },
     },
-    async (req) => moderate(req.body.text),
+    async (req) => {
+      const { scores: _scores, ...check } = await checkSafety(ctx.ml, req.body.text);
+      return check;
+    },
   );
 
   r.post(
@@ -915,7 +988,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
         ],
         { temperature: 0.8, maxTokens: 300 },
       );
-      const check = moderate(result.text);
+      const check = await checkSafety(ctx.ml, result.text);
       if (check.flagged) throw new AppError(422, 'CONTENT_BLOCKED', 'That request produced content that breaks ALT’s rules.', { categories: check.categories });
       return { text: result.text, provider: result.provider, latencyMs: Date.now() - started };
     },

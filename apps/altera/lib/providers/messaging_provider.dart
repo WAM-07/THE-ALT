@@ -7,6 +7,26 @@ import '../services/auth_service.dart';
 import '../services/messaging_service.dart';
 import 'auth_provider.dart';
 
+/// What ALT's safety check said about a message the person just tried to send (Module 16).
+/// [blocked]: not sent. Otherwise a warning: "This may be hurtful. Send it anyway?".
+class DmSafetyNotice {
+  final bool blocked;
+  final String message;
+  final String draftId;
+
+  const DmSafetyNotice({required this.blocked, required this.message, required this.draftId});
+}
+
+class _DmDraft {
+  final Conversation conversation;
+  final String content;
+  final String? mediaUrl;
+  final String? mediaType;
+  final bool isForwarded;
+
+  const _DmDraft(this.conversation, this.content, this.mediaUrl, this.mediaType, this.isForwarded);
+}
+
 class MessagingState {
   final List<Conversation> conversations;
   final Map<String, List<Message>> messagesByConversation;
@@ -16,6 +36,7 @@ class MessagingState {
   final bool isLoading;
   final bool isSearching;
   final String? error;
+  final DmSafetyNotice? safetyNotice;
 
   const MessagingState({
     required this.conversations,
@@ -26,6 +47,7 @@ class MessagingState {
     this.isLoading = false,
     this.isSearching = false,
     this.error,
+    this.safetyNotice,
   });
 
   MessagingState copyWith({
@@ -37,6 +59,8 @@ class MessagingState {
     bool? isLoading,
     bool? isSearching,
     String? error,
+    DmSafetyNotice? safetyNotice,
+    bool clearSafetyNotice = false,
   }) {
     return MessagingState(
       conversations: conversations ?? this.conversations,
@@ -48,6 +72,7 @@ class MessagingState {
       isLoading: isLoading ?? this.isLoading,
       isSearching: isSearching ?? this.isSearching,
       error: error,
+      safetyNotice: clearSafetyNotice ? null : (safetyNotice ?? this.safetyNotice),
     );
   }
 
@@ -94,7 +119,25 @@ class MessagingNotifier extends StateNotifier<MessagingState> {
     _socket?.on('dm:sent', _handleIncomingMessage);
     _socket?.on('dm:status', _handleMessageStatus);
     _socket?.on('dm:error', (data) {
+      if (data is Map && data['code'] == 'CONTENT_BLOCKED') {
+        final draftId = data['client_id']?.toString() ?? '';
+        _dropPending(draftId);
+        _drafts.remove(draftId);
+        state = state.copyWith(
+          safetyNotice: DmSafetyNotice(blocked: true, message: data['message']?.toString() ?? 'Not sent.', draftId: draftId),
+        );
+        return;
+      }
       state = state.copyWith(error: data['message']?.toString() ?? 'Message failed');
+    });
+    // The message may be hurtful: it was not sent; the person decides (confirmSafetyNotice / dismissSafetyNotice).
+    _socket?.on('dm:warn', (data) {
+      if (data is! Map) return;
+      final draftId = data['client_id']?.toString() ?? '';
+      _dropPending(draftId);
+      state = state.copyWith(
+        safetyNotice: DmSafetyNotice(blocked: false, message: data['message']?.toString() ?? 'This message may be hurtful. Send it anyway?', draftId: draftId),
+      );
     });
   }
 
@@ -372,12 +415,41 @@ class MessagingNotifier extends StateNotifier<MessagingState> {
     }
   }
 
+  final Map<String, _DmDraft> _drafts = {};
+
+  /// Removes a message shown while it was being sent (it was not delivered).
+  void _dropPending(String draftId) {
+    if (draftId.isEmpty) return;
+    final byConversation = <String, List<Message>>{};
+    state.messagesByConversation.forEach((id, messages) {
+      byConversation[id] = messages.where((m) => m.id != draftId).toList();
+    });
+    state = state.copyWith(messagesByConversation: byConversation);
+  }
+
+  /// "Send anyway": sends the message the safety check warned about.
+  Future<void> confirmSafetyNotice() async {
+    final notice = state.safetyNotice;
+    state = state.copyWith(clearSafetyNotice: true);
+    final draft = notice == null ? null : _drafts.remove(notice.draftId);
+    if (draft == null) return;
+    await sendMessage(draft.conversation, draft.content,
+        mediaUrl: draft.mediaUrl, mediaType: draft.mediaType, isForwarded: draft.isForwarded, confirmed: true);
+  }
+
+  void dismissSafetyNotice() {
+    final notice = state.safetyNotice;
+    if (notice != null) _drafts.remove(notice.draftId);
+    state = state.copyWith(clearSafetyNotice: true);
+  }
+
   Future<bool> sendMessage(
     Conversation conversation,
     String content, {
     String? mediaUrl,
     String? mediaType,
     bool isForwarded = false,
+    bool confirmed = false,
   }) async {
     final auth = ref.read(authStateProvider);
     final activeId = auth.activeProfileId;
@@ -470,7 +542,14 @@ class MessagingNotifier extends StateNotifier<MessagingState> {
       if (mediaUrl != null) 'media_url': mediaUrl,
       if (mediaType != null) 'media_type': mediaType,
       'is_forwarded': isForwarded,
+      'client_id': pendingMessage.id,
+      if (confirmed) 'confirmed': true,
     });
+    // Kept briefly, in case the safety check asks the person to confirm it.
+    _drafts[pendingMessage.id] = _DmDraft(conversation, content, mediaUrl, mediaType, isForwarded);
+    while (_drafts.length > 20) {
+      _drafts.remove(_drafts.keys.first);
+    }
     return true;
   }
 

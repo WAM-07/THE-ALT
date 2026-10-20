@@ -1,0 +1,7 @@
+# ALT ML service (CPU only: ONNX Runtime, no PyTorch)
+fastapi==0.115.6
+uvicorn==0.34.0
+onnxruntime==1.20.1
+tokenizers==0.21.0
+numpy==2.2.1
+scikit-learn==1.6.0
