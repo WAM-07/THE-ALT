@@ -1,5 +1,5 @@
 // Throwaway PostgreSQL with every service's migrations (core first, then altera), and a throwaway
-// blockchain with THE ALT contracts so AIs can really be minted during the tests.
+// blockchain with the ALT contracts so AIs can really be minted during the tests.
 import { dropDatabase, ensureDatabase, runMigrations, startLocalChain, startPostgres } from '@alt/devkit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

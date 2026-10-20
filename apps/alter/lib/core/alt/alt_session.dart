@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ai_api.dart';
 
-/// Where ALTER finds THE ALT. Set with `flutter run --dart-define-from-file=env/dev.json`
+/// Where ALTER finds ALT. Set with `flutter run --dart-define-from-file=env/dev.json`
 /// (written by `npm run dev`) or `--dart-define=ALT_API_URL=http://<pc-lan-ip>:8080` on a phone.
 class AltConfig {
   static const String _configured = String.fromEnvironment('ALT_API_URL', defaultValue: '');

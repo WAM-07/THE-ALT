@@ -4,7 +4,7 @@ Read this whole file before changing anything. Then read `PROGRESS.md` (where th
 
 ## What you are working on
 
-THE ALT ECOSYSTEM has one shared backend (ALT Core) behind one gateway, three platforms for people (ALTER, Flutter; ALTERA, Flutter with its own API; ALTAR, Next.js with its own API) and one website for staff (the ALT Command Centre, `/command`).
+The ALT Ecosystem has one shared backend (ALT Core) behind one gateway, three platforms for people (ALTER, Flutter; ALTERA, Flutter with its own API; ALTAR, Next.js with its own API) and one website for staff (the ALT Command Centre, `/command`).
 
 The core concepts. Every change keeps all of them; if a task seems to need breaking one, stop and ask:
 

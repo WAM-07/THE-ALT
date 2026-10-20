@@ -1,4 +1,4 @@
-# THE ALT ECOSYSTEM: 60% demo script
+# The ALT Ecosystem: 60% demo script
 
 A 10-minute walkthrough that tells one story and touches every finished module. Practise it twice
 before the evaluation. Each scene says **what to click**, **what to say** and **which modules it proves**.
@@ -52,7 +52,7 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 **Show:** the terminal running `npm run demo`, then `localhost:8080/health`.
 
 **Say:**
-- "THE ALT is three apps on one backend. One command starts all of it: the database, a local blockchain with our smart contracts deployed, ALT Core, ALTERA’s service and the API gateway."
+- "ALT is three apps on one backend. One command starts all of it: the database, a local blockchain with our smart contracts deployed, ALT Core, ALTERA’s service and the API gateway."
 - "Every request goes through one gateway. It checks the ALT sign-in token, strips forged identity headers, rate-limits, and keeps one failing service from taking the others down."
 - "Security-relevant actions go into a hash-chained audit log, so tampering is detectable."
 
@@ -118,7 +118,7 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 
 ### Scene 8: one inbox for everything (30 seconds). Module 2
 **Show:**
-1. The **bell** in ALTER and **Notifications → ALT inbox** in ALTERA: the same items in both apps (*verified*, *v2 is live*, *new sign-in*, the admin’s *Welcome to THE ALT demo*).
+1. The **bell** in ALTER and **Notifications → ALT inbox** in ALTERA: the same items in both apps (*verified*, *v2 is live*, *new sign-in*, the admin’s *Welcome to the ALT demo*).
 2. Live: sign in to ALTERA from another device or browser. A *New sign-in* alert appears in ALTER on the phone within a second (the browser version checks every 30 seconds).
 
 **Say:**
@@ -157,7 +157,7 @@ before the evaluation. Each scene says **what to click**, **what to say** and **
 
 | Problem | What to do |
 |---|---|
-| `npm run demo` says THE ALT is already running | Close the other terminal running `npm run dev` (Ctrl+C), then run `npm run demo` again. |
+| `npm run demo` says ALT is already running | Close the other terminal running `npm run dev` (Ctrl+C), then run `npm run demo` again. |
 | "The demo story could not be created" | Read the reason it prints. Ctrl+C and run `npm run demo` again: a demo that was never finished is rebuilt. Don't edit code while it runs (the services reload and the story stops part-way). |
 | ALTAR shows no prices | The ALTAR service isn't running. Check `localhost:8080/health` shows `altar` as ok, then refresh. |
 | AI replies say `[mock]` | No LLM key is set, or there's no internet. The flow still works. Say so honestly: "Offline, it falls back to a labelled stand-in." Check `GROQ_API_KEY` in `.env`. |

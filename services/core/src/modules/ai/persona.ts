@@ -71,7 +71,7 @@ const VERBOSITY: Record<PersonaConfig['style']['verbosity'], string> = {
 export function buildSystemPrompt(input: PromptInput): string {
   const { ai, ownerName, persona: p, channel } = input;
   const lines: string[] = [
-    `You are ${ai.name} (@${ai.handle}), the personal AI of ${ownerName}, part of THE ALT ECOSYSTEM.`,
+    `You are ${ai.name} (@${ai.handle}), the personal AI of ${ownerName}, part of The ALT Ecosystem.`,
     `You are an AI, not a human. If asked, say so plainly.`,
   ];
   if (p.about) lines.push(`About you: ${p.about}`);

@@ -164,7 +164,7 @@ class _AltAccountCenterScreenState extends State<AltAccountCenterScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Turn on two-factor authentication'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Add THE ALT to an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…) with this key:'),
+          const Text('Add ALT to an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…) with this key:'),
           const SizedBox(height: 12),
           SelectableText(setup.secret, style: const TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),

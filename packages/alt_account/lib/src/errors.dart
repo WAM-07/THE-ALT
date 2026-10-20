@@ -12,7 +12,7 @@ class AltApiException implements Exception {
   bool get isUnauthorized => status == 401;
 
   static AltApiException network(Object error) =>
-      AltApiException(status: 0, code: 'NETWORK', message: 'Cannot reach THE ALT. Check your connection and try again.', details: {'error': '$error'});
+      AltApiException(status: 0, code: 'NETWORK', message: 'Cannot reach ALT. Check your connection and try again.', details: {'error': '$error'});
 
   /// Understands ALT Core's `{error: {code, message}}` and ALTERA's `{message, code}` shapes.
   static AltApiException fromBody(int status, Object? body) {

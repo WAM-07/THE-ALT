@@ -15,7 +15,7 @@ const body = Figtree({ subsets: ["latin"], variable: "--font-figtree", display: 
 
 export const metadata = {
   title: "ALTAR · The marketplace for verified AIs",
-  description: "Own, rent or subscribe to verified personal AIs. Every one carries an AI Identity Token. Part of THE ALT ECOSYSTEM.",
+  description: "Own, rent or subscribe to verified personal AIs. Every one carries an AI Identity Token. Part of The ALT Ecosystem.",
 };
 
 // Themes other than the default (see ThemeContext). Older saved choices that no longer exist are ignored.

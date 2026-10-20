@@ -681,7 +681,7 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
           await ctx.mailer.send({
             to: person.email,
             subject: 'Your ALT account is suspended',
-            text: `Hello ${person.display_name},\n\nALT suspended your account ${when}.\n\nReason: ${b.reason}\n\nYou can't sign in to ALTER, ALTERA or ALTAR meanwhile. If you think this is a mistake, reply to this email.\n\nTHE ALT`,
+            text: `Hello ${person.display_name},\n\nALT suspended your account ${when}.\n\nReason: ${b.reason}\n\nYou can't sign in to ALTER, ALTERA or ALTAR meanwhile. If you think this is a mistake, reply to this email.\n\nALT`,
           });
           return record({ userId, until: b.days ? until.toISOString() : null, sessionsEnded: sessions });
         }
@@ -689,7 +689,7 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
         // unlock_account
         await client.query('UPDATE core.users SET locked_until = NULL, lock_reason = NULL, failed_login_count = 0 WHERE id = $1', [userId]);
         await tell(userId, 'account.unlocked', 'Your ALT account is active again', b.reason);
-        await ctx.mailer.send({ to: person.email, subject: 'Your ALT account is active again', text: `Hello ${person.display_name},\n\nYou can sign in to ALT again. ${b.reason}\n\nTHE ALT` });
+        await ctx.mailer.send({ to: person.email, subject: 'Your ALT account is active again', text: `Hello ${person.display_name},\n\nYou can sign in to ALT again. ${b.reason}\n\nALT` });
         return record({ userId });
       });
     },

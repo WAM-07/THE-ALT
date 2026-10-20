@@ -192,7 +192,7 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
 
     // Deploy: see the transaction first, then mint through the job worker.
     const preview = (await call('GET', `/ais/${ai.id}/deploy/preview`, u.accessToken)).json();
-    expect(preview).toMatchObject({ chainId: 31337, version: 1, royaltyBps: 500, paidBy: expect.stringContaining('THE ALT') });
+    expect(preview).toMatchObject({ chainId: 31337, version: 1, royaltyBps: 500, paidBy: expect.stringContaining('ALT') });
     const deploy = await call('POST', `/ais/${ai.id}/deploy`, u.accessToken);
     expect(deploy.statusCode).toBe(202);
     expect((await call('GET', `/ais/${ai.id}`, u.accessToken)).json().status).toBe('minting');

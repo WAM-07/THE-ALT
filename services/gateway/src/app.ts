@@ -229,7 +229,7 @@ export async function buildGateway(config: GatewayConfig, opts: { jwks?: JWTVeri
     });
   } else {
     app.get('/', async () => ({
-      name: 'THE ALT ECOSYSTEM gateway',
+      name: 'The ALT Ecosystem gateway',
       services: config.upstreams.map((u) => ({ name: u.name, path: u.prefix })),
       docs: `${config.publicUrl}/core/docs`,
       health: `${config.publicUrl}/health`,

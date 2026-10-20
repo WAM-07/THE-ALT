@@ -1,7 +1,7 @@
 {
   "name": "the-alt-ecosystem",
   "private": true,
-  "description": "THE ALT ECOSYSTEM: ALT Core, ALTER, ALTAR and ALTERA in one repository. See ROADMAP.md.",
+  "description": "The ALT Ecosystem: ALT Core, ALTER, ALTAR and ALTERA in one repository. See ROADMAP.md.",
   "type": "module",
   "engines": {
     "node": ">=22"

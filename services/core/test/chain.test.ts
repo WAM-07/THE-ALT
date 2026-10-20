@@ -49,7 +49,7 @@ describe('blockchain (Module 17)', () => {
 
     const preview = await chain.previewMint(creator, aiId, manifest.cid, 500);
     expect(BigInt(preview.gasEstimate)).toBeGreaterThan(0n);
-    expect(preview.paidBy).toContain('THE ALT');
+    expect(preview.paidBy).toContain('ALT');
 
     const hash = await chain.sendMint(creator, aiId, manifest.cid, 500);
     const { tokenId } = await chain.confirmMint(hash);

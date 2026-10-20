@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// THE ALT ECOSYSTEM: one command to run everything locally.
+// The ALT Ecosystem: one command to run everything locally.
 //
 //   npm run dev                 start database, migrations and every service behind http://localhost:8080
 //   npm run dev -- --reset-db   wipe the local database first
@@ -92,7 +92,7 @@ for (const [name, port] of [['gateway', ports.gateway], ['ALT Core', ports.core]
   if (await portInUse(port)) busy.push(`${name} (port ${port})`);
 }
 if (busy.length) {
-  fail(`THE ALT already seems to be running: ${busy.join(', ')} in use. Stop the other "npm run dev" (Ctrl+C in its window) and try again.`);
+  fail(`ALT already seems to be running: ${busy.join(', ')} in use. Stop the other "npm run dev" (Ctrl+C in its window) and try again.`);
 }
 
 // ---------------------------------------------------------------- 3. database
@@ -407,7 +407,7 @@ for (const s of services) {
 
 const url = process.env.ALT_PUBLIC_URL;
 console.log(`
-\x1b[1m  THE ALT ECOSYSTEM is running\x1b[0m
+\x1b[1m  The ALT Ecosystem is running\x1b[0m
     Gateway (single entry point)  ${url}
     ALTAR marketplace (web)       ${url}/
     Health of every service       ${url}/health

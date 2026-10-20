@@ -2,7 +2,7 @@
   "name": "@alt/contracts",
   "version": "0.1.0",
   "private": true,
-  "description": "THE ALT smart contracts: AITRegistry (AI Identity Tokens) and ALTMarketplace (sales, rentals, royalties).",
+  "description": "ALT smart contracts: AITRegistry (AI Identity Tokens) and ALTMarketplace (sales, rentals, royalties).",
   "type": "module",
   "scripts": {
     "build": "hardhat build && node scripts/export-abi.mjs",

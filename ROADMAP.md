@@ -1,6 +1,6 @@
-# THE ALT ECOSYSTEM: Roadmap
+# The ALT Ecosystem: Roadmap
 
-> **Read this first.** This is the plan for finishing THE ALT ECOSYSTEM. It assumes you know nothing about the project.
+> **Read this first.** This is the plan for finishing The ALT Ecosystem. It assumes you know nothing about the project.
 > It replaces `docs/history/first-implementation-plan.md`. That older plan proposed a full rewrite, and its database schema and smart contracts have bugs. Keep it only as history.
 >
 > Last updated: 2026-10-11 · Owner: Wamiq Ejaz (sole developer from the 60% stage onward)
@@ -9,7 +9,7 @@
 
 ## 1. What this project is
 
-THE ALT ECOSYSTEM is a Final Year Project at COMSATS University Islamabad, supervised by Sir Muzaffar Iqbal. People create a **personal AI** that talks and thinks like them. The AI gets a **verifiable identity on a blockchain**, and it can then act on three connected platforms:
+The ALT Ecosystem is a Final Year Project at COMSATS University Islamabad, supervised by Sir Muzaffar Iqbal. People create a **personal AI** that talks and thinks like them. The AI gets a **verifiable identity on a blockchain**, and it can then act on three connected platforms:
 
 | Platform | What it is | Form | Who uses it |
 |---|---|---|---|

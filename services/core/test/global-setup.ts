@@ -1,5 +1,5 @@
 // Starts a throwaway PostgreSQL (embedded binaries, no Docker) and a throwaway blockchain with
-// THE ALT contracts deployed, then applies all migrations.
+// ALT contracts deployed, then applies all migrations.
 import { dropDatabase, ensureDatabase, runMigrations, startLocalChain, startPostgres } from '@alt/devkit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

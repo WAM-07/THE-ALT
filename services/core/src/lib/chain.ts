@@ -156,7 +156,7 @@ export class ChainService {
         gasEstimate: gas.toString(),
         gasPriceWei: gasPrice.toString(),
         estimatedCostWei: (gas * gasPrice).toString(),
-        paidBy: 'THE ALT (relayer)',
+        paidBy: 'ALT (relayer)',
       };
     } catch (err) {
       this.explain(err, 'prepare the mint');

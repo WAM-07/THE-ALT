@@ -8,7 +8,7 @@ const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], 
 
 export const metadata = {
   title: "ALT Command Centre",
-  description: "Staff only: moderation, support, people and the audit log for THE ALT ECOSYSTEM.",
+  description: "Staff only: moderation, support, people and the audit log for The ALT Ecosystem.",
   robots: { index: false, follow: false },
 };
 

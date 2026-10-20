@@ -577,7 +577,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx) {
     { config: loginLimit, schema: { tags: ['auth'], summary: 'Get a nonce for a Sign-In With Ethereum message' } },
     async (_req, reply) => {
       const n = await createSiweNonce(ctx.db, 'login', null);
-      return reply.send({ ...n, domain: ctx.config.publicHost, uri: ctx.config.publicUrl, statement: 'Sign in to THE ALT.' });
+      return reply.send({ ...n, domain: ctx.config.publicHost, uri: ctx.config.publicUrl, statement: 'Sign in to ALT.' });
     },
   );
 

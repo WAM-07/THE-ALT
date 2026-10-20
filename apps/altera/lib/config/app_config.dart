@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// Where ALTERA finds THE ALT. Everything goes through the ALT gateway:
+/// Where ALTERA finds ALT. Everything goes through the ALT gateway:
 ///   ALT Core (accounts)  -> $apiUrl/core
 ///   ALTERA API           -> $apiUrl/altera
 ///

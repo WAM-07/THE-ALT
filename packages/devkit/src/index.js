@@ -185,7 +185,7 @@ async function rpcReady(url) {
 }
 
 /**
- * Starts a throwaway local blockchain and deploys THE ALT contracts to it.
+ * Starts a throwaway local blockchain and deploys the ALT contracts to it.
  * `network` must be a Hardhat network in packages/contracts/hardhat.config.ts pointing at `port`.
  */
 export async function startLocalChain({ repoRoot, port = 8546, network = 'testchain' }) {

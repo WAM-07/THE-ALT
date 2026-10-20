@@ -169,10 +169,10 @@ export async function seedDemo({ gateway, log = console.log }) {
   const wamiqAi = await makeAi(t.wamiq, {
     name: 'Wamiq’s ALT',
     handle: 'wamiq.alt',
-    bio: 'The digital twin of a CS student building THE ALT. Talks code, Flutter and blockchain.',
-    onboarding: { about: 'Final-year CS student at COMSATS building THE ALT ecosystem.', pronouns: 'He/Him', roles: ['Developer', 'Student'], primaryTrait: 'Logical' },
+    bio: 'The digital twin of a CS student building ALT. Talks code, Flutter and blockchain.',
+    onboarding: { about: 'Final-year CS student at COMSATS building The ALT Ecosystem.', pronouns: 'He/Him', roles: ['Developer', 'Student'], primaryTrait: 'Logical' },
     data: [
-      { title: 'About me', category: 'personality', text: 'I am a final-year computer science student at COMSATS. I am building THE ALT: one account, personal AIs with blockchain identity tokens, a social hub (ALTERA) and a marketplace (ALTAR). I love Flutter, clean architecture and late-night debugging. I prefer short, direct answers.' },
+      { title: 'About me', category: 'personality', text: 'I am a final-year computer science student at COMSATS. I am building ALT: one account, personal AIs with blockchain identity tokens, a social hub (ALTERA) and a marketplace (ALTAR). I love Flutter, clean architecture and late-night debugging. I prefer short, direct answers.' },
       { title: 'How I write', category: 'communication_style', text: 'Friendly and to the point. I explain technical ideas with small concrete examples and I am honest about what is not finished yet.' },
     ],
     memories: ['Wamiq’s favourite stack is Flutter on the front end and TypeScript with PostgreSQL on the back end.', 'Wamiq is preparing for the 60% FYP evaluation.'],
@@ -203,7 +203,7 @@ export async function seedDemo({ gateway, log = console.log }) {
   await upload(`/core/ais/${museAi.id}/avatar`, t.ayesha, orbPng([255, 200, 120], [214, 80, 140], [40, 20, 45]));
 
   log('version 2 of Wamiq’s ALT: new data, built, published on-chain…');
-  await call('POST', `/core/ais/${wamiqAi.id}/datasets`, t.wamiq, { title: 'Project update', category: 'knowledge', text: 'THE ALT now has one notification inbox shared by ALTER and ALTERA, and AIs keep their identity tokens across restarts of the development chain.' });
+  await call('POST', `/core/ais/${wamiqAi.id}/datasets`, t.wamiq, { title: 'Project update', category: 'knowledge', text: 'ALT now has one notification inbox shared by ALTER and ALTERA, and AIs keep their identity tokens across restarts of the development chain.' });
   const v2 = (await call('POST', `/core/ais/${wamiqAi.id}/versions`, t.wamiq)).data;
   await call('POST', `/core/ais/${wamiqAi.id}/versions/${v2.id}/publish`, t.wamiq);
   for (let i = 0; i < 60; i++) {
@@ -290,7 +290,7 @@ export async function seedDemo({ gateway, log = console.log }) {
       sock.on('connect_error', fail);
     });
     const reply = new Promise((ok) => sock.on('dm:receive', (m) => m.sender_is_ai && ok(m)));
-    sock.emit('dm:send', { content: 'Hi! What is THE ALT, in two sentences?', sender_profile_id: H.id, sender_type: 'human', receiver_id: wamiqProfile.id, receiver_type: 'ai' });
+    sock.emit('dm:send', { content: 'Hi! What is ALT, in two sentences?', sender_profile_id: H.id, sender_type: 'human', receiver_id: wamiqProfile.id, receiver_type: 'ai' });
     await Promise.race([reply, sleep(30_000)]);
     sock.close();
   } catch (err) {
@@ -326,7 +326,7 @@ export async function seedDemo({ gateway, log = console.log }) {
   }
 
   log('an announcement from the ALT team to everyone…');
-  await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to THE ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
+  await call('POST', '/core/admin/notifications/broadcast', adminToken, { title: 'Welcome to the ALT demo', body: 'One account, verified personal AIs and a social hub, all on one platform.' });
 
   // The ALT Command Centre (/command) opens on a queue with real work in it: two people report the same AI
   // (one case, two reports), a help request and an appeal. Sign in there as admin@demo.alt.

@@ -1,4 +1,4 @@
-// A throwaway PostgreSQL and blockchain (THE ALT contracts deployed), then every migration.
+// A throwaway PostgreSQL and blockchain (ALT contracts deployed), then every migration.
 import { dropDatabase, ensureDatabase, runMigrations, startLocalChain, startPostgres } from '@alt/devkit';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

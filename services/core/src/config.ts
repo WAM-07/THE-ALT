@@ -27,7 +27,7 @@ const EnvSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   MAIL_MODE: z.enum(['console', 'smtp']).default('console'),
   SMTP_URL: z.string().optional(),
-  MAIL_FROM: z.string().default('THE ALT <no-reply@alt.local>'),
+  MAIL_FROM: z.string().default('ALT <no-reply@alt.local>'),
   GOOGLE_CLIENT_IDS: z.string().optional(),
   // Push notifications (Firebase Cloud Messaging): a service-account key, as JSON, a path or base64. Off when empty.
   FCM_SERVICE_ACCOUNT: z.string().optional(),

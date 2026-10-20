@@ -66,5 +66,5 @@ export function verifyTotp(secretBase32: string, code: string, now = Date.now())
   return null;
 }
 
-export const totpUri = (secretBase32: string, account: string, issuer = 'THE ALT') =>
+export const totpUri = (secretBase32: string, account: string, issuer = 'ALT') =>
   `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}?secret=${secretBase32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=${DIGITS}&period=${STEP_SECONDS}`;
