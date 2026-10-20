@@ -224,3 +224,16 @@ style is not yet learned. The personal adapter phase should be judged with this 
 unflagged, 20+ characters, newest 40) and the AI's "communication style" items. Each reply in ALTER's test chat
 shows "Sounds like you · N%"; `GET /ais/:id/style` gives the average over the last 10 replies and a readable
 comparison (words per sentence, exclamations, emoji, capital letters, contractions: you vs the AI).
+
+### 2026-10-20 · Deployed to the beta server
+
+The ML service runs on the beta (https://13-207-216-40.sslip.io; AWS EC2 c7i-flex.large, 2 vCPUs, 4 GB) beside the
+other services, set up by `deploy/beta/deploy.sh` (virtualenv and pinned models in `/var/lib/alt`). Memory with
+everything running: 1.5 GB used of 3.8 GB. Measured on the server (ML_THREADS 2, one text per request, after
+warm-up): toxicity **about 21 ms** per short message, query embedding **about 6 ms**; requests without the service
+key are refused (401). Search by meaning answers over HTTPS ("someone to help with poetry" -> Urdu Ustad 0.58,
+Muse 0.567). The first behaviour scan ran and reported "not enough history" (0 active days before the last 24
+hours: the beta's data is all from its first day), as designed; it scans daily from then on.
+
+Found while deploying: ALT Core's `index.ts` starts the job worker itself, so the scan scheduled in `app.ts` ran
+only in tests; it now starts beside the worker (`startBehaviourScans`, test added).
