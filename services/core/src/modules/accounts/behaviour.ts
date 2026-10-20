@@ -100,6 +100,17 @@ export async function scanBehaviour(ctx: Ctx, now = new Date(), minTrainingDays 
   return saved;
 }
 
+/** Checks hourly (first a minute after start) and scans when the last scan is a day old. Returns a stop function. */
+export function startBehaviourScans(ctx: Ctx, warn: (msg: string) => void) {
+  const check = () => void scanIfDue(ctx).catch((err: Error) => warn(`behaviour scan: ${err.message}`));
+  const first = setTimeout(check, 60_000);
+  const timer = setInterval(check, 3600_000);
+  return () => {
+    clearTimeout(first);
+    clearInterval(timer);
+  };
+}
+
 /** Runs the daily scan when the last one is a day old (one Core instance at a time). */
 export async function scanIfDue(ctx: Ctx) {
   const client = await ctx.db.connect();

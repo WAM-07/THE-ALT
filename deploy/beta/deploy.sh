@@ -22,7 +22,7 @@ scp -i "$HOME/.ssh/alt_beta" -q /tmp/alt-beta.tgz "$USR@$IP:/tmp/alt-beta.tgz"
 
 $SSH sudo bash -s -- "${1:-}" <<'REMOTE'
 set -euo pipefail
-SEED="$1"
+SEED="${1:-}"
 rm -rf /opt/alt/app.new && mkdir -p /opt/alt/app.new
 tar xzf /tmp/alt-beta.tgz -C /opt/alt/app.new && chown -R alt:alt /opt/alt/app.new
 cd /opt/alt/app.new

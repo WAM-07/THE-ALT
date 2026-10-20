@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MlClient } from '../src/lib/ml.js';
-import { BEHAVIOUR_FEATURES, scanBehaviour } from '../src/modules/accounts/behaviour.js';
+import { BEHAVIOUR_FEATURES, scanBehaviour, scanIfDue } from '../src/modules/accounts/behaviour.js';
 import { auth, makeApp, signUp, uniq, type TestApp } from './helpers.js';
 
 /** A stand-in for ALT's behaviour model: an account is unusual when it failed to sign in 3 or more times. */
@@ -68,5 +68,10 @@ describe('abnormal-behaviour detection (Module 16 FE-3, with the behaviour model
   it('says so instead of guessing when there is too little history or no ML service', async () => {
     expect((await scanBehaviour(t.app.ctx, new Date(), 1_000_000)).status).toBe('not_enough_data');
     expect((await scanBehaviour({ ...t.app.ctx, ml: null })).status).toBe('unavailable');
+  });
+
+  it('scans at most once a day', async () => {
+    // Earlier tests in this file already scanned today, so the daily check does nothing.
+    expect(await scanIfDue(t.app.ctx)).toBeNull();
   });
 });

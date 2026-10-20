@@ -29,7 +29,6 @@ import { createGoogleVerifier, type GoogleVerifier } from './modules/auth/google
 import { createLlmRouter, type LlmProvider, LlmRouter } from './modules/ai/llm.js';
 import { createMlClient, type MlClient } from './lib/ml.js';
 import { JobRunner } from './jobs/worker.js';
-import { scanIfDue } from './modules/accounts/behaviour.js';
 import { aiRoutes } from './http/routes/ais.js';
 import { authRoutes } from './http/routes/auth.js';
 import { directoryRoutes } from './http/routes/directory.js';
@@ -99,21 +98,13 @@ export async function buildApp(opts: BuildOptions) {
   }
   const jobs = new JobRunner(ctx);
   app.decorate('jobs', jobs);
-  // The daily abnormal-behaviour scan (Module 16 FE-3): checked hourly, run when the last is a day old.
-  let behaviourTimer: NodeJS.Timeout | null = null;
   if (opts.jobs ?? config.jobsEnabled) {
     app.addHook('onReady', async () => {
       await jobs.start();
-      if (ctx.ml) {
-        const check = () => void scanIfDue(ctx).catch((err: Error) => app.log.warn(`behaviour scan: ${err.message}`));
-        behaviourTimer = setInterval(check, 3600_000);
-        setTimeout(check, 60_000).unref();
-      }
     });
   }
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => {
-    if (behaviourTimer) clearInterval(behaviourTimer);
     await jobs.stop();
     await ctx.hub.stop();
     await db.end();
