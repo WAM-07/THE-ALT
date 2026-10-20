@@ -1,0 +1,54 @@
+{
+  "dataset": "Blog Authorship Corpus (Schler et al., 2006)",
+  "revision": {
+    "tasksource/blog_authorship_corpus": "8d658f137b1844d28b533f67888a6d244f6cc28a"
+  },
+  "bloggers": {
+    "train": 200,
+    "test": 100
+  },
+  "pairs": {
+    "train": 2000,
+    "test": 1000
+  },
+  "profile_posts": 20,
+  "chars_per_post": 250,
+  "embed_ms_per_post": 28.1,
+  "test": {
+    "style features only": {
+      "auc": 0.6974,
+      "accuracy@0.5": 0.644,
+      "eer": 0.364
+    },
+    "meaning only (cosine)": {
+      "auc": 0.6873
+    },
+    "style + meaning (ALT uses it)": {
+      "auc": 0.7389,
+      "accuracy@0.5": 0.684,
+      "eer": 0.318
+    }
+  },
+  "profile_size_test_auc": {
+    "3": 0.7174,
+    "5": 0.7642,
+    "10": 0.7324,
+    "20": 0.7519
+  },
+  "weights": {
+    "word_length": -0.3731,
+    "sentence_length": -0.0577,
+    "commas": -0.3848,
+    "exclamations": -0.0221,
+    "questions": 0.0406,
+    "ellipses": -0.5311,
+    "emoji": 0.0,
+    "capitals": 0.0397,
+    "first_person": -0.3487,
+    "contractions": -0.3642,
+    "lowercase_starts": -0.7827,
+    "long_words": -0.187,
+    "digits": 0.0512,
+    "meaning": 6.5493
+  }
+}
