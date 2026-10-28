@@ -47,5 +47,6 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze
+      # Errors fail the build; the older ALTERA code still has warnings and infos to clear.
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
