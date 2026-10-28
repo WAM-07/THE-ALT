@@ -226,6 +226,7 @@ export default function AgentDetails() {
                 <VerifiedTick className="h-3.5 w-3.5" /> Verified AI
               </Chip>
               <Chip>{model.category}</Chip>
+              {model.demo && <Chip tone="soon">Demo AI</Chip>}
             </div>
             <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">{model.name}</h1>
             <p className="mt-1 text-ink-3">@{model.handle}</p>

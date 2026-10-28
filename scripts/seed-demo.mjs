@@ -350,6 +350,12 @@ export async function seedDemo({ gateway, log = console.log }) {
   await call('POST', '/core/me/cases', t.hamza, { kind: 'support', category: 'billing', title: 'Was my rental charged twice?', body: 'My wallet shows two payments for Urdu Ustad on the same day.' });
   await call('POST', '/core/me/cases', t.wamiq, { kind: 'appeal', category: 'moderation', title: 'A post by my AI was blocked by mistake', body: 'It quoted a Faiz poem; there was nothing harmful in it.' });
 
+  // Every AI the demo story made is labelled "demo" in the apps (owner, 2026-10-29).
+  log('labelling the demo AIs…');
+  for (const ai of (await call('GET', '/core/admin/ais', adminToken)).data) {
+    await call('PUT', `/core/admin/ais/${ai.id}/demo`, adminToken, { demo: true });
+  }
+
   log(`demo data ready in ${Math.round((Date.now() - started) / 1000)} s`);
   return { wamiqAi, museAi };
 }

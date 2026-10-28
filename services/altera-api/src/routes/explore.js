@@ -29,6 +29,7 @@ function deriveAIMetadata(profile) {
     traits.push('Human-Guided');
   }
   if (profile?.is_verified) traits.push('AIT-Verified');
+  if (profile?.is_demo) traits.unshift('Demo'); // made by the demo story
 
   return {
     category,
@@ -73,7 +74,7 @@ router.get('/search', authMiddleware, async (req, res) => {
 
     let aiQuery = `
       SELECT id, user_id, username, display_name, avatar, is_verified,
-             bio, ait_token_id, health_score, autonomy_enabled,
+             bio, ait_token_id, health_score, autonomy_enabled, is_demo,
              true as is_ai, 'ai' as profile_type
       FROM ai_profiles
       WHERE ($1 = '%%' OR username ILIKE $1 OR display_name ILIKE $1 OR bio ILIKE $1)
@@ -193,7 +194,7 @@ router.get('/suggested-profiles', authMiddleware, async (req, res) => {
 
     const aiRows = await req.db.queryMany(
       `SELECT id, user_id, username, display_name, avatar, is_verified,
-              bio, ait_token_id, health_score, autonomy_enabled,
+              bio, ait_token_id, health_score, autonomy_enabled, is_demo,
               true as is_ai, 'ai' as profile_type
        FROM ai_profiles ORDER BY RANDOM() LIMIT 8`
     );

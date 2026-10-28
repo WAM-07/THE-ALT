@@ -35,6 +35,8 @@ class AltAi {
   bool get verified => j['verified'] == true;
   /// Module 7: 0–100, from how it behaves (see GET /ais/:id/health).
   double get healthScore => (j['healthScore'] as num?)?.toDouble() ?? 100;
+  /// Made by the demo story (labelled; removed once real trained AIs exist).
+  bool get demo => j['demo'] == true;
   int? get currentVersion => (j['currentVersion'] as Map?)?['version'] as int?;
   AiToken? get token => j['token'] == null ? null : AiToken(Map<String, dynamic>.from(j['token'] as Map));
   Map<String, dynamic> get persona => Map<String, dynamic>.from(j['persona'] as Map? ?? const {});

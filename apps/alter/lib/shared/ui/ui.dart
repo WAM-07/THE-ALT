@@ -512,6 +512,7 @@ class AiIdentityCard extends StatelessWidget {
                 Text('ALT IDENTITY', style: Ds.overline.copyWith(color: ink.withValues(alpha: 0.7))),
                 const Spacer(),
                 Pill(status.$1, color: status.$2, dot: true),
+                if (ai.demo) ...[const SizedBox(width: 6), Pill('Demo', color: Ds.textSecondary)],
               ]),
               const Spacer(),
               Row(children: [

@@ -81,6 +81,21 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
   const auditReader = requireAnyRole(ctx, ['admin', 'auditor']);
   const behaviourReader = requireAnyRole(ctx, ['admin', 'moderator', 'auditor']);
 
+  // Demo AIs (owner, 2026-10-29): the demo story labels the AIs it creates.
+  r.put(
+    '/admin/ais/:id/demo',
+    { preHandler: admin, schema: { tags: ['admin'], summary: 'Label an AI as made by the demo story (or not)', params: z.object({ id: z.uuid() }), body: z.object({ demo: z.boolean() }) } },
+    async (req) => {
+      return tx(ctx.db, async (client) => {
+        const { rowCount } = await client.query('UPDATE core.personal_ais SET is_demo = $2 WHERE id = $1 AND deleted_at IS NULL', [req.params.id, req.body.demo]);
+        if (!rowCount) throw notFound('AI');
+        await audit(client, { action: 'ai.demo_label', actorUserId: req.auth!.userId, entityType: 'ai', entityId: req.params.id, ip: req.ip, data: { demo: req.body.demo } });
+        await client.query(`SELECT pg_notify('alt_ai_events', $1)`, [JSON.stringify({ aiId: req.params.id, event: 'demo' })]);
+        return { id: req.params.id, demo: req.body.demo };
+      });
+    },
+  );
+
   // Module 5 forensics: AIs (least healthy first), and how one behaved over time.
   r.get(
     '/admin/ais',

@@ -31,6 +31,7 @@ export default function AICard({ model }) {
           <div className="flex items-center gap-1.5">
             <h3 className="truncate font-display text-[17px] font-bold leading-tight">{model.name}</h3>
             {model.verified && <VerifiedTick />}
+            {model.demo && <Chip tone="soon" className="ml-auto shrink-0">Demo</Chip>}
           </div>
           <p className="mt-0.5 truncate text-sm text-ink-2">
             by {model.creatorName} · {model.category}

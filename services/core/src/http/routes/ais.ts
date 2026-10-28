@@ -111,6 +111,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       status: ai.status,
       verified: ai.status === 'verified',
       healthScore: Number(ai.health_score),
+      // Made by the demo story (labelled in every app; removed once real trained AIs exist).
+      demo: ai.is_demo,
       royaltyBps: ai.royalty_bps,
       currentVersion: current?.rows[0] ? { version: current.rows[0].version_no as number, manifestCid: current.rows[0].manifest_cid as string } : null,
       token,

@@ -69,6 +69,7 @@ function deriveAIMetadata(profile) {
     traits.push('Human-Guided');
   }
   if (profile?.is_verified) traits.push('AIT-Verified');
+  if (profile?.is_demo) traits.unshift('Demo'); // made by the demo story
 
   return {
     category,

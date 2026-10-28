@@ -51,11 +51,11 @@ export async function aiTimeline(ctx: Ctx, aiId: string, days = 30) {
 
 export async function searchAis(ctx: Ctx, q: string) {
   const { rows } = await ctx.db.query(
-    `SELECT a.id, a.name, a.handle, a.status, a.health_score, o.handle AS owner_handle
+    `SELECT a.id, a.name, a.handle, a.status, a.health_score, a.is_demo, o.handle AS owner_handle
        FROM core.personal_ais a JOIN core.users o ON o.id = a.owner_id
       WHERE a.deleted_at IS NULL AND ($1 = '' OR a.handle ILIKE $2 OR a.name ILIKE $2)
-      ORDER BY a.health_score ASC, a.created_at DESC LIMIT 50`,
+      ORDER BY a.health_score ASC, a.created_at DESC LIMIT 200`,
     [q, `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`],
   );
-  return rows.map((a) => ({ id: a.id, name: a.name, handle: a.handle, status: a.status, healthScore: Number(a.health_score), owner: a.owner_handle }));
+  return rows.map((a) => ({ id: a.id, name: a.name, handle: a.handle, status: a.status, healthScore: Number(a.health_score), demo: a.is_demo, owner: a.owner_handle }));
 }

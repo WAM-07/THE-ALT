@@ -4,9 +4,10 @@ import { auth, makeApp, signUp, trainAi, uniq, type TestApp } from './helpers.js
 // Module 5 forensics: an AI's behaviour over time, for staff in the ALT Command Centre.
 
 const bossEmail = `boss_${uniq()}@alt.test`;
+const labellerEmail = `labeller_${uniq()}@alt.test`;
 let t: TestApp;
 beforeAll(async () => {
-  t = await makeApp({ ADMIN_EMAILS: bossEmail });
+  t = await makeApp({ ADMIN_EMAILS: `${bossEmail},${labellerEmail}` });
 });
 afterAll(async () => {
   await t.app.close();
@@ -34,5 +35,19 @@ describe('an AI over time (Module 5)', () => {
     expect(tl.versions).toEqual([expect.objectContaining({ version: 1, engine: 'adapter', training: 'simulated' })]);
     expect(tl.health[0].parts).toMatchObject({ safety: expect.any(Number) });
     expect(tl.audit.map((e: { action: string }) => e.action)).toEqual(expect.arrayContaining(['ai.created', 'ai.training_started', 'ai.training_completed']));
+  });
+});
+
+describe('demo AIs (owner, 2026-10-29)', () => {
+  it('an admin labels an AI as demo; it shows in its public profile; nobody else can', async () => {
+    const u = await signUp(t);
+    const ai = (await t.app.inject({ method: 'POST', url: '/ais', headers: auth(u.accessToken), payload: { name: 'Seeded', handle: `s_${uniq()}`, consents: { persona_training: true } } })).json();
+    expect(ai.demo).toBe(false);
+    expect((await t.app.inject({ method: 'PUT', url: `/admin/ais/${ai.id}/demo`, headers: auth(u.accessToken), payload: { demo: true } })).statusCode).toBe(403);
+    const boss = await signUp(t, { email: labellerEmail, platform: 'admin' });
+    expect((await t.app.inject({ method: 'PUT', url: `/admin/ais/${ai.id}/demo`, headers: auth(boss.accessToken), payload: { demo: true } })).json()).toEqual({ id: ai.id, demo: true });
+    expect((await t.app.inject({ method: 'GET', url: `/ais/${ai.id}`, headers: auth(u.accessToken) })).json().demo).toBe(true);
+    const { rows } = await t.app.ctx.db.query(`SELECT 1 FROM core.audit_log WHERE action = 'ai.demo_label' AND entity_id = $1`, [ai.id]);
+    expect(rows).toHaveLength(1);
   });
 });

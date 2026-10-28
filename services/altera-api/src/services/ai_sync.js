@@ -8,7 +8,7 @@ const db = require('../db/database');
  */
 async function syncLinkedAi(coreAiId) {
   const row = await db.queryOne(
-    `SELECT a.id, a.name, a.description, a.avatar_url, a.category, a.status, a.health_score, a.deleted_at, a.owner_id,
+    `SELECT a.id, a.name, a.description, a.avatar_url, a.category, a.status, a.health_score, a.deleted_at, a.owner_id, a.is_demo,
             t.token_id, t.suspended
        FROM core.personal_ais a
        LEFT JOIN core.ai_identity_tokens t ON t.ai_id = a.id
@@ -22,10 +22,10 @@ async function syncLinkedAi(coreAiId) {
         SET display_name = $2, avatar = COALESCE($3, avatar), category = $4, is_verified = $5,
             ait_token_id = $6, health_score = $7, bio = COALESCE(NULLIF(bio, ''), $8),
             autonomy_enabled = CASE WHEN user_id <> $9 THEN false ELSE autonomy_enabled END,
-            user_id = $9
+            user_id = $9, is_demo = $10
       WHERE core_ai_id = $1
       RETURNING id, is_verified, user_id`,
-    [coreAiId, row.name, row.avatar_url, row.category, verified, row.token_id === null ? null : String(row.token_id), row.health_score, row.description, row.owner_id]
+    [coreAiId, row.name, row.avatar_url, row.category, verified, row.token_id === null ? null : String(row.token_id), row.health_score, row.description, row.owner_id, row.is_demo === true]
   );
   return rows[0] || null;
 }

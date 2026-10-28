@@ -21,6 +21,7 @@ export interface AiRow {
   current_version_id: string | null;
   royalty_bps: number;
   health_score: string;
+  is_demo: boolean;
   owner_confirmed_at: Date | null;
   created_at: Date;
   updated_at: Date;
