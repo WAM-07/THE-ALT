@@ -4,7 +4,7 @@ import { audit } from '../../lib/audit.js';
 import { forbidden } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
 
-export const CASE_KINDS = ['report', 'flag', 'support', 'dispute', 'appeal'] as const;
+export const CASE_KINDS = ['report', 'flag', 'support', 'dispute', 'appeal', 'review'] as const;
 export type CaseKind = (typeof CASE_KINDS)[number];
 export const CASE_STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'dismissed'] as const;
 export const OPEN_STATUSES = ['open', 'in_progress', 'waiting'] as const;
@@ -22,6 +22,7 @@ const HANDLED_BY: Record<CaseKind, StaffRole[]> = {
   appeal: ['moderator'],
   support: ['support'],
   dispute: ['support'],
+  review: ['moderator'],
 };
 
 export const isStaff = (roles: Role[]) => roles.some((r) => (STAFF_ROLES as readonly string[]).includes(r));

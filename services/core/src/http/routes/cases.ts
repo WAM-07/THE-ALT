@@ -10,6 +10,8 @@ import { notify } from '../../lib/notify.js';
 import { callService } from '../../lib/services.js';
 import { revokeAllSessions } from '../../modules/accounts/sessions.js';
 import { parseRoles } from '../../modules/accounts/users.js';
+import { startMint } from '../../modules/ai/lifecycle.js';
+import { latestVersion, loadAi } from '../../modules/ai/repo.js';
 import {
   addEvent,
   APPEALABLE,
@@ -561,6 +563,8 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
         : null,
       content: removable ? { type: c.subject_type, id: c.subject_id, platform: c.platform } : null,
       canSuspendOnChain: Boolean(ctx.chain?.canGovern),
+      // Module 3: an open review before minting, which staff approve or reject.
+      review: c.kind === 'review' && isOpen(c.status) ? ((await ctx.db.query(`SELECT data FROM core.case_events WHERE case_id = $1 AND kind = 'opened' ORDER BY id LIMIT 1`, [c.id])).rows[0]?.data?.evidence ?? {}) : null,
     };
   }
 
@@ -572,6 +576,8 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
     z.object({ action: z.literal('warn_user'), reason: Reason }),
     z.object({ action: z.literal('lock_account'), reason: Reason, days: z.number().int().min(1).max(3650).nullable() }),
     z.object({ action: z.literal('unlock_account'), reason: Reason }),
+    z.object({ action: z.literal('approve_deploy'), reason: Reason }),
+    z.object({ action: z.literal('reject_deploy'), reason: Reason }),
   ]);
   // Warnings may come from support too; everything else is moderation.
   const MAY_ACT: Record<z.infer<typeof ActionBody>['action'], Role[]> = {
@@ -581,6 +587,8 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
     warn_user: ['admin', 'moderator', 'support'],
     lock_account: ['admin', 'moderator'],
     unlock_account: ['admin', 'moderator'],
+    approve_deploy: ['admin', 'moderator'],
+    reject_deploy: ['admin', 'moderator'],
   };
   const appealHint = 'If you think this is a mistake, appeal it under Help & support in any ALT app.';
   const INDEFINITE = new Date('2100-01-01T00:00:00Z');
@@ -632,6 +640,38 @@ export async function caseRoutes(app: FastifyInstance, ctx: Ctx) {
             suspend ? `${ai.name} can't speak, post or be sold until this is lifted. Reason: ${b.reason}` : `The suspension was lifted. ${b.reason}`,
           );
           return record({ aiId: c.subject_ai_id, tokenId: ai.token_id, txHash: tx.hash, explorer: ctx.chain.explorerTx(tx.hash) });
+        }
+
+        // Module 3: the review before minting (DEPLOY_REVIEW). Approving starts the mint; rejecting tells the owner why.
+        if (b.action === 'approve_deploy' || b.action === 'reject_deploy') {
+          if (c.kind !== 'review' || !isOpen(c.status) || !c.subject_ai_id) throw badRequest('NOT_A_REVIEW', 'This is not an open review before minting.');
+          const { rows: opened } = await client.query<{ data: { evidence?: { versionId?: string; version?: number } } }>(
+            `SELECT data FROM core.case_events WHERE case_id = $1 AND kind = 'opened' ORDER BY id LIMIT 1`,
+            [c.id],
+          );
+          const asked = opened[0]?.data.evidence ?? {};
+          const ai = await loadAi(client, c.subject_ai_id, true);
+          if (!ai) throw notFound('AI');
+          const approve = b.action === 'approve_deploy';
+          if (approve) {
+            if (ai.status === 'minting' || ai.status === 'verified') throw conflict('AI_BUSY', 'This AI is already being minted or verified.');
+            const latest = await latestVersion(client, ai.id);
+            if (!latest || latest.id !== asked.versionId) throw conflict('VERSION_CHANGED', 'The owner built a newer version since asking; they need to ask again.');
+            await startMint(client, ai.id, { id: latest.id, version: latest.version_no }, me, req.ip);
+          }
+          await client.query('UPDATE core.cases SET status = $2, resolution = $3, closed_at = now() WHERE id = $1', [c.id, approve ? 'resolved' : 'dismissed', b.reason]);
+          await addEvent(client, c.id, { kind: 'status', visibility: 'participants', actorUserId: me, body: b.reason, data: { from: c.status, to: approve ? 'resolved' : 'dismissed' } });
+          await notify(client, {
+            userId: ai.owner_id,
+            category: 'ai',
+            type: approve ? 'ai.review_approved' : 'ai.review_rejected',
+            title: approve ? `ALT approved ${ai.name}: its identity token is being minted` : `ALT did not approve ${ai.name} yet`,
+            body: approve ? b.reason : `${b.reason} Change it, train again if needed, and ask again.`,
+            data: { aiId: ai.id, caseNumber: Number(c.number) },
+            platform: 'alter',
+            link: 'alter://training',
+          });
+          return record({ aiId: ai.id, version: asked.version ?? null });
         }
 
         if (b.action === 'remove_content') {

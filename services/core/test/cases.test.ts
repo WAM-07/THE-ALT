@@ -78,7 +78,7 @@ describe('the ALT Command Centre case queue (M3)', () => {
     const fromApp = await t.app.inject({ method: 'GET', url: '/staff/summary', headers: auth(await login(mod, 'altera')) });
     expect(fromApp.json().error.code).toBe('COMMAND_SESSION_REQUIRED');
 
-    expect((await t.app.inject({ method: 'GET', url: '/staff/me', headers: auth(mod.token) })).json()).toMatchObject({ roles: ['moderator'], handles: ['report', 'flag', 'appeal'] });
+    expect((await t.app.inject({ method: 'GET', url: '/staff/me', headers: auth(mod.token) })).json()).toMatchObject({ roles: ['moderator'], handles: ['report', 'flag', 'appeal', 'review'] });
     expect((await t.app.inject({ method: 'GET', url: `/staff/cases/${helpId}`, headers: auth(mod.token) })).statusCode).toBe(404);
     expect((await t.app.inject({ method: 'GET', url: `/staff/cases/${helpId}`, headers: auth(sup.token) })).statusCode).toBe(200);
     const queue = (await t.app.inject({ method: 'GET', url: '/staff/cases?kind=support', headers: auth(mod.token) })).json().items;

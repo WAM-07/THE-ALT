@@ -217,7 +217,12 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
       ),
     );
     if (go != true) return;
-    await _run('Sending the mint transaction…', () => aiApi.deploy(ai.id));
+    var inReview = false;
+    await _run('Sending the mint transaction…', () async {
+      inReview = (await aiApi.deploy(ai.id))['status'] == 'in_review';
+    });
+    // Module 3: ALT staff look at it first; the owner hears the decision in their ALT inbox.
+    if (inReview) return _toast('Sent to ALT for review. You will hear in your inbox; minting starts once it is approved.');
     _watchDeployment();
   }
 

@@ -6,6 +6,7 @@ import { sha256 } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
 import { countEvalItems, latestEvaluation } from './evaluation.js';
+import { fileCase } from '../cases/cases.js';
 import { checkSafety } from './moderation.js';
 import { parsePersona } from './persona.js';
 import { approvedMemories, consentState, latestVersion, loadAi, requireConsent, type AiRow, type VersionRow } from './repo.js';
@@ -230,15 +231,37 @@ export async function requestDeploy(ctx: Ctx, aiId: string, userId: string, ip: 
   return tx(ctx.db, async (client) => {
     const locked = await loadAi(client, aiId, true);
     if (locked?.status === 'minting' || locked?.status === 'verified') throw new AppError(409, 'AI_BUSY', 'Your AI is already being deployed.');
-    await client.query(`UPDATE core.personal_ais SET status = 'minting' WHERE id = $1`, [aiId]);
-    const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO core.jobs (kind, payload) VALUES ('mint_ait', $1) RETURNING id`,
-      [{ aiId, versionId: gate.latestVersion!.id }],
-    );
-    await audit(client, { action: 'ai.deploy_requested', actorUserId: userId, entityType: 'ai', entityId: aiId, ip, data: { version: gate.latestVersion!.version } });
-    await client.query(`SELECT pg_notify('alt_jobs', $1)`, [rows[0]!.id]);
-    return { jobId: rows[0]!.id, version: gate.latestVersion! };
+    if (ctx.config.deployReview) {
+      // Module 3: staff look at it first; approving the review case starts the mint (startMint below).
+      const { rows: pending } = await client.query(
+        `SELECT number FROM core.cases WHERE kind = 'review' AND subject_ai_id = $1 AND status IN ('open', 'in_progress', 'waiting')`,
+        [aiId],
+      );
+      if (pending.length) throw new AppError(409, 'REVIEW_PENDING', 'ALT is already reviewing your AI. You will hear in your ALT inbox.');
+      const filed = await fileCase(client, {
+        kind: 'review',
+        platform: 'alter',
+        category: 'deploy_review',
+        title: `Review before minting: ${ai.name} v${gate.latestVersion!.version}`,
+        subject: { type: 'ai', id: aiId, aiId, userId: ai.owner_id },
+        evidence: { versionId: gate.latestVersion!.id, version: gate.latestVersion!.version, checks: gate.checks.map((c) => ({ id: c.id, detail: c.detail ?? null })) },
+        openedBy: userId,
+        ip,
+      });
+      await audit(client, { action: 'ai.deploy_review_requested', actorUserId: userId, entityType: 'ai', entityId: aiId, ip, data: { version: gate.latestVersion!.version, caseNumber: Number(filed.case.number) } });
+      return { review: { caseNumber: Number(filed.case.number) }, version: gate.latestVersion! };
+    }
+    return startMint(client, aiId, gate.latestVersion!, userId, ip);
   });
+}
+
+/** Queues the mint of the AI's identity token (the job worker sends it). Inside the caller's transaction. */
+export async function startMint(client: pg.PoolClient, aiId: string, version: { id: string; version: number }, actorUserId: string, ip: string | null) {
+  await client.query(`UPDATE core.personal_ais SET status = 'minting' WHERE id = $1`, [aiId]);
+  const { rows } = await client.query<{ id: string }>(`INSERT INTO core.jobs (kind, payload) VALUES ('mint_ait', $1) RETURNING id`, [{ aiId, versionId: version.id }]);
+  await audit(client, { action: 'ai.deploy_requested', actorUserId, entityType: 'ai', entityId: aiId, ip, data: { version: version.version } });
+  await client.query(`SELECT pg_notify('alt_jobs', $1)`, [rows[0]!.id]);
+  return { jobId: rows[0]!.id, version };
 }
 
 /** Publishes an already-built version of a verified AI on-chain. */

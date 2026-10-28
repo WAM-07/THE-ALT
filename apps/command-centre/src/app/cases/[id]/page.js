@@ -15,6 +15,8 @@ const ACTION_DONE = {
   warn_user: "warned the person",
   lock_account: "locked the person's account",
   unlock_account: "unlocked the person's account",
+  approve_deploy: "approved the AI; its identity token is being minted",
+  reject_deploy: "did not approve the AI",
 };
 const ACTION_ASK = {
   suspend_ai: "Suspend this AI on-chain",
@@ -23,6 +25,8 @@ const ACTION_ASK = {
   warn_user: "Warn this person",
   lock_account: "Lock this person's account",
   unlock_account: "Unlock this person's account",
+  approve_deploy: "Approve: mint its identity token",
+  reject_deploy: "Do not approve: tell the owner why",
 };
 const LOCK_FOR = [
   [1, "1 day"],
@@ -430,6 +434,22 @@ function TakeAction({ targets, busy, run }) {
         Take action <span className="aside">each one is audited</span>
       </h2>
       <div className="pad">
+        {targets?.review && moderates && (
+          <div className="act-row">
+            <div>
+              <div className="eyebrow">Review before minting</div>
+              <b>Version {targets.review.version ?? "?"}</b> <span className="muted">passed every automatic check</span>
+            </div>
+            <div className="act-buttons">
+              <button className="btn" disabled={busy} onClick={ask("reject_deploy")}>
+                Reject
+              </button>
+              <button className="btn primary" disabled={busy} onClick={ask("approve_deploy")}>
+                Approve
+              </button>
+            </div>
+          </div>
+        )}
         {ai && (
           <div className="act-row">
             <div>

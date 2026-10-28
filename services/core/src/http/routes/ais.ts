@@ -1095,7 +1095,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
 
   r.post('/ais/:id/deploy', { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Mint the AI’s identity token (verifies it everywhere)', params: AiId } }, async (req, reply) => {
     const result = await requestDeploy(ctx, req.params.id, req.auth!.userId, req.ip);
-    return reply.status(202).send({ status: 'minting', ...result });
+    return reply.status(202).send({ status: 'review' in result ? 'in_review' : 'minting', ...result });
   });
 
   r.post(

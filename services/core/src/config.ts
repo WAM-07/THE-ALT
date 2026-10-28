@@ -89,6 +89,8 @@ const EnvSchema = z.object({
   // Where trained adapters answer (the inference socket). Blank = trained versions speak through the base engine.
   ADAPTER_INFERENCE_URL: z.string().optional(),
   JOBS_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  // Module 3: staff review every AI in the ALT Command Centre before it is minted (off: minting starts at once).
+  DEPLOY_REVIEW: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   DEEP_LINK_ALTER: z.string().default('alter://handoff'),
   DEEP_LINK_ALTERA: z.string().default('altera://handoff'),
 });
@@ -180,6 +182,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       inferenceUrl: e.ADAPTER_INFERENCE_URL?.replace(/\/$/, '') || null,
     },
     jobsEnabled: e.JOBS_ENABLED,
+    deployReview: e.DEPLOY_REVIEW,
     deepLinks: {
       alter: e.DEEP_LINK_ALTER,
       altera: e.DEEP_LINK_ALTERA,

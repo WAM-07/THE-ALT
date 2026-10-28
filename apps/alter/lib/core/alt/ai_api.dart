@@ -424,7 +424,8 @@ class AiApi {
 
   Future<void> confirm(String id, bool confirmed) => _call('POST', '/ais/$id/confirm', body: {'confirmed': confirmed});
   Future<Map<String, dynamic>> deployPreview(String id) async => Map<String, dynamic>.from(await _call('GET', '/ais/$id/deploy/preview') as Map);
-  Future<void> deploy(String id) => _call('POST', '/ais/$id/deploy');
+  /// Starts minting, or (when ALT reviews AIs first) sends it to ALT staff: `status` is `minting` or `in_review`.
+  Future<Map<String, dynamic>> deploy(String id) async => Map<String, dynamic>.from(await _call('POST', '/ais/$id/deploy') as Map);
   Future<void> publish(String id, String versionId) => _call('POST', '/ais/$id/versions/$versionId/publish');
 }
 
