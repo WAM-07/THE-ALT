@@ -40,6 +40,12 @@ export interface VersionRow {
   onchain_tx_hash: string | null;
   created_at: Date;
   published_at: Date | null;
+  engine: 'base' | 'adapter';
+  training_mode: 'cloud' | 'local' | 'simulated' | null;
+  training_job_id: string | null;
+  adapter_sha256: string | null;
+  adapter_uri: string | null;
+  readiness: string | null;
 }
 
 export const CONSENT_SCOPES = ['persona_training', 'third_party_processing', 'public_deployment', 'interaction_learning'] as const;

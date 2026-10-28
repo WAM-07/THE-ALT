@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { LlmProvider } from '../src/modules/ai/llm.js';
-import { auth, makeApp, signUp, uniq, type TestApp } from './helpers.js';
+import { auth, makeApp, signUp, trainAi, uniq, type TestApp } from './helpers.js';
 
 // Hardhat's development account #0 deploys the test chain's contracts, so it is the registry's governor.
 const GOVERNOR = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
@@ -66,7 +66,7 @@ async function verifiedAi(owner: User) {
       consents: { persona_training: true, third_party_processing: true, public_deployment: true },
     })
   ).json();
-  await call('POST', `/ais/${ai.id}/versions`, owner.accessToken);
+  await trainAi(t, ai.id, owner.accessToken); // only a trained AI can be verified
   const s = (await call('POST', `/ais/${ai.id}/chat/sessions`, owner.accessToken, {})).json();
   await call('POST', `/ais/${ai.id}/chat/sessions/${s.id}/messages`, owner.accessToken, { content: 'hello' });
   await call('POST', `/ais/${ai.id}/confirm`, owner.accessToken, { confirmed: true });

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { LlmMessage, LlmProvider } from '../src/modules/ai/llm.js';
-import { auth, makeApp, signUp, uniq, type TestApp } from './helpers.js';
+import { auth, makeApp, signUp, trainAi, uniq, type TestApp } from './helpers.js';
 
 /** Records every prompt so tests can check exactly what the AI was (and was not) given. */
 const calls: LlmMessage[][] = [];
@@ -180,7 +180,7 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
     // Clearance: not tested enough and not confirmed yet.
     const gate = (await call('GET', `/ais/${ai.id}/clearance`, u.accessToken)).json();
     expect(gate.passed).toBe(false);
-    expect(gate.checks.filter((c: { passed: boolean }) => !c.passed).map((c: { id: string }) => c.id).sort()).toEqual(['owner_confirmed', 'tested']);
+    expect(gate.checks.filter((c: { passed: boolean }) => !c.passed).map((c: { id: string }) => c.id).sort()).toEqual(['owner_confirmed', 'tested', 'trained']);
     expect((await call('POST', `/ais/${ai.id}/deploy`, u.accessToken)).json().error.code).toBe('CLEARANCE_FAILED');
 
     const session = (await call('POST', `/ais/${ai.id}/chat/sessions`, u.accessToken, {})).json();
@@ -188,23 +188,34 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
       await call('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, u.accessToken, { content: m });
     }
     await call('POST', `/ais/${ai.id}/confirm`, u.accessToken, { confirmed: true });
+    // A base version can be tested, but only a trained one is verified: train it (simulated in tests).
+    expect((await call('GET', `/ais/${ai.id}/clearance`, u.accessToken)).json().passed).toBe(false);
+    const training = await trainAi(t, ai.id, u.accessToken);
+    expect(training).toMatchObject({ status: 'completed', mode: 'simulated' });
+    const trained = (await call('GET', `/ais/${ai.id}/versions`, u.accessToken)).json()[0];
+    expect(trained).toMatchObject({ id: training.versionId, version: 2, engine: 'adapter', training: 'simulated', simulated: true });
+    expect((await t.app.inject({ method: 'GET', url: `/ipfs/${trained.manifestCid}` })).json().engine).toMatchObject({
+      type: 'adapter',
+      training: 'simulated',
+      note: 'Simulated training: no model weights were trained.',
+    });
     expect((await call('GET', `/ais/${ai.id}/clearance`, u.accessToken)).json().passed).toBe(true);
 
     // Deploy: see the transaction first, then mint through the job worker.
     const preview = (await call('GET', `/ais/${ai.id}/deploy/preview`, u.accessToken)).json();
-    expect(preview).toMatchObject({ chainId: 31337, version: 1, royaltyBps: 500, paidBy: expect.stringContaining('ALT') });
+    expect(preview).toMatchObject({ chainId: 31337, version: 2, royaltyBps: 500, paidBy: expect.stringContaining('ALT') });
     const deploy = await call('POST', `/ais/${ai.id}/deploy`, u.accessToken);
     expect(deploy.statusCode).toBe(202);
     expect((await call('GET', `/ais/${ai.id}`, u.accessToken)).json().status).toBe('minting');
     await t.app.jobs.drain();
 
     const verified = (await call('GET', `/ais/${ai.id}`, u.accessToken)).json();
-    expect(verified).toMatchObject({ status: 'verified', verified: true, currentVersion: { version: 1, manifestCid: v1.manifestCid } });
+    expect(verified).toMatchObject({ status: 'verified', verified: true, currentVersion: { version: 2, manifestCid: trained.manifestCid } });
     const wallet = (await call('GET', '/me', u.accessToken)).json().wallets.find((w: { isPrimary: boolean }) => w.isPrimary).address;
     expect(verified.token).toMatchObject({ owner: wallet, creator: wallet, chainId: 31337, onchainVersion: 1 });
     const onchain = await t.app.ctx.chain!.readIdentity(BigInt(verified.token.tokenId));
     expect(onchain.owner.toLowerCase()).toBe(wallet);
-    expect(onchain.manifestCid).toBe(v1.manifestCid);
+    expect(onchain.manifestCid).toBe(trained.manifestCid);
 
     // Public profile for ALTERA and ALTAR.
     const pub = (await t.app.inject({ method: 'GET', url: `/public/ais/${verified.handle}` })).json();
@@ -219,14 +230,18 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
     expect(onAltar.owner.avatarUrl).toBe(altarPic);
     expect((await t.app.inject({ method: 'GET', url: `/public/ais/${verified.handle}` })).json().owner.avatarUrl).toBe(globalPic);
 
-    // Behaviour changes go in by version: edit draft, build v2, publish it on-chain.
+    // Behaviour changes go in by version: edit the draft, train again, publish it on-chain.
     await call('PATCH', `/ais/${ai.id}`, u.accessToken, { persona: { ...verified.persona, traits: ['Logical', 'Curious'] } });
-    const v2 = (await call('POST', `/ais/${ai.id}/versions`, u.accessToken)).json();
-    expect((await t.app.inject({ method: 'GET', url: `/ipfs/${v2.manifestCid}` })).json().parent).toEqual({ version: 1, cid: v1.manifestCid });
+    const untrained = (await call('POST', `/ais/${ai.id}/versions`, u.accessToken)).json();
+    expect((await call('POST', `/ais/${ai.id}/versions/${untrained.id}/publish`, u.accessToken)).json().error.code).toBe('VERSION_NOT_TRAINED');
+    await trainAi(t, ai.id, u.accessToken);
+    const v2 = (await call('GET', `/ais/${ai.id}/versions`, u.accessToken)).json()[0];
+    expect(v2.version).toBe(4);
+    expect((await t.app.inject({ method: 'GET', url: `/ipfs/${v2.manifestCid}` })).json().parent).toEqual({ version: 3, cid: untrained.manifestCid });
     expect((await call('POST', `/ais/${ai.id}/versions/${v2.id}/publish`, u.accessToken)).statusCode).toBe(202);
     await t.app.jobs.drain();
     const after = (await call('GET', `/ais/${ai.id}`, u.accessToken)).json();
-    expect(after.currentVersion).toMatchObject({ version: 2, manifestCid: v2.manifestCid });
+    expect(after.currentVersion).toMatchObject({ version: 4, manifestCid: v2.manifestCid });
     expect(after.token.onchainVersion).toBe(2);
     expect((await t.app.ctx.chain!.readIdentity(BigInt(after.token.tokenId))).manifestCid).toBe(v2.manifestCid);
 

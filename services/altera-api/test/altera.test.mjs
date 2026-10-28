@@ -30,6 +30,7 @@ beforeAll(async () => {
     ALT_PUBLIC_URL: PUBLIC_URL,
     RATE_LIMIT_ENABLED: 'false',
     CLEARANCE_MIN_TEST_MESSAGES: '1',
+    TRAINING_SIMULATED_SECONDS: '0',
     STORAGE_DIR: '.data/test-uploads',
     CHAIN_RPC_URL: inject('chain').rpcUrl,
     CHAIN_ID: String(inject('chain').chainId),
@@ -535,7 +536,9 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
       onboarding: { primaryTrait: 'Creative' },
       consents: { persona_training: true, third_party_processing: true, public_deployment: true, interaction_learning: true },
     })).body;
-    await coreCall('POST', `/ais/${ai.id}/versions`, owner.token);
+    // Only a trained AI can be verified: ALT's simulated training, instant here.
+    await coreCall('POST', `/ais/${ai.id}/trainings`, owner.token);
+    await core.jobs.drain();
     const session = (await coreCall('POST', `/ais/${ai.id}/chat/sessions`, owner.token, {})).body;
     await coreCall('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, owner.token, { content: 'hello' });
     await coreCall('POST', `/ais/${ai.id}/confirm`, owner.token, { confirmed: true });

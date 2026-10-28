@@ -34,6 +34,7 @@ import { authRoutes } from './http/routes/auth.js';
 import { directoryRoutes } from './http/routes/directory.js';
 import { meRoutes } from './http/routes/me.js';
 import { chainRoutes } from './http/routes/chain.js';
+import { trainerRoutes } from './http/routes/trainer.js';
 
 export interface BuildOptions {
   config: Config;
@@ -179,6 +180,7 @@ export async function buildApp(opts: BuildOptions) {
   await app.register(async (i) => directoryRoutes(i, ctx));
   await app.register(async (i) => chainRoutes(i, ctx));
   await app.register(async (i) => aiRoutes(i, ctx));
+  await app.register(async (i) => trainerRoutes(i, ctx));
   await app.register(async (i) => notificationRoutes(i, ctx));
   await app.register(async (i) => accountPageRoutes(i));
   await app.register(async (i) => avatarRoutes(i, ctx));

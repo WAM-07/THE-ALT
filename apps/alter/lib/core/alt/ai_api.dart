@@ -128,6 +128,25 @@ class AiVersionInfo {
   int get datasets => (j['datasets'] as num?)?.toInt() ?? 0;
   int get memories => (j['memories'] as num?)?.toInt() ?? 0;
   DateTime? get createdAt => j['createdAt'] == null ? null : DateTime.parse(j['createdAt'] as String);
+
+  /// `base` (persona on the base model) or `adapter` (trained); only a trained version can be verified.
+  String get engine => j['engine'] as String? ?? 'base';
+  bool get trained => engine == 'adapter';
+  /// ALT's labelled stand-in for the real trainer.
+  bool get simulated => j['simulated'] == true;
+}
+
+/// One training of an AI (Module 9) with its live progress.
+class AiTraining {
+  AiTraining(this.j);
+  final Map<String, dynamic> j;
+  String get id => j['id'] as String;
+  String get status => j['status'] as String;
+  String? get stage => j['stage'] as String?;
+  int get progress => (j['progress'] as num?)?.toInt() ?? 0;
+  bool get simulated => j['simulated'] == true;
+  String? get error => j['error'] as String?;
+  bool get finished => status == 'completed' || status == 'failed';
 }
 
 /// Something the AI remembers about its owner, or a suggestion waiting for approval.
@@ -286,6 +305,9 @@ class AiApi {
 
   // lifecycle
   Future<AiVersionInfo> buildVersion(String id) async => AiVersionInfo(Map<String, dynamic>.from(await _call('POST', '/ais/$id/versions') as Map));
+  Future<AiTraining> startTraining(String id) async => AiTraining(Map<String, dynamic>.from(await _call('POST', '/ais/$id/trainings') as Map));
+  Future<List<AiTraining>> trainings(String id) async =>
+      (await _call('GET', '/ais/$id/trainings') as List).map((e) => AiTraining(Map<String, dynamic>.from(e as Map))).toList();
   Future<List<AiVersionInfo>> versions(String id) async =>
       (await _call('GET', '/ais/$id/versions') as List).map((e) => AiVersionInfo(Map<String, dynamic>.from(e as Map))).toList();
   Future<(bool, List<ClearanceCheck>)> clearance(String id) async {

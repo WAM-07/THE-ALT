@@ -6,6 +6,7 @@ import { audit, publish } from '../lib/audit.js';
 import { AppError } from '../lib/errors.js';
 import { notify } from '../lib/notify.js';
 import { loadAi, loadVersion } from '../modules/ai/repo.js';
+import { runSimulatedTraining, simulatedTrainingFailed } from '../modules/ai/training.js';
 
 interface JobRow {
   id: string;
@@ -184,6 +185,11 @@ const HANDLERS: Record<string, { run: Handler; failed?: FailureHandler }> = {
   mint_ait: { run: mintAit, failed: mintFailed },
   publish_version: { run: publishVersion },
   starter_funds: { run: starterFunds },
+  // Labelled stand-in for the real trainer (TRAINING_MODE=simulated); see modules/ai/training.ts.
+  simulate_training: {
+    run: (ctx, job) => runSimulatedTraining(ctx, job.payload.trainingJobId!),
+    failed: (ctx, job, error) => simulatedTrainingFailed(ctx, job.payload.trainingJobId!, error),
+  },
 };
 
 /**

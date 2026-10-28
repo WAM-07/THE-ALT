@@ -1,11 +1,11 @@
 import type { Ctx } from '../../context.js';
 import { AppError } from '../../lib/errors.js';
-import type { LlmMessage } from './llm.js';
+import type { LlmMessage, LlmOptions, LlmResult } from './llm.js';
 import { checkSafety, FLAGGED_REPLY } from './moderation.js';
 import { tx } from '../../db.js';
 import { fileCase } from '../cases/cases.js';
 import { buildSystemPrompt, parsePersona, temperatureFor, type Channel } from './persona.js';
-import { approvedMemories, consentState, datasetTexts, loadVersion, type AiRow } from './repo.js';
+import { approvedMemories, consentState, datasetTexts, loadVersion, type AiRow, type VersionRow } from './repo.js';
 import { retrieveSemantic } from './semantic.js';
 
 export interface RespondInput {
@@ -32,6 +32,34 @@ export interface RespondResult {
 const MAX_TOKENS = { short: 180, medium: 450, long: 900 } as const;
 
 /**
+ * The inference socket: a version trained by a real trainer (cloud or local) answers through its adapter
+ * on ALT's inference server (ADAPTER_INFERENCE_URL). Base versions, simulated trainings and an unreachable
+ * server use the base engine; the provider that answered is logged with every reply.
+ */
+async function speak(ctx: Ctx, version: VersionRow | null, messages: LlmMessage[], options: LlmOptions): Promise<LlmResult> {
+  const url = ctx.config.training.inferenceUrl;
+  if (url && version?.engine === 'adapter' && version.training_mode !== 'simulated' && version.adapter_uri) {
+    try {
+      const res = await fetch(`${url}/v1/adapter-chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ baseModel: version.base_model, adapterUri: version.adapter_uri, adapterSha256: version.adapter_sha256, messages, ...options }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { text?: unknown; tokensIn?: number; tokensOut?: number };
+        if (typeof body.text === 'string' && body.text.trim()) {
+          return { text: body.text, provider: 'alt-adapter', model: `adapter:${version.adapter_sha256!.slice(0, 12)}`, tokensIn: body.tokensIn, tokensOut: body.tokensOut };
+        }
+      }
+    } catch {
+      // Falls back to the base engine below.
+    }
+  }
+  return ctx.llm.complete(messages, options);
+}
+
+/**
  * The persona engine: the one place that makes an AI speak, whichever ALT platform asks.
  * Same persona, same memories, same rules everywhere, and every reply is moderated and logged.
  */
@@ -41,6 +69,7 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
   let versionId: string | null = null;
   let memoryIds: string[] | undefined;
   let datasetIds: string[] | undefined;
+  let version: VersionRow | null = null;
 
   if (input.version === 'current') {
     if (!ai.current_version_id || ai.status !== 'verified') {
@@ -49,6 +78,7 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
     const v = await loadVersion(ctx.db, ai.current_version_id);
     if (!v) throw new AppError(409, 'AI_NOT_VERIFIED', 'This AI has no verified version yet.');
     personaSource = v.persona_config;
+    version = v;
     versionId = v.id;
     memoryIds = v.memory_ids;
     datasetIds = v.dataset_ids;
@@ -78,7 +108,7 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
   const messages: LlmMessage[] = [{ role: 'system', content: system }, ...input.messages.slice(-12)];
 
   const started = Date.now();
-  const result = await ctx.llm.complete(messages, { temperature: temperatureFor(persona), maxTokens: MAX_TOKENS[persona.style.verbosity] });
+  const result = await speak(ctx, version, messages, { temperature: temperatureFor(persona), maxTokens: MAX_TOKENS[persona.style.verbosity] });
   const latencyMs = Date.now() - started;
   const check = await checkSafety(ctx.ml, result.text);
 

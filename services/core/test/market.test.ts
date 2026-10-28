@@ -3,7 +3,7 @@ import type { Hex } from 'viem';
 import { decrypt } from '../src/lib/crypto.js';
 import type { LlmProvider } from '../src/modules/ai/llm.js';
 import { indexRegistry, syncToken } from '../src/modules/market/holders.js';
-import { auth, makeApp, signUp, uniq, type TestApp } from './helpers.js';
+import { auth, makeApp, signUp, trainAi, uniq, type TestApp } from './helpers.js';
 
 const echo: LlmProvider = {
   name: 'echo',
@@ -43,7 +43,7 @@ async function verifiedAi(owner: User) {
     })
   ).json();
   await call('POST', `/ais/${ai.id}/datasets`, owner.accessToken, { title: 'My private diary', category: 'personality', text: 'Only for me: my bank PIN hint is the cat.' });
-  await call('POST', `/ais/${ai.id}/versions`, owner.accessToken);
+  await trainAi(t, ai.id, owner.accessToken); // only a trained AI can be verified
   const s = (await call('POST', `/ais/${ai.id}/chat/sessions`, owner.accessToken, {})).json();
   await call('POST', `/ais/${ai.id}/chat/sessions/${s.id}/messages`, owner.accessToken, { content: 'hello' });
   await call('POST', `/ais/${ai.id}/confirm`, owner.accessToken, { confirmed: true });

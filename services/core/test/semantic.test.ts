@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MlClient } from '../src/lib/ml.js';
 import { retrieveSemantic } from '../src/modules/ai/semantic.js';
-import { auth, makeApp, signUp, uniq, type TestApp } from './helpers.js';
+import { auth, makeApp, signUp, trainAi, uniq, type TestApp } from './helpers.js';
 
 /**
  * A stand-in for ALT's embedding model: words of the same concept share a dimension, so "enjoy" meets "love"
@@ -79,7 +79,7 @@ describe('semantic search (Modules 10 and 11, with the embedding model)', () => 
         consents: { persona_training: true, third_party_processing: true, public_deployment: true },
       })
     ).json();
-    await call('POST', `/ais/${ai.id}/versions`, u.accessToken);
+    await trainAi(t, ai.id, u.accessToken); // only a trained AI can be verified
     const session = (await call('POST', `/ais/${ai.id}/chat/sessions`, u.accessToken, {})).json();
     await call('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, u.accessToken, { content: 'hello' });
     await call('POST', `/ais/${ai.id}/confirm`, u.accessToken, { confirmed: true });

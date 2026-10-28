@@ -89,6 +89,19 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
         _toast('Version ${v.version} built and pinned to IPFS');
       });
 
+  /// Trains the AI and follows its checkpoints (simulated until ALT's trainer runs, and labelled so).
+  Future<void> _train() => _run('Starting the training…', () async {
+        final id = _ai!.id;
+        var job = await aiApi.startTraining(id);
+        while (!job.finished && mounted) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          job = (await aiApi.trainings(id)).firstWhere((t) => t.id == job.id, orElse: () => job);
+          if (mounted) setState(() => _busyLabel = '${job.stage ?? 'Training'} · ${job.progress}%');
+        }
+        if (job.status == 'failed') return _toast(job.error ?? 'The training did not finish.');
+        _toast(job.simulated ? 'Simulated training finished: a trained version is ready' : 'Training finished: a trained version is ready');
+      });
+
   Future<void> _fix(ClearanceCheck c) async {
     final ai = _ai!;
     switch (c.id) {
@@ -100,6 +113,8 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
         return _run('Saving consent…', () => aiApi.setConsent(ai.id, 'public_deployment', true));
       case 'version_built':
         return _build();
+      case 'trained':
+        return _train();
       case 'tested':
         context.go('/chat');
       case 'owner_confirmed':

@@ -77,6 +77,13 @@ const EnvSchema = z.object({
   LLM_COMPAT_MODEL: z.string().optional(),
   // Clearance gate before an AI can be deployed.
   CLEARANCE_MIN_TEST_MESSAGES: z.coerce.number().int().min(0).default(3),
+  // Training (Module 9, "the engine"). simulated = ALT's labelled stand-in, a short run of checkpoints that
+  // trains nothing (development, tests, the demo); trainer = jobs wait for a real trainer to claim them
+  // through /internal/trainer. Defaults to simulated outside production.
+  TRAINING_MODE: z.enum(['simulated', 'trainer']).optional(),
+  TRAINING_SIMULATED_SECONDS: z.coerce.number().min(0).max(120).default(10),
+  // Where trained adapters answer (the inference socket). Blank = trained versions speak through the base engine.
+  ADAPTER_INFERENCE_URL: z.string().optional(),
   JOBS_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
   DEEP_LINK_ALTER: z.string().default('alter://handoff'),
   DEEP_LINK_ALTERA: z.string().default('altera://handoff'),
@@ -159,6 +166,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       compatModel: e.LLM_COMPAT_MODEL,
     },
     clearance: { minTestMessages: e.CLEARANCE_MIN_TEST_MESSAGES },
+    training: {
+      mode: e.TRAINING_MODE ?? (e.NODE_ENV === 'production' ? 'trainer' : 'simulated'),
+      simulatedSeconds: e.TRAINING_SIMULATED_SECONDS,
+      inferenceUrl: e.ADAPTER_INFERENCE_URL?.replace(/\/$/, '') || null,
+    },
     jobsEnabled: e.JOBS_ENABLED,
     deepLinks: {
       alter: e.DEEP_LINK_ALTER,

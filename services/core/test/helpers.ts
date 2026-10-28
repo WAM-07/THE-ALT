@@ -44,6 +44,7 @@ export async function makeApp(env: Record<string, string> = {}, opts: { llmProvi
     AIT_REGISTRY_ADDRESS: inject('chain').registry,
     ALT_MARKETPLACE_ADDRESS: inject('chain').marketplace,
     RELAYER_PRIVATE_KEY: inject('chain').relayerPrivateKey,
+    TRAINING_SIMULATED_SECONDS: '0',
     ...env,
   });
   const mailer = createMailer(config, () => {});
@@ -92,4 +93,13 @@ export async function signUp(t: TestApp, opts: { email?: string; password?: stri
     sessionId: string;
     user: { id: string; wallets: { address: string; kind: string; isPrimary: boolean }[]; roles: string[] };
   };
+}
+
+/** Trains an AI with ALT's simulated training (instant in tests) and returns the finished training. */
+export async function trainAi(t: TestApp, aiId: string, accessToken: string) {
+  const res = await t.app.inject({ method: 'POST', url: `/ais/${aiId}/trainings`, headers: auth(accessToken) });
+  if (res.statusCode !== 202) throw new Error(`training did not start: ${res.body}`);
+  await t.app.jobs.drain();
+  const list = await t.app.inject({ method: 'GET', url: `/ais/${aiId}/trainings`, headers: auth(accessToken) });
+  return list.json()[0] as { id: string; status: string; versionId: string; mode: string; checkpoints: unknown[] };
 }

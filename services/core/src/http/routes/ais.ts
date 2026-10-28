@@ -10,6 +10,7 @@ import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media
 import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
+import { listTrainings, startTraining, trainingOut } from '../../modules/ai/training.js';
 import { checkSafety } from '../../modules/ai/moderation.js';
 import { indexItems, searchAis } from '../../modules/ai/semantic.js';
 import { describe as describeStyle, profileFor, STYLE_CHARS, STYLE_MIN_SAMPLES, styleFeatures, styleMatch, styleScore } from '../../modules/ai/style.js';
@@ -795,7 +796,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
   r.get('/ais/:id/versions', { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Version history', params: AiId } }, async (req) => {
     const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
     const { rows } = await ctx.db.query(
-      `SELECT id, version_no, manifest_cid, manifest_sha256, onchain_tx_hash, created_at, published_at, array_length(dataset_ids, 1) AS datasets, array_length(memory_ids, 1) AS memories
+      `SELECT id, version_no, manifest_cid, manifest_sha256, onchain_tx_hash, created_at, published_at, array_length(dataset_ids, 1) AS datasets, array_length(memory_ids, 1) AS memories,
+              engine, training_mode, readiness
          FROM core.ai_versions WHERE ai_id = $1 ORDER BY version_no DESC`,
       [ai.id],
     );
@@ -810,8 +812,27 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       onchainTx: v.onchain_tx_hash,
       datasets: v.datasets ?? 0,
       memories: v.memories ?? 0,
+      // The engine slot: `base` (persona on the base model) or `adapter` (trained); `simulated` is the stand-in.
+      engine: v.engine,
+      training: v.training_mode,
+      simulated: v.training_mode === 'simulated',
+      readiness: v.readiness === null ? null : Number(v.readiness),
       createdAt: (v.created_at as Date).toISOString(),
     }));
+  });
+
+  r.post(
+    '/ais/:id/trainings',
+    { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Train the AI on its consented data (simulated until ALT’s trainer runs; then queued for it)', params: AiId } },
+    async (req, reply) => {
+      const job = await startTraining(ctx, req.params.id, req.auth!.userId, req.ip);
+      return reply.status(202).send(trainingOut(job));
+    },
+  );
+
+  r.get('/ais/:id/trainings', { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Trainings of this AI, newest first, with their checkpoints', params: AiId } }, async (req) => {
+    const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+    return (await listTrainings(ctx.db, ai.id)).map(trainingOut);
   });
 
   r.get('/ais/:id/training-jobs', { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Recent build jobs and their progress', params: AiId } }, async (req) => {

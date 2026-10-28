@@ -1,6 +1,6 @@
 // Fills a fresh ALT with a small, believable story for the 60% demo (see docs/demo-script.md).
 // Everything goes through the public APIs behind the gateway, exactly as the apps do: sign-up with
-// e-mailed codes, consent, chat, build, mint, bring to ALTERA, post, follow, DM. Nothing is written to
+// e-mailed codes, consent, chat, train, mint, bring to ALTERA, post, follow, DM. Nothing is written to
 // the database directly, so the seed doubles as an end-to-end check of the system.
 //
 // Used by `npm run demo` (scripts/dev.mjs --demo) on its own database, `alt_demo`.
@@ -123,6 +123,18 @@ function demoClient(gateway) {
     return (await call('POST', '/core/auth/handoff/redeem', null, { code, platform: 'altera' })).data;
   }
 
+  /** Trains the AI (ALT's simulated training in development and the demo) and waits for the trained version. */
+  async function train(token, aiId, name) {
+    const job = (await call('POST', `/core/ais/${aiId}/trainings`, token)).data;
+    for (let i = 0; i < 240; i++) {
+      const now = (await call('GET', `/core/ais/${aiId}/trainings`, token)).data.find((j) => j.id === job.id);
+      if (now?.status === 'completed') return now.versionId;
+      if (now?.status === 'failed') throw new Error(`${name} training failed: ${now.error}`);
+      await sleep(500);
+    }
+    throw new Error(`${name} took too long to train`);
+  }
+
   /** Creates an AI in ALTER and, unless `draft`, takes it all the way to a minted identity token. */
   async function makeAi(token, spec) {
     const ai = (await call('POST', '/core/ais', token, { name: spec.name, handle: spec.handle, description: spec.bio, category: spec.category, royaltyBps: spec.royaltyBps, onboarding: spec.onboarding, consents: CONSENTS })).data;
@@ -131,7 +143,7 @@ function demoClient(gateway) {
     if (spec.draft) return ai;
     const session = (await call('POST', `/core/ais/${ai.id}/chat/sessions`, token, {})).data;
     for (const content of spec.chat) await call('POST', `/core/ais/${ai.id}/chat/sessions/${session.id}/messages`, token, { content });
-    await call('POST', `/core/ais/${ai.id}/versions`, token);
+    await train(token, ai.id, spec.name); // only a trained AI can be verified
     await call('POST', `/core/ais/${ai.id}/confirm`, token, { confirmed: true });
     await call('POST', `/core/ais/${ai.id}/deploy`, token);
     for (let i = 0; i < 60; i++) {
@@ -203,9 +215,9 @@ export async function seedDemo({ gateway, log = console.log }) {
   await upload(`/core/ais/${wamiqAi.id}/avatar`, t.wamiq, orbPng([110, 240, 170], [18, 110, 70], [12, 40, 30]));
   await upload(`/core/ais/${museAi.id}/avatar`, t.ayesha, orbPng([255, 200, 120], [214, 80, 140], [40, 20, 45]));
 
-  log('version 2 of Wamiq’s ALT: new data, built, published on-chain…');
+  log('version 2 of Wamiq’s ALT: new data, trained again, published on-chain…');
   await call('POST', `/core/ais/${wamiqAi.id}/datasets`, t.wamiq, { title: 'Project update', category: 'knowledge', text: 'ALT now has one notification inbox shared by ALTER and ALTERA, and AIs keep their identity tokens across restarts of the development chain.' });
-  const v2 = (await call('POST', `/core/ais/${wamiqAi.id}/versions`, t.wamiq)).data;
+  const v2 = { id: await train(t.wamiq, wamiqAi.id, 'Wamiq’s ALT') };
   await call('POST', `/core/ais/${wamiqAi.id}/versions/${v2.id}/publish`, t.wamiq);
   for (let i = 0; i < 60; i++) {
     const versions = (await call('GET', `/core/ais/${wamiqAi.id}/versions`, t.wamiq)).data;

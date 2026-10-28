@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseEther, type Hex } from 'viem';
 import { decrypt } from '../src/lib/crypto.js';
 import type { LlmProvider } from '../src/modules/ai/llm.js';
-import { auth, makeApp, signUp, uniq, type TestApp } from './helpers.js';
+import { auth, makeApp, signUp, trainAi, uniq, type TestApp } from './helpers.js';
 
 const echo: LlmProvider = {
   name: 'echo',
@@ -31,7 +31,7 @@ async function verifiedAi(token: string) {
       consents: { persona_training: true, third_party_processing: true, public_deployment: true },
     })
   ).json();
-  await call('POST', `/ais/${ai.id}/versions`, token);
+  await trainAi(t, ai.id, token); // only a trained AI can be verified
   const session = (await call('POST', `/ais/${ai.id}/chat/sessions`, token, {})).json();
   await call('POST', `/ais/${ai.id}/chat/sessions/${session.id}/messages`, token, { content: 'hello' });
   await call('POST', `/ais/${ai.id}/confirm`, token, { confirmed: true });
