@@ -11,6 +11,7 @@ import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
 import { listTrainings, startTraining, trainingOut } from '../../modules/ai/training.js';
+import { HEALTH_WEIGHTS, healthHistory, refreshHealth } from '../../modules/ai/health.js';
 import { addEvalItem, deleteEvalItem, evalItems, evaluationOut, latestEvaluation, requestEvaluation, setVerdict } from '../../modules/ai/evaluation.js';
 import { checkSafety } from '../../modules/ai/moderation.js';
 import { indexItems, searchAis } from '../../modules/ai/semantic.js';
@@ -831,6 +832,14 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       return reply.status(202).send(trainingOut(job));
     },
   );
+
+  // ---------------------------------------------------------------- Module 7: the Health Score
+
+  r.get('/ais/:id/health', { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'The AI’s Health Score now, what makes it up, and its history', params: AiId } }, async (req) => {
+    const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+    const { score, components } = await refreshHealth(ctx, ai.id);
+    return { score, weights: HEALTH_WEIGHTS, ...components, history: await healthHistory(ctx, ai.id) };
+  });
 
   // ---------------------------------------------------------------- readiness and approval (Module 9 FE-2/FE-4)
 

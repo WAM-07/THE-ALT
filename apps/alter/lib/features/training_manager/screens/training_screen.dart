@@ -102,6 +102,42 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
         _toast(job.simulated ? 'Simulated training finished: a trained version is ready' : 'Training finished: a trained version is ready');
       });
 
+  /// Module 7: the Health Score and what makes it up.
+  Future<void> _showHealth() async {
+    AiHealth h;
+    try {
+      h = await aiApi.health(_ai!.id);
+    } on AltApiException catch (e) {
+      return _toast(e.message);
+    }
+    if (!mounted) return;
+    const names = {'safety': 'Safe replies', 'reports': 'Reports', 'readiness': 'Readiness', 'rating': 'ALTAR rating', 'speed': 'Speed'};
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Ds.sheet,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Health ${h.score.round()}', style: Ds.title2),
+            const SizedBox(height: 4),
+            Text('From what ALT records about how your AI behaves. Parts with no data yet are left out.', style: Ds.caption),
+            const SizedBox(height: 12),
+            for (final e in names.entries)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(children: [
+                  Expanded(child: Text(e.value, style: Ds.body)),
+                  Text(h.parts[e.key] == null ? 'no data yet' : '${h.parts[e.key]!.round()}', style: Ds.bodyStrong),
+                ]),
+              ),
+            if (h.drift > 0) Text('−${h.drift.round()} for readiness lost since the previous version', style: Ds.caption.copyWith(color: Ds.amber)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> _fix(ClearanceCheck c) async {
     final ai = _ai!;
     switch (c.id) {
@@ -260,6 +296,13 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
                 title: 'Readiness',
                 subtitle: latest?.readiness == null ? 'Your questions, its answers, your approval' : '${latest!.readiness!.round()}% on your questions',
                 onTap: () => context.push('/ai/readiness'),
+              ),
+              ListRow(
+                icon: Icons.favorite_border_rounded,
+                color: ai.healthScore >= 80 ? Ds.mint : (ai.healthScore >= 60 ? Ds.amber : Ds.rose),
+                title: 'Health',
+                subtitle: '${ai.healthScore.round()} of 100 · how it behaves everywhere',
+                onTap: _showHealth,
               ),
             ]),
             SectionLabel('Versions', action: _versions.isEmpty ? null : 'All ${_versions.length}', onAction: () => context.push('/ai/versions')),

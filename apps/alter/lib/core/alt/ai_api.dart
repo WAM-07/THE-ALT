@@ -33,6 +33,8 @@ class AltAi {
   String? get avatarUrl => j['avatarUrl'] == null ? null : media(j['avatarUrl'] as String);
   String get status => j['status'] as String;
   bool get verified => j['verified'] == true;
+  /// Module 7: 0–100, from how it behaves (see GET /ais/:id/health).
+  double get healthScore => (j['healthScore'] as num?)?.toDouble() ?? 100;
   int? get currentVersion => (j['currentVersion'] as Map?)?['version'] as int?;
   AiToken? get token => j['token'] == null ? null : AiToken(Map<String, dynamic>.from(j['token'] as Map));
   Map<String, dynamic> get persona => Map<String, dynamic>.from(j['persona'] as Map? ?? const {});
@@ -137,6 +139,16 @@ class AiVersionInfo {
   double? get readiness => (j['readiness'] as num?)?.toDouble();
   /// The owner's verdict: `approved`, `rejected` (train again) or null.
   String? get verdict => j['verdict'] as String?;
+}
+
+/// The AI's Health Score (Module 7) and what makes it up.
+class AiHealth {
+  AiHealth(this.j);
+  final Map<String, dynamic> j;
+  double get score => (j['score'] as num).toDouble();
+  /// safety, reports, readiness, rating, speed: 0–100, or null with no data yet.
+  Map<String, double?> get parts => Map<String, dynamic>.from(j['parts'] as Map).map((k, v) => MapEntry(k, (v as num?)?.toDouble()));
+  double get drift => (j['drift'] as num?)?.toDouble() ?? 0;
 }
 
 /// A question with the owner's own answer (the evaluation set, Module 9 FE-2).
@@ -329,6 +341,7 @@ class AiApi {
   // lifecycle
   Future<AiVersionInfo> buildVersion(String id) async => AiVersionInfo(Map<String, dynamic>.from(await _call('POST', '/ais/$id/versions') as Map));
   Future<AiTraining> startTraining(String id) async => AiTraining(Map<String, dynamic>.from(await _call('POST', '/ais/$id/trainings') as Map));
+  Future<AiHealth> health(String id) async => AiHealth(Map<String, dynamic>.from(await _call('GET', '/ais/$id/health') as Map));
   Future<List<EvalItem>> evaluationSet(String id) async =>
       (await _call('GET', '/ais/$id/evaluation-set') as List).map((e) => EvalItem(Map<String, dynamic>.from(e as Map))).toList();
   Future<void> addEvalItem(String id, String question, String answer) => _call('POST', '/ais/$id/evaluation-set', body: {'question': question, 'answer': answer});
