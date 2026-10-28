@@ -216,6 +216,16 @@ class AiApi {
     return decoded;
   }
 
+  /// Module 18: earnings, royalties, engagement, health and versions of your AIs in one place.
+  Future<Map<String, dynamic>> creatorPanel() async => Map<String, dynamic>.from(await _call('GET', '/me/creator-panel') as Map);
+
+  /// The panel's export: `csv` (every earning) or `pdf` (a one-page summary).
+  Future<List<int>> creatorPanelExport(String format) async {
+    final res = await altAccount.authorizedSend('GET', Uri.parse('${altAccount.coreUrl}/me/creator-panel/export?format=$format'));
+    if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, res.body.isEmpty ? null : jsonDecode(res.body));
+    return res.bodyBytes;
+  }
+
   /// Every AI on the account: owned, rented and subscribed (active first, then ended).
   Future<List<AccountAi>> accountAis() async =>
       (await _call('GET', '/me/ais') as List).map((e) => AccountAi(Map<String, dynamic>.from(e as Map))).toList();

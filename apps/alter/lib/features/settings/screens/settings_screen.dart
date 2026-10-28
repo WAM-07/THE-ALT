@@ -110,6 +110,7 @@ class SettingsScreen extends StatelessWidget {
       Group(children: [
         ListRow(icon: Icons.face_retouching_natural_rounded, title: 'Profile & personality', subtitle: 'Picture, bio, traits and boundaries', onTap: () => context.push('/ai')),
         ListRow(icon: Icons.psychology_alt_outlined, color: Ds.mint, title: 'Memories', subtitle: 'What it remembers about you', onTap: () => context.push('/ai/memories')),
+        ListRow(icon: Icons.insights_rounded, color: Ds.mint, title: 'Creator panel', subtitle: 'Earnings, royalties, engagement and health', onTap: () => context.push('/creator')),
         ListRow(icon: Icons.layers_outlined, color: Ds.amber, title: 'Version history', subtitle: 'Every version, its manifest and transaction', onTap: () => context.push('/ai/versions')),
       ]),
       const SectionLabel('Across ALT'),

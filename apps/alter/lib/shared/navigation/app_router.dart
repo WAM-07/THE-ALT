@@ -12,6 +12,7 @@ import '../../features/dataset/screens/dataset_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/persona_interface/screens/chat_screen.dart';
 import '../../features/persona_interface/screens/home_screen.dart';
+import '../../features/settings/screens/creator_panel_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/training_manager/screens/readiness_screen.dart';
 import '../../features/training_manager/screens/training_screen.dart';
@@ -92,6 +93,7 @@ final goRouter = GoRouter(
     ),
     // Every AI on the ALT account, and talking to the ones the person rents or subscribes to.
     GoRoute(path: '/yours', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const YourAisScreen()),
+    GoRoute(path: '/creator', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const CreatorPanelScreen()),
     GoRoute(path: '/held/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => AccountAiScreen(aiId: state.pathParameters['id']!)),
     GoRoute(path: '/talk/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => TalkScreen(aiId: state.pathParameters['id']!)),
     // The ALT inbox, shared by every ALT app (Module 2).

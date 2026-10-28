@@ -12,6 +12,7 @@ import { badRequest, conflict, notFound, unauthorized } from '../../lib/errors.j
 import { revokeAllSessions, revokeSession } from '../../modules/accounts/sessions.js';
 import { consumeSiwe, createSiweNonce } from '../../modules/accounts/siwe.js';
 import { findUserById, handleTaken, loadMe, touchPlatform } from '../../modules/accounts/users.js';
+import { creatorPanel, panelCsv, panelPdf } from '../../modules/market/creator-panel.js';
 import { requireUser } from '../auth-guard.js';
 import { Address, DisplayName, Handle, Platform, SelfRole } from '../schemas.js';
 
@@ -342,6 +343,29 @@ export async function meRoutes(app: FastifyInstance, ctx: Ctx) {
         await publish(client, 'user.wallets_changed', { userId });
       });
       return (await loadMe(ctx.db, await current(userId))).wallets;
+    },
+  );
+
+  // ---------------------------------------------------------------- Module 18: the Creator Control Panel
+
+  r.get('/me/creator-panel', { preHandler: authed, schema: { tags: ['account'], summary: 'Your AIs in one place: earnings, royalties, engagement, health and versions' } }, async (req) =>
+    creatorPanel(ctx, req.auth!.userId),
+  );
+
+  r.get(
+    '/me/creator-panel/export',
+    { preHandler: authed, schema: { tags: ['account'], summary: 'Your earnings as CSV, or a one-page PDF summary', querystring: z.object({ format: z.enum(['csv', 'pdf']).default('csv') }) } },
+    async (req, reply) => {
+      const panel = await creatorPanel(ctx, req.auth!.userId);
+      const day = new Date().toISOString().slice(0, 10);
+      if (req.query.format === 'pdf') {
+        const me = await findUserById(ctx.db, req.auth!.userId);
+        return reply
+          .header('content-type', 'application/pdf')
+          .header('content-disposition', `attachment; filename="alt-creator-panel-${day}.pdf"`)
+          .send(panelPdf(panel, me ? `${me.display_name} (@${me.handle})` : 'ALT creator'));
+      }
+      return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="alt-earnings-${day}.csv"`).send(panelCsv(panel));
     },
   );
 }
