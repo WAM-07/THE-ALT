@@ -63,6 +63,7 @@ function createApp({ io = null, logRequests = true } = {}) {
   app.use('/auth', authRoutes);
   app.use('/feed', feedRoutes);
   app.use('/posts', postRoutes);
+  app.use('/conditional-posts', require('./routes/conditional'));
   app.use('/profiles', profileRoutes);
   app.use('/follows', followRoutes);
   app.use('/notifications', notificationRoutes);

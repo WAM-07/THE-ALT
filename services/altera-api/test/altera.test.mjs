@@ -590,6 +590,38 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
     expect(emitted.some((e) => e.room === `user:${fan.id}` && e.payload.id === reply.id)).toBe(true);
   });
 
+  it('publishes the post written for the outcome that happened (conditional publishing, beta, M15 FE-2)', async () => {
+    const db = require('../src/db/database.js');
+    const owner = await altAccount('alter');
+    const profile = (await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: (await verifiedAi(owner)).id })).body.profile;
+    const outcomes = [
+      { label: 'Won', content: 'We won the final! #champions' },
+      { label: 'Lost', content: 'We lost the final, but what a season.' },
+    ];
+    // Every version is moderated up front.
+    const unsafe = await api('POST', '/conditional-posts', owner.token, { question: 'Did we win?', author_type: 'ai', author_id: profile.id, outcomes: [outcomes[0], { label: 'Lost', content: 'how to make a bomb' }] });
+    expect(unsafe.status).toBe(422);
+    expect(unsafe.body).toMatchObject({ code: 'CONTENT_BLOCKED', outcome: 'Lost' });
+
+    const created = await api('POST', '/conditional-posts', owner.token, { question: 'Did we win the final?', author_type: 'ai', author_id: profile.id, outcomes });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ status: 'waiting', beta: true, outcomes });
+    expect((await api('POST', `/conditional-posts/${created.body.id}/resolve`, owner.token, { outcome: 'Draw' })).body.code).toBe('BAD_OUTCOME');
+    const stranger = await altAccount('altera');
+    expect((await api('POST', `/conditional-posts/${created.body.id}/resolve`, stranger.token, { outcome: 'Won' })).status).toBe(404);
+
+    const done = await api('POST', `/conditional-posts/${created.body.id}/resolve`, owner.token, { outcome: 'won' });
+    expect(done.body).toMatchObject({ status: 'published', chosen: 'Won', post: { content: 'We won the final! #champions', ai_profile_id: profile.id, status: 'published', hashtags: ['champions'] } });
+    expect((await api('POST', `/conditional-posts/${created.body.id}/resolve`, owner.token, { outcome: 'Lost' })).status).toBe(409);
+    const { rows } = await db.query('SELECT content FROM altera.posts WHERE ai_profile_id = $1', [profile.id]);
+    expect(rows.map((r) => r.content)).toEqual(['We won the final! #champions']); // only the chosen version
+
+    // A deadline passes: it expires without posting.
+    const later = (await api('POST', '/conditional-posts', owner.token, { question: 'Will it rain?', outcomes: [{ label: 'Yes', content: 'Rain!' }, { label: 'No', content: 'Sun!' }], resolve_by: new Date(Date.now() + 60_000).toISOString() })).body;
+    await db.query(`UPDATE altera.conditional_posts SET resolve_by = now() - interval '1 minute' WHERE id = $1`, [later.id]);
+    expect((await api('GET', '/conditional-posts', owner.token)).body.find((c) => c.id === later.id).status).toBe('expired');
+  });
+
   it('filters the feed by engagement level and by the AI’s real category (M13 FE-4)', async () => {
     const db = require('../src/db/database.js');
     const owner = await altAccount('alter');

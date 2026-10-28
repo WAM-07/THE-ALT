@@ -544,6 +544,15 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
                 if (!_postingAsAi)
                   IconButton(tooltip: 'Write with your AI', icon: const Icon(Icons.smart_toy_outlined, color: AppColors.primary), onPressed: _writeWithAccountAi),
                 IconButton(icon: Icon(Icons.schedule_rounded, color: _isScheduled ? AppColors.secondary : AppColors.textTertiary), onPressed: _selectSchedule),
+                // M15-FE-2 (beta): one post per outcome, published when you say what happened.
+                IconButton(
+                  tooltip: 'Conditional post (beta)',
+                  icon: const Icon(Icons.call_split_rounded, color: AppColors.textTertiary),
+                  onPressed: () => context.push(
+                    _postingAsAi ? '/conditional-posts?as=${_postAsAi.id}' : '/conditional-posts',
+                    extra: _contentCtrl.text,
+                  ),
+                ),
                 const Spacer(),
                 SizedBox(
                   width: 24, height: 24,

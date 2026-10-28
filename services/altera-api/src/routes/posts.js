@@ -911,3 +911,5 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
 module.exports = router;
 module.exports.logActivity = logActivity;
+module.exports.moderateContent = moderateContent;
+module.exports.coreModeration = coreModeration;

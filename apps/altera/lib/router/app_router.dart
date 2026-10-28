@@ -13,6 +13,7 @@ import '../screens/feed/post_detail_screen.dart';
 import '../screens/explore/explore_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/post/conditional_posts_screen.dart';
 import '../screens/post/post_composer_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../screens/messages/chat_detail_screen.dart';
@@ -88,6 +89,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         // ?as=<AI persona id>: start the post as one of your AIs (from its Manage page).
         builder: (context, state) => PostComposerScreen(initialAuthorId: state.uri.queryParameters['as']),
+      ),
+      GoRoute(
+        path: '/conditional-posts',
+        parentNavigatorKey: _rootNavigatorKey,
+        // M15-FE-2 (beta): ?as=<AI persona id> posts as that AI; extra = the composer's text, as the first outcome.
+        builder: (context, state) => ConditionalPostsScreen(aiProfileId: state.uri.queryParameters['as'], initialText: state.extra as String?),
       ),
       // One of your AIs on ALTERA: autonomy, posting as it, approvals and its posts.
       GoRoute(
