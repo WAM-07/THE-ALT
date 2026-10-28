@@ -23,8 +23,8 @@
     "read-pdf": "node scripts/read-pdf.cjs"
   },
   "devDependencies": {
-    "@dicebear/collection": "9.4.2",
-    "@dicebear/core": "9.4.2",
+    "@dicebear/collection": "9.4.3",
+    "@dicebear/core": "9.4.3",
     "@resvg/resvg-js": "2.6.2",
     "pdf2json": "^4.0.2"
   }
