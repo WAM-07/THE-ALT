@@ -49,6 +49,11 @@ export class PushSender {
     );
     const n = rows[0];
     if (!n) return 0;
+    // Module 2: push muted for this category (security notices always go out).
+    if (n.category !== 'security') {
+      const { rows: muted } = await this.db.query('SELECT 1 FROM core.notification_settings WHERE user_id = $1 AND $2 = ANY(push_muted)', [n.user_id, n.category]);
+      if (muted.length) return 0;
+    }
     const { rows: devices } = await this.db.query<{ token: string }>('SELECT token FROM core.push_devices WHERE user_id = $1', [n.user_id]);
     let sent = 0;
     for (const d of devices) {

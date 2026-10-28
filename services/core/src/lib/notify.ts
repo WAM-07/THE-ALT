@@ -21,7 +21,15 @@ export interface NewNotification {
  * Adds a notification to a person's ALT inbox (Module 2). Call it inside the transaction that
  * caused it: the NOTIFY that pushes it to open apps is only delivered if that transaction commits.
  */
+/** Categories a person can never mute: they are about their account's safety or ALT itself. */
+export const ALWAYS_ON: NotificationCategory[] = ['security', 'system'];
+
 export async function notify(q: Queryable, n: NewNotification) {
+  // Module 2: a category the person muted stays out of their inbox (never security or system notices).
+  if (!ALWAYS_ON.includes(n.category)) {
+    const { rows: muted } = await q.query('SELECT 1 FROM core.notification_settings WHERE user_id = $1 AND $2 = ANY(muted)', [n.userId, n.category]);
+    if (muted.length) return null;
+  }
   const { rows } = await q.query<{ id: string }>(
     `INSERT INTO core.notifications (user_id, category, type, title, body, data, platform, link)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,

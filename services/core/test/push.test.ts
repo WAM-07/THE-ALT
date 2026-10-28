@@ -49,7 +49,7 @@ describe('push notifications (Firebase Cloud Messaging)', () => {
 
     const google = fakeGoogle((token) => (token === gone ? { status: 404, body: '{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}' } : { status: 200, body: '{}' }));
     const push = new PushSender(t.app.ctx.db, loadPushConfig(serviceAccount()), () => {}, google.impl);
-    const id = await notify(t.app.ctx.db, { userId: u.user.id, category: 'social', type: 'social.comment', title: 'Sara commented', body: 'Nice post!', platform: 'altera', link: 'altera://post/1' });
+    const id = (await notify(t.app.ctx.db, { userId: u.user.id, category: 'social', type: 'social.comment', title: 'Sara commented', body: 'Nice post!', platform: 'altera', link: 'altera://post/1' }))!;
 
     expect(await push.sendNotification(id)).toBe(1);
     expect(google.sent.map((s) => s.token).sort()).toEqual([gone, live].sort());

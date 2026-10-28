@@ -7,6 +7,7 @@ import { audit } from '../../lib/audit.js';
 import { notFound } from '../../lib/errors.js';
 import { NOTIFICATIONS_CHANNEL, notify } from '../../lib/notify.js';
 import { isSessionActive } from '../../modules/accounts/sessions.js';
+import { MUTABLE, notificationSettings, saveNotificationSettings } from '../../modules/notifications/settings.js';
 import { requireRole, requireService, requireUser } from '../auth-guard.js';
 
 const out = (n: Record<string, unknown>) => ({
@@ -60,6 +61,23 @@ export async function notificationRoutes(app: FastifyInstance, ctx: Ctx) {
       );
       return { items: rows.map(out), unreadCount: await unreadCount(req.auth!.userId) };
     },
+  );
+
+  r.get('/notifications/settings', { preHandler: authed, schema: { tags: ['notifications'], summary: 'What you want to hear about, and your e-mail digest' } }, async (req) =>
+    notificationSettings(ctx, req.auth!.userId),
+  );
+
+  r.put(
+    '/notifications/settings',
+    {
+      preHandler: authed,
+      schema: {
+        tags: ['notifications'],
+        summary: 'Mute categories in your inbox or on your phone, and choose a daily or weekly e-mail digest (security and system notices always come through)',
+        body: z.object({ muted: z.array(z.enum(MUTABLE as [string, ...string[]])).max(10), pushMuted: z.array(z.enum(MUTABLE as [string, ...string[]])).max(10), digest: z.enum(['off', 'daily', 'weekly']) }),
+      },
+    },
+    async (req) => saveNotificationSettings(ctx, req.auth!.userId, req.body),
   );
 
   r.get('/notifications/unread-count', { preHandler: authed, schema: { tags: ['notifications'], summary: 'How many unread notifications' } }, async (req) => ({

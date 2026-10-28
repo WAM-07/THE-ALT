@@ -58,8 +58,8 @@ class AltInbox {
     }
   }
 
-  Future<dynamic> _call(String method, String path) async {
-    final res = await client.authorizedSend(method, Uri.parse('${client.coreUrl}$path'));
+  Future<dynamic> _call(String method, String path, {Object? payload}) async {
+    final res = await client.authorizedSend(method, Uri.parse('${client.coreUrl}$path'), body: payload);
     final body = res.body.isEmpty ? null : jsonDecode(res.body);
     if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, body);
     return body;
@@ -76,6 +76,12 @@ class AltInbox {
     final body = await _call('POST', '/notifications/$id/read') as Map;
     unread.value = (body['unreadCount'] as num).toInt();
   }
+
+  /// Module 2: which categories reach the inbox and the phone, and the e-mail digest (`off`, `daily`, `weekly`).
+  Future<Map<String, dynamic>> settings() async => Map<String, dynamic>.from(await _call('GET', '/notifications/settings') as Map);
+
+  Future<Map<String, dynamic>> saveSettings({required List<String> muted, required List<String> pushMuted, required String digest}) async =>
+      Map<String, dynamic>.from(await _call('PUT', '/notifications/settings', payload: {'muted': muted, 'pushMuted': pushMuted, 'digest': digest}) as Map);
 
   Future<void> markAllRead() async {
     await _call('POST', '/notifications/read-all');

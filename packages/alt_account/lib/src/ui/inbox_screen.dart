@@ -98,6 +98,75 @@ class _AltInboxScreenState extends State<AltInboxScreen> {
     return '${d.inDays}d';
   }
 
+  /// Module 2: mute categories in the inbox or on the phone, and choose an e-mail digest.
+  Future<void> _settings(BuildContext context) async {
+    Map<String, dynamic> s;
+    try {
+      s = await widget.inbox.settings();
+    } on AltApiException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    }
+    if (!context.mounted) return;
+    const names = {'ai': 'Your AIs', 'moderation': 'Moderation', 'social': 'Likes, comments and follows', 'transaction': 'Sales, rentals and payments'};
+    final cats = (s['categories'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    var digest = s['digest'] as String;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<void> save() async {
+            try {
+              await widget.inbox.saveSettings(
+                muted: [for (final c in cats) if (c['inbox'] != true) c['category'] as String],
+                pushMuted: [for (final c in cats) if (c['push'] != true) c['category'] as String],
+                digest: digest,
+              );
+            } on AltApiException catch (e) {
+              if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+            }
+          }
+
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('What you hear about', style: Theme.of(ctx).textTheme.titleLarge),
+                const SizedBox(height: 4),
+                Text('Security and ALT notices always come through.', style: Theme.of(ctx).textTheme.bodySmall),
+                for (final c in cats) ...[
+                  const SizedBox(height: 12),
+                  Text(names[c['category']] ?? c['category'] as String, style: Theme.of(ctx).textTheme.titleSmall),
+                  SwitchListTile(contentPadding: EdgeInsets.zero, dense: true, title: const Text('In the inbox'), value: c['inbox'] == true, onChanged: (v) {
+                    setSheet(() => c['inbox'] = v);
+                    save();
+                  }),
+                  SwitchListTile(contentPadding: EdgeInsets.zero, dense: true, title: const Text('On my phone'), value: c['push'] == true, onChanged: (v) {
+                    setSheet(() => c['push'] = v);
+                    save();
+                  }),
+                ],
+                const SizedBox(height: 12),
+                Text('E-mail digest of what you have not read', style: Theme.of(ctx).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [ButtonSegment(value: 'off', label: Text('Off')), ButtonSegment(value: 'daily', label: Text('Daily')), ButtonSegment(value: 'weekly', label: Text('Weekly'))],
+                  selected: {digest},
+                  onSelectionChanged: (v) {
+                    setSheet(() => digest = v.first);
+                    save();
+                  },
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -105,6 +174,7 @@ class _AltInboxScreenState extends State<AltInboxScreen> {
       appBar: AppBar(
         title: const Text('ALT inbox'),
         actions: [
+          IconButton(tooltip: 'What you hear about', icon: const Icon(Icons.tune_rounded), onPressed: () => _settings(context)),
           TextButton(
             onPressed: () async {
               await widget.inbox.markAllRead();

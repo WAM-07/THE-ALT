@@ -4,6 +4,7 @@ import { replayLocalChain } from './jobs/replay-local-chain.js';
 import { assignDefaultAvatars } from './jobs/default-avatars.js';
 import { startBehaviourScans } from './modules/accounts/behaviour.js';
 import { startHealthScores } from './modules/ai/health.js';
+import { startDigests } from './modules/notifications/settings.js';
 import { startRegistryIndexer } from './modules/market/holders.js';
 
 const config = loadConfig();
@@ -13,11 +14,13 @@ const app = await buildApp({ config, jobs: false });
 let stopIndexer: () => void = () => {};
 let stopScans: () => void = () => {};
 let stopHealth: () => void = () => {};
+let stopDigests: () => void = () => {};
 const shutdown = async (signal: string) => {
   app.log.info(`${signal} received, shutting down`);
   stopIndexer();
   stopScans();
   stopHealth();
+  stopDigests();
   await app.close();
   process.exit(0);
 };
@@ -44,4 +47,6 @@ if (config.jobsEnabled) {
   if (app.ctx.ml) stopScans = startBehaviourScans(app.ctx, (msg) => app.log.warn(msg));
   // Module 7: every live AI's Health Score, hourly.
   stopHealth = startHealthScores(app.ctx, (msg) => app.log.warn(msg));
+  // Module 2: e-mail digests of unread notifications, for those who asked for one.
+  stopDigests = startDigests(app.ctx, (msg) => app.log.warn(msg));
 }
