@@ -134,6 +134,29 @@ class AiVersionInfo {
   bool get trained => engine == 'adapter';
   /// ALT's labelled stand-in for the real trainer.
   bool get simulated => j['simulated'] == true;
+  double? get readiness => (j['readiness'] as num?)?.toDouble();
+  /// The owner's verdict: `approved`, `rejected` (train again) or null.
+  String? get verdict => j['verdict'] as String?;
+}
+
+/// A question with the owner's own answer (the evaluation set, Module 9 FE-2).
+class EvalItem {
+  EvalItem(this.j);
+  final Map<String, dynamic> j;
+  String get id => j['id'] as String;
+  String get question => j['question'] as String;
+  String get answer => j['answer'] as String;
+}
+
+/// A version's answers to the owner's questions, scored (readiness, 0–100).
+class AiEvaluation {
+  AiEvaluation(this.j);
+  final Map<String, dynamic> j;
+  String get status => j['status'] as String;
+  double? get readiness => (j['readiness'] as num?)?.toDouble();
+  bool get safe => j['safe'] != false;
+  bool get finished => status == 'completed' || status == 'failed';
+  List<Map<String, dynamic>> get items => (j['items'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
 }
 
 /// One training of an AI (Module 9) with its live progress.
@@ -306,6 +329,21 @@ class AiApi {
   // lifecycle
   Future<AiVersionInfo> buildVersion(String id) async => AiVersionInfo(Map<String, dynamic>.from(await _call('POST', '/ais/$id/versions') as Map));
   Future<AiTraining> startTraining(String id) async => AiTraining(Map<String, dynamic>.from(await _call('POST', '/ais/$id/trainings') as Map));
+  Future<List<EvalItem>> evaluationSet(String id) async =>
+      (await _call('GET', '/ais/$id/evaluation-set') as List).map((e) => EvalItem(Map<String, dynamic>.from(e as Map))).toList();
+  Future<void> addEvalItem(String id, String question, String answer) => _call('POST', '/ais/$id/evaluation-set', body: {'question': question, 'answer': answer});
+  Future<void> deleteEvalItem(String id, String itemId) => _call('DELETE', '/ais/$id/evaluation-set/$itemId');
+  Future<void> evaluate(String id, String versionId) => _call('POST', '/ais/$id/versions/$versionId/evaluate');
+  Future<AiEvaluation?> evaluation(String id, String versionId) async {
+    try {
+      return AiEvaluation(Map<String, dynamic>.from(await _call('GET', '/ais/$id/versions/$versionId/evaluation') as Map));
+    } on AltApiException catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  Future<void> verdict(String id, String versionId, bool approved) => _call('POST', '/ais/$id/versions/$versionId/verdict', body: {'approved': approved});
   Future<List<AiTraining>> trainings(String id) async =>
       (await _call('GET', '/ais/$id/trainings') as List).map((e) => AiTraining(Map<String, dynamic>.from(e as Map))).toList();
   Future<List<AiVersionInfo>> versions(String id) async =>

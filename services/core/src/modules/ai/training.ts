@@ -5,6 +5,7 @@ import { audit, canonical } from '../../lib/audit.js';
 import { sha256 } from '../../lib/crypto.js';
 import { AppError, forbidden } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
+import { countEvalItems, requestEvaluation } from './evaluation.js';
 import { currentSnapshot, writeVersion, type VersionSnapshot } from './lifecycle.js';
 import { parsePersona } from './persona.js';
 import { approvedMemories, assertMutable, consentState, datasetTexts, loadAi, requireConsent } from './repo.js';
@@ -123,7 +124,7 @@ async function finishTraining(ctx: Ctx, job: TrainingRow, adapter: { sha256: str
   const ai = await loadAi(ctx.db, job.ai_id);
   if (!ai) throw new AppError(404, 'NOT_FOUND', 'AI not found.');
   const mode = job.mode === 'base' ? 'cloud' : job.mode;
-  return writeVersion(
+  const version = await writeVersion(
     ctx,
     ai,
     snapshotOf(job),
@@ -131,6 +132,8 @@ async function finishTraining(ctx: Ctx, job: TrainingRow, adapter: { sha256: str
     job.id,
     job.initiated_by,
   );
+  if ((await countEvalItems(ctx.db, ai.id)) > 0) await requestEvaluation(ctx, ai.id, version.id, job.initiated_by);
+  return version;
 }
 
 async function failTrainingJob(ctx: Ctx, job: TrainingRow, code: string, message: string, actorService: string | null) {

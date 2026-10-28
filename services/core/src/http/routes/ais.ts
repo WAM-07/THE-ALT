@@ -11,6 +11,7 @@ import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
 import { listTrainings, startTraining, trainingOut } from '../../modules/ai/training.js';
+import { addEvalItem, deleteEvalItem, evalItems, evaluationOut, latestEvaluation, requestEvaluation, setVerdict } from '../../modules/ai/evaluation.js';
 import { checkSafety } from '../../modules/ai/moderation.js';
 import { indexItems, searchAis } from '../../modules/ai/semantic.js';
 import { describe as describeStyle, profileFor, STYLE_CHARS, STYLE_MIN_SAMPLES, styleFeatures, styleMatch, styleScore } from '../../modules/ai/style.js';
@@ -797,7 +798,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
     const { rows } = await ctx.db.query(
       `SELECT id, version_no, manifest_cid, manifest_sha256, onchain_tx_hash, created_at, published_at, array_length(dataset_ids, 1) AS datasets, array_length(memory_ids, 1) AS memories,
-              engine, training_mode, readiness
+              engine, training_mode, readiness, owner_verdict
          FROM core.ai_versions WHERE ai_id = $1 ORDER BY version_no DESC`,
       [ai.id],
     );
@@ -817,6 +818,7 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       training: v.training_mode,
       simulated: v.training_mode === 'simulated',
       readiness: v.readiness === null ? null : Number(v.readiness),
+      verdict: v.owner_verdict,
       createdAt: (v.created_at as Date).toISOString(),
     }));
   });
@@ -827,6 +829,73 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req, reply) => {
       const job = await startTraining(ctx, req.params.id, req.auth!.userId, req.ip);
       return reply.status(202).send(trainingOut(job));
+    },
+  );
+
+  // ---------------------------------------------------------------- readiness and approval (Module 9 FE-2/FE-4)
+
+  r.get('/ais/:id/evaluation-set', { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Your questions with your own answers (only you see them)', params: AiId } }, async (req) =>
+    evalItems(ctx, (await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id)).id),
+  );
+
+  r.post(
+    '/ais/:id/evaluation-set',
+    {
+      preHandler: authed,
+      schema: { tags: ['lifecycle'], summary: 'Add a question with your own answer', params: AiId, body: z.object({ question: z.string().trim().min(3).max(500), answer: z.string().trim().min(1).max(4000) }) },
+    },
+    async (req, reply) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      return reply.status(201).send(await addEvalItem(ctx, ai, req.auth!.userId, req.body.question, req.body.answer));
+    },
+  );
+
+  r.delete(
+    '/ais/:id/evaluation-set/:itemId',
+    { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Remove a question', params: z.object({ id: z.uuid(), itemId: z.uuid() }) } },
+    async (req, reply) => {
+      await deleteEvalItem(ctx, await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id), req.params.itemId);
+      return reply.status(204).send();
+    },
+  );
+
+  const VersionParams = z.object({ id: z.uuid(), versionId: z.uuid() });
+
+  r.post(
+    '/ais/:id/versions/:versionId/evaluate',
+    { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Ask this version your questions and score its answers (readiness)', params: VersionParams } },
+    async (req, reply) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      return reply.status(202).send(evaluationOut(await requestEvaluation(ctx, ai.id, req.params.versionId, req.auth!.userId)));
+    },
+  );
+
+  r.get(
+    '/ais/:id/versions/:versionId/evaluation',
+    { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'The latest evaluation of this version: readiness and each answer next to yours', params: VersionParams } },
+    async (req) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      const e = await latestEvaluation(ctx.db, req.params.versionId);
+      if (!e || e.ai_id !== ai.id) throw new AppError(404, 'NOT_FOUND', 'This version has not been evaluated.');
+      return evaluationOut(e);
+    },
+  );
+
+  r.post(
+    '/ais/:id/versions/:versionId/verdict',
+    {
+      preHandler: authed,
+      schema: {
+        tags: ['lifecycle'],
+        summary: 'Approve the version (it behaves like you) or ask to train again',
+        params: VersionParams,
+        body: z.object({ approved: z.boolean(), note: z.string().trim().max(500).optional() }),
+      },
+    },
+    async (req) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      assertMutable(ai);
+      return setVerdict(ctx, ai, req.params.versionId, req.auth!.userId, req.body.approved, req.body.note ?? null, req.ip);
     },
   );
 
@@ -846,7 +915,12 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     { preHandler: authed, schema: { tags: ['lifecycle'], summary: 'Confirm the AI behaves like you (part of clearance)', params: AiId, body: z.object({ confirmed: z.boolean() }) } },
     async (req) => {
       const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
-      await ctx.db.query('UPDATE core.personal_ais SET owner_confirmed_at = CASE WHEN $2 THEN now() ELSE NULL END WHERE id = $1', [ai.id, req.body.confirmed]);
+      const latest = await latestVersion(ctx.db, ai.id);
+      if (latest?.engine === 'adapter') {
+        await setVerdict(ctx, ai, latest.id, req.auth!.userId, req.body.confirmed, null, req.ip);
+      } else {
+        await ctx.db.query('UPDATE core.personal_ais SET owner_confirmed_at = CASE WHEN $2 THEN now() ELSE NULL END WHERE id = $1', [ai.id, req.body.confirmed]);
+      }
       return { confirmed: req.body.confirmed };
     },
   );

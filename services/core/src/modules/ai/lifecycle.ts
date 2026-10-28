@@ -5,6 +5,7 @@ import { audit, canonical } from '../../lib/audit.js';
 import { sha256 } from '../../lib/crypto.js';
 import { AppError } from '../../lib/errors.js';
 import { notify } from '../../lib/notify.js';
+import { countEvalItems, latestEvaluation } from './evaluation.js';
 import { checkSafety } from './moderation.js';
 import { parsePersona } from './persona.js';
 import { approvedMemories, consentState, latestVersion, loadAi, requireConsent, type AiRow, type VersionRow } from './repo.js';
@@ -167,6 +168,22 @@ export async function clearance(ctx: Ctx, ai: AiRow) {
   const personaText = [persona.about, ...persona.traits, ...persona.interests, ...persona.boundaries, persona.instructions ?? '', ai.name, ai.description ?? ''].join('\n');
   const mod = await checkSafety(ctx.ml, personaText);
   const minChats = ctx.config.clearance.minTestMessages;
+  const { minEvalItems, minReadiness } = ctx.config.clearance;
+  const questions = await countEvalItems(ctx.db, ai.id);
+  const evaluation = latest ? await latestEvaluation(ctx.db, latest.id) : undefined;
+  const readiness = evaluation?.status === 'completed' ? Number(evaluation.readiness) : null;
+  // ALT's system check: with questions written (or required), the latest version must have been evaluated
+  // on them, reach the readiness threshold and give only safe answers.
+  const systemCheck =
+    questions === 0 && minEvalItems === 0
+      ? { passed: true, detail: 'no questions required' }
+      : questions < minEvalItems
+        ? { passed: false, detail: `${questions} of ${minEvalItems} questions written` }
+        : readiness === null
+          ? { passed: false, detail: evaluation ? `evaluation ${evaluation.status}` : 'not evaluated yet' }
+          : !evaluation!.safe
+            ? { passed: false, detail: 'some answers broke the safety rules' }
+            : { passed: readiness >= minReadiness, detail: `readiness ${Math.round(readiness)}%${minReadiness ? ` (needs ${minReadiness}%)` : ''}` };
 
   const checks: ClearanceCheck[] = [
     { id: 'consent_training', label: 'Consent to build the AI from your data', passed: consents.persona_training.granted },
@@ -181,7 +198,19 @@ export async function clearance(ctx: Ctx, ai: AiRow) {
       detail: latest?.engine === 'adapter' ? `${latest.training_mode} training` : latest ? 'not trained yet' : undefined,
     },
     { id: 'tested', label: `You tested it in at least ${minChats} chat messages`, passed: Number(chats[0]?.n ?? 0) >= minChats, detail: `${chats[0]?.n ?? 0} so far` },
-    { id: 'owner_confirmed', label: 'You confirmed it behaves like you', passed: Boolean(ai.owner_confirmed_at) },
+    {
+      id: 'ready',
+      label: minEvalItems ? `ALT’s check: it answers your ${minEvalItems}+ questions well and safely` : 'ALT’s check: it answers your questions well and safely',
+      passed: systemCheck.passed,
+      detail: systemCheck.detail,
+    },
+    // The approval loop: the owner approves the latest version itself (training again needs a new approval).
+    {
+      id: 'owner_confirmed',
+      label: 'You approved its latest version (it behaves like you)',
+      passed: latest?.owner_verdict === 'approved',
+      detail: latest?.owner_verdict === 'rejected' ? 'you asked to train again' : undefined,
+    },
     { id: 'persona_safe', label: 'Its persona passes the safety check', passed: !mod.flagged, detail: mod.flagged ? mod.categories.join(', ') : undefined },
     { id: 'wallet', label: 'You have a wallet to hold its identity token', passed: wallet.length > 0 },
   ];

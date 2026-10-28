@@ -10,8 +10,8 @@ import { retrieveSemantic } from './semantic.js';
 
 export interface RespondInput {
   ai: AiRow;
-  /** `draft` (owner testing in ALTER) or `current` (the published, verified version). */
-  version: 'draft' | 'current';
+  /** `draft` (owner testing in ALTER), `current` (the published, verified version) or one version by id (evaluation). */
+  version: 'draft' | 'current' | { id: string };
   channel: Channel;
   /** Conversation so far, oldest first. The last message is the one to answer. */
   messages: { role: 'user' | 'assistant'; content: string }[];
@@ -77,6 +77,14 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
     }
     const v = await loadVersion(ctx.db, ai.current_version_id);
     if (!v) throw new AppError(409, 'AI_NOT_VERIFIED', 'This AI has no verified version yet.');
+    personaSource = v.persona_config;
+    version = v;
+    versionId = v.id;
+    memoryIds = v.memory_ids;
+    datasetIds = v.dataset_ids;
+  } else if (typeof input.version === 'object') {
+    const v = await loadVersion(ctx.db, input.version.id);
+    if (!v || v.ai_id !== ai.id) throw new AppError(404, 'NOT_FOUND', 'Version not found.');
     personaSource = v.persona_config;
     version = v;
     versionId = v.id;

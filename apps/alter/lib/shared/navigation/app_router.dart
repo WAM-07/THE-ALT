@@ -13,6 +13,7 @@ import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/persona_interface/screens/chat_screen.dart';
 import '../../features/persona_interface/screens/home_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
+import '../../features/training_manager/screens/readiness_screen.dart';
 import '../../features/training_manager/screens/training_screen.dart';
 import '../../features/your_ais/account_ai_screen.dart';
 import '../../features/your_ais/talk_screen.dart';
@@ -86,6 +87,7 @@ final goRouter = GoRouter(
       routes: [
         GoRoute(path: 'memories', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const MemoriesScreen()),
         GoRoute(path: 'versions', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const VersionsScreen()),
+        GoRoute(path: 'readiness', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const ReadinessScreen()),
       ],
     ),
     // Every AI on the ALT account, and talking to the ones the person rents or subscribes to.

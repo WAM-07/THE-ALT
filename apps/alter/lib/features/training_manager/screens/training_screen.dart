@@ -117,19 +117,11 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
         return _train();
       case 'tested':
         context.go('/chat');
+      // Readiness and approval: compare its answers with yours, then approve or train again.
+      case 'ready':
       case 'owner_confirmed':
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Does it behave like you?'),
-            content: const Text('Only confirm after chatting with it. Your AI will speak for you on ALTERA and ALTAR.'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not yet')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, it’s me')),
-            ],
-          ),
-        );
-        if (ok == true) await _run('Saving…', () => aiApi.confirm(ai.id, true));
+        await context.push('/ai/readiness');
+        await _reload();
       case 'persona_safe':
         context.go('/chat');
         _toast('Adjust its personality so it passes the safety check, then rebuild.');
@@ -260,6 +252,16 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
             ],
             if (ai.token != null) _tokenSection(ai.token!),
             if (!ai.verified) _journey(ai, latest),
+            const SizedBox(height: 14),
+            Group(children: [
+              ListRow(
+                icon: Icons.speed_rounded,
+                color: Ds.mint,
+                title: 'Readiness',
+                subtitle: latest?.readiness == null ? 'Your questions, its answers, your approval' : '${latest!.readiness!.round()}% on your questions',
+                onTap: () => context.push('/ai/readiness'),
+              ),
+            ]),
             SectionLabel('Versions', action: _versions.isEmpty ? null : 'All ${_versions.length}', onAction: () => context.push('/ai/versions')),
             if (_versions.isEmpty)
               Glass(child: Text('No versions yet. Building one freezes what your AI knows right now and pins a public fingerprint of it to IPFS.', style: Ds.callout))

@@ -199,6 +199,11 @@ describe('from draft to verified AI (Modules 6, 9, 17)', () => {
       training: 'simulated',
       note: 'Simulated training: no model weights were trained.',
     });
+    // The approval loop: a new version needs the owner's approval again.
+    const afterTraining = (await call('GET', `/ais/${ai.id}/clearance`, u.accessToken)).json();
+    expect(afterTraining.checks.filter((c: { passed: boolean }) => !c.passed).map((c: { id: string }) => c.id)).toEqual(['owner_confirmed']);
+    await call('POST', `/ais/${ai.id}/confirm`, u.accessToken, { confirmed: true });
+    expect((await call('GET', `/ais/${ai.id}/versions`, u.accessToken)).json()[0].verdict).toBe('approved');
     expect((await call('GET', `/ais/${ai.id}/clearance`, u.accessToken)).json().passed).toBe(true);
 
     // Deploy: see the transaction first, then mint through the job worker.

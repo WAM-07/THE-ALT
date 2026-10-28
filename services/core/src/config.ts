@@ -77,6 +77,10 @@ const EnvSchema = z.object({
   LLM_COMPAT_MODEL: z.string().optional(),
   // Clearance gate before an AI can be deployed.
   CLEARANCE_MIN_TEST_MESSAGES: z.coerce.number().int().min(0).default(3),
+  // ALT's system check (Module 9 FE-4): questions the owner must answer themselves, and the readiness a
+  // trained version must reach on them. Defaults 3 and 50 in production; 0 and 0 elsewhere (shown, not enforced).
+  CLEARANCE_MIN_EVAL_ITEMS: z.coerce.number().int().min(0).max(50).optional(),
+  CLEARANCE_MIN_READINESS: z.coerce.number().min(0).max(100).optional(),
   // Training (Module 9, "the engine"). simulated = ALT's labelled stand-in, a short run of checkpoints that
   // trains nothing (development, tests, the demo); trainer = jobs wait for a real trainer to claim them
   // through /internal/trainer. Defaults to simulated outside production.
@@ -165,7 +169,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       compatApiKey: e.LLM_COMPAT_API_KEY,
       compatModel: e.LLM_COMPAT_MODEL,
     },
-    clearance: { minTestMessages: e.CLEARANCE_MIN_TEST_MESSAGES },
+    clearance: {
+      minTestMessages: e.CLEARANCE_MIN_TEST_MESSAGES,
+      minEvalItems: e.CLEARANCE_MIN_EVAL_ITEMS ?? (e.NODE_ENV === 'production' ? 3 : 0),
+      minReadiness: e.CLEARANCE_MIN_READINESS ?? (e.NODE_ENV === 'production' ? 50 : 0),
+    },
     training: {
       mode: e.TRAINING_MODE ?? (e.NODE_ENV === 'production' ? 'trainer' : 'simulated'),
       simulatedSeconds: e.TRAINING_SIMULATED_SECONDS,

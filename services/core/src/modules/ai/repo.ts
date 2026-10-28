@@ -46,6 +46,8 @@ export interface VersionRow {
   adapter_sha256: string | null;
   adapter_uri: string | null;
   readiness: string | null;
+  owner_verdict: 'approved' | 'rejected' | null;
+  owner_verdict_at: Date | null;
 }
 
 export const CONSENT_SCOPES = ['persona_training', 'third_party_processing', 'public_deployment', 'interaction_learning'] as const;

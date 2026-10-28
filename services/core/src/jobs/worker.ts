@@ -7,6 +7,7 @@ import { AppError } from '../lib/errors.js';
 import { notify } from '../lib/notify.js';
 import { loadAi, loadVersion } from '../modules/ai/repo.js';
 import { runSimulatedTraining, simulatedTrainingFailed } from '../modules/ai/training.js';
+import { evaluationFailed, runEvaluation } from '../modules/ai/evaluation.js';
 
 interface JobRow {
   id: string;
@@ -189,6 +190,10 @@ const HANDLERS: Record<string, { run: Handler; failed?: FailureHandler }> = {
   simulate_training: {
     run: (ctx, job) => runSimulatedTraining(ctx, job.payload.trainingJobId!),
     failed: (ctx, job, error) => simulatedTrainingFailed(ctx, job.payload.trainingJobId!, error),
+  },
+  evaluate_version: {
+    run: (ctx, job) => runEvaluation(ctx, job.payload.evaluationId!),
+    failed: (ctx, job, error) => evaluationFailed(ctx, job.payload.evaluationId!, error),
   },
 };
 
