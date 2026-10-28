@@ -37,7 +37,7 @@ describe('notification settings (Module 2)', () => {
     await call('PUT', '/notifications/settings', u.accessToken, { muted: [], pushMuted: [], digest: 'daily' });
     await notify(t.app.ctx.db, { userId: u.user.id, category: 'ai', type: 'ai.test', title: 'Your AI scored 80%', body: 'Approve it or train again.' });
 
-    const digests = () => t.mailer.outbox().filter((m) => m.to === u.user.email && m.subject.includes('digest'));
+    const digests = () => t.mailer.outbox().filter((m) => m.to === u.email && m.subject.includes('digest'));
     await sendDigests(t.app.ctx);
     const mail = digests()[0];
     expect(mail?.subject).toMatch(/daily digest: \d+ unread/);

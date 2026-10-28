@@ -10,6 +10,7 @@ import { audit, verifyAuditChain } from '../../lib/audit.js';
 import { notFound } from '../../lib/errors.js';
 import { findUserByHandle, findUserById, handleTaken, parseRoles, publicProfile, type UserRow } from '../../modules/accounts/users.js';
 import { BEHAVIOUR_FEATURES, MIN_TRAINING_DAYS, scanBehaviour } from '../../modules/accounts/behaviour.js';
+import { aiTimeline, searchAis } from '../../modules/ai/forensics.js';
 import { requireAnyRole, requireRole, requireService } from '../auth-guard.js';
 import { Handle } from '../schemas.js';
 
@@ -79,6 +80,26 @@ export async function directoryRoutes(app: FastifyInstance, ctx: Ctx) {
   // Auditors read the audit log too (the ALT Command Centre's audit page); only admins change anything.
   const auditReader = requireAnyRole(ctx, ['admin', 'auditor']);
   const behaviourReader = requireAnyRole(ctx, ['admin', 'moderator', 'auditor']);
+
+  // Module 5 forensics: AIs (least healthy first), and how one behaved over time.
+  r.get(
+    '/admin/ais',
+    { preHandler: behaviourReader, schema: { tags: ['admin'], summary: 'Find AIs by handle or name, least healthy first', querystring: z.object({ q: z.string().trim().max(60).default('') }) } },
+    async (req) => searchAis(ctx, req.query.q),
+  );
+
+  r.get(
+    '/admin/ais/:id/timeline',
+    {
+      preHandler: behaviourReader,
+      schema: { tags: ['admin'], summary: 'An AI over time: replies and blocks per day, health, versions, cases and audit entries', params: z.object({ id: z.uuid() }), querystring: z.object({ days: z.coerce.number().int().min(1).max(90).default(30) }) },
+    },
+    async (req) => {
+      const timeline = await aiTimeline(ctx, req.params.id, req.query.days);
+      if (!timeline) throw notFound('AI');
+      return timeline;
+    },
+  );
 
   // Abnormal-behaviour scans (Module 16 FE-3): what ALT's behaviour model saw, newest first.
   r.get(
