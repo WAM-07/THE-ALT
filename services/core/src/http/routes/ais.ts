@@ -1,3 +1,8 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
+import { mkdir, rename, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -10,7 +15,7 @@ import { AVATAR_MAX_BYTES, isTrustedMediaUrl, saveAvatar } from '../../lib/media
 import { checkAvatarUrl, defaultAvatar } from '../../lib/avatars.js';
 import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
-import { listTrainings, startTraining, trainingOut } from '../../modules/ai/training.js';
+import { adapterFormat, importLocalAdapter, listTrainings, MAX_ADAPTER_BYTES, startTraining, trainingOut } from '../../modules/ai/training.js';
 import { HEALTH_WEIGHTS, healthHistory, refreshHealth } from '../../modules/ai/health.js';
 import { consentRecord, consentRecordPdf, versionDiff } from '../../modules/ai/records.js';
 import { addEvalItem, deleteEvalItem, evalItems, evaluationOut, latestEvaluation, requestEvaluation, setVerdict } from '../../modules/ai/evaluation.js';
@@ -940,6 +945,45 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
       assertMutable(ai);
       return setVerdict(ctx, ai, req.params.versionId, req.auth!.userId, req.body.approved, req.body.note ?? null, req.ip);
+    },
+  );
+
+  r.post(
+    '/ais/:id/trainings/local',
+    {
+      preHandler: authed,
+      schema: { tags: ['lifecycle'], summary: 'Bring an adapter you trained on your own GPU (safetensors or GGUF); it then goes through ALT’s checks', params: AiId, consumes: ['multipart/form-data'] },
+    },
+    async (req, reply) => {
+      await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      const file = await req.file({ limits: { fileSize: MAX_ADAPTER_BYTES, files: 1 } });
+      if (!file) throw badRequest('FILE_REQUIRED', 'Attach the adapter file.');
+      // Streamed to disk while it is hashed: adapters can be hundreds of MB.
+      const dir = join(ctx.config.storageDir, 'adapters');
+      await mkdir(dir, { recursive: true });
+      const tmp = join(dir, `upload-${randomUUID()}`);
+      const hash = createHash('sha256');
+      let head = Buffer.alloc(0);
+      let size = 0;
+      file.file.on('data', (chunk: Buffer) => {
+        hash.update(chunk);
+        size += chunk.length;
+        if (head.length < 16) head = Buffer.concat([head, chunk.subarray(0, 16 - head.length)]);
+      });
+      await pipeline(file.file, createWriteStream(tmp));
+      try {
+        if (file.file.truncated) throw badRequest('FILE_TOO_LARGE', 'Adapters can be up to 512 MB.');
+        const format = adapterFormat(head);
+        if (!format) throw badRequest('ADAPTER_FORMAT', 'That is not an adapter file. Upload a LoRA adapter as .safetensors or .gguf.');
+        const sha = hash.digest('hex');
+        await rename(tmp, join(dir, `${sha}.${format}`));
+        const fields = file.fields as Record<string, { value?: string } | undefined>;
+        const baseModel = fields.baseModel?.value?.trim().slice(0, 100) || null;
+        const { job, version } = await importLocalAdapter(ctx, req.params.id, req.auth!.userId, { path: join(dir, `${sha}.${format}`), sha256: sha, format, sizeBytes: size, baseModel }, req.ip);
+        return reply.status(201).send({ training: trainingOut({ ...job, status: 'completed', version_id: version.id }), versionId: version.id, version: version.version_no, adapterSha256: sha });
+      } finally {
+        await rm(tmp, { force: true });
+      }
     },
   );
 

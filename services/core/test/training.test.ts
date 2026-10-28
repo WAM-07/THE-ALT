@@ -158,3 +158,42 @@ describe('the trainer socket (TRAINING_MODE=trainer)', () => {
     expect(failed).toMatchObject({ status: 'failed', error: 'The owner withdrew consent to train on their data.' });
   });
 });
+
+describe('bringing an adapter trained on the owner’s own GPU (E4)', () => {
+  const upload = (t: TestApp, aiId: string, token: string, bytes: Buffer, name = 'adapter.safetensors') => {
+    const boundary = `b${uniq()}`;
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="baseModel"\r\n\r\nQwen2.5-3B-Instruct\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: application/octet-stream\r\n\r\n`),
+      bytes,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    return t.app.inject({ method: 'POST', url: `/ais/${aiId}/trainings/local`, headers: { ...auth(token), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload: body });
+  };
+  // A tiny but well-formed safetensors file: 8-byte header length, JSON header, tensor bytes.
+  const header = Buffer.from(JSON.stringify({ __metadata__: { format: 'pt' }, 'lora_A.weight': { dtype: 'F32', shape: [2], data_offsets: [0, 8] } }));
+  const len = Buffer.alloc(8);
+  len.writeBigUInt64LE(BigInt(header.length));
+  const safetensors = Buffer.concat([len, header, Buffer.alloc(8, 1)]);
+
+  it('accepts a real adapter file as a version "trained locally", and refuses anything else', async () => {
+    const u = await signUp(sim);
+    const ai = await newAi(sim, u.accessToken);
+    expect((await upload(sim, ai.id, u.accessToken, Buffer.from('not an adapter at all'), 'notes.txt')).json().error.code).toBe('ADAPTER_FORMAT');
+
+    const res = await upload(sim, ai.id, u.accessToken, safetensors);
+    expect(res.statusCode).toBe(201);
+    const { createHash } = await import('node:crypto');
+    expect(res.json().adapterSha256).toBe(createHash('sha256').update(safetensors).digest('hex'));
+    const [version] = (await sim.app.inject({ method: 'GET', url: `/ais/${ai.id}/versions`, headers: auth(u.accessToken) })).json();
+    expect(version).toMatchObject({ id: res.json().versionId, engine: 'adapter', training: 'local', simulated: false });
+    const clearance = (await sim.app.inject({ method: 'GET', url: `/ais/${ai.id}/clearance`, headers: auth(u.accessToken) })).json();
+    expect(clearance.checks.find((c: { id: string }) => c.id === 'trained')).toMatchObject({ passed: true, detail: 'trained locally' });
+
+    // ALT's inference server can fetch it (service key only).
+    const file = `${res.json().adapterSha256}.safetensors`;
+    expect((await sim.app.inject({ method: 'GET', url: `/internal/trainer/adapters/${file}` })).statusCode).toBe(401);
+    const got = await sim.app.inject({ method: 'GET', url: `/internal/trainer/adapters/${file}`, headers: SERVICE });
+    expect(Buffer.compare(got.rawPayload, safetensors)).toBe(0);
+  });
+});

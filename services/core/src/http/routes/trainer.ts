@@ -1,7 +1,11 @@
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Ctx } from '../../context.js';
+import { AppError } from '../../lib/errors.js';
 import { claimTraining, completeTraining, exportTrainingData, failTraining, reportCheckpoint } from '../../modules/ai/training.js';
 import { requireService } from '../auth-guard.js';
 
@@ -68,6 +72,18 @@ export async function trainerRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req) => {
       await failTraining(ctx, req.params.id, req.service!, req.body);
       return { failed: true };
+    },
+  );
+
+  // The inference socket fetches adapters owners brought themselves (alt://adapters/<sha256>.<format>).
+  r.get(
+    '/internal/trainer/adapters/:file',
+    { preHandler: guard, schema: { tags: ['internal'], summary: 'Download an adapter an owner uploaded', params: z.object({ file: z.string().regex(/^[0-9a-f]{64}\.(safetensors|gguf)$/) }) } },
+    async (req, reply) => {
+      const path = join(ctx.config.storageDir, 'adapters', req.params.file);
+      const info = await stat(path).catch(() => null);
+      if (!info) throw new AppError(404, 'NOT_FOUND', 'Adapter not found.');
+      return reply.header('content-type', 'application/octet-stream').header('content-length', info.size).send(createReadStream(path));
     },
   );
 }

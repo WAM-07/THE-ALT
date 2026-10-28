@@ -184,7 +184,7 @@ class _VersionsScreenState extends State<VersionsScreen> {
                         Text(_date(v.createdAt), style: ALTTypography.bodySmall),
                       ]),
                       const SizedBox(height: 6),
-                      Text('${v.datasets} data item${v.datasets == 1 ? '' : 's'} · ${v.memories} memor${v.memories == 1 ? 'y' : 'ies'} · ${v.trained ? (v.simulated ? 'simulated training' : 'trained') : 'not trained'}', style: ALTTypography.bodySmall),
+                      Text('${v.datasets} data item${v.datasets == 1 ? '' : 's'} · ${v.memories} memor${v.memories == 1 ? 'y' : 'ies'} · ${v.trained ? (v.simulated ? 'simulated training' : (v.training == 'local' ? 'trained locally' : 'trained')) : 'not trained'}', style: ALTTypography.bodySmall),
                       const SizedBox(height: 6),
                       _CopyRow(label: 'Manifest', value: v.manifestCid, shown: _short(v.manifestCid)),
                       if (v.onchainTx != null && !v.onchainTx!.startsWith('adopted')) _CopyRow(label: 'Transaction', value: v.onchainTx!, shown: _short(v.onchainTx!)),

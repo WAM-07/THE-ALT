@@ -136,6 +136,8 @@ class AiVersionInfo {
   bool get trained => engine == 'adapter';
   /// ALT's labelled stand-in for the real trainer.
   bool get simulated => j['simulated'] == true;
+  /// `cloud` (ALT's trainer), `local` (the owner's own GPU) or `simulated`; null for base versions.
+  String? get training => j['training'] as String?;
   double? get readiness => (j['readiness'] as num?)?.toDouble();
   /// The owner's verdict: `approved`, `rejected` (train again) or null.
   String? get verdict => j['verdict'] as String?;
@@ -288,6 +290,19 @@ class AiApi {
       ..headers['authorization'] = 'Bearer $token'
       ..fields['title'] = title ?? fileName
       ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: fileName, contentType: MediaType.parse(mimeType)));
+    final res = await http.Response.fromStream(await req.send());
+    if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, res.body.isEmpty ? null : jsonDecode(res.body));
+  }
+
+  /// Module 9 (E4): an adapter trained on the owner's own GPU (.safetensors or .gguf), sent from disk.
+  Future<void> uploadAdapter(String id, {String? path, List<int>? bytes, required String fileName, String? baseModel}) async {
+    final token = await altAccount.accessToken();
+    final req = http.MultipartRequest('POST', Uri.parse('${altAccount.coreUrl}/ais/$id/trainings/local'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..fields['baseModel'] = baseModel ?? '';
+    req.files.add(path != null
+        ? await http.MultipartFile.fromPath('file', path, filename: fileName)
+        : http.MultipartFile.fromBytes('file', bytes!, filename: fileName));
     final res = await http.Response.fromStream(await req.send());
     if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, res.body.isEmpty ? null : jsonDecode(res.body));
   }

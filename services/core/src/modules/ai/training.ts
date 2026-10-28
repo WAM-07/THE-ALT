@@ -278,3 +278,55 @@ export async function listTrainings(q: pg.Pool, aiId: string) {
   const { rows } = await q.query<TrainingRow>(`SELECT * FROM core.training_jobs WHERE ai_id = $1 AND mode <> 'base' ORDER BY created_at DESC LIMIT 20`, [aiId]);
   return rows;
 }
+
+// ---------------------------------------------------------------- bring a trained AI (Module 9; owner's plan E4)
+
+/** LoRA adapters for a 3–4B model are tens to a few hundred MB. */
+export const MAX_ADAPTER_BYTES = 512 * 1024 * 1024;
+
+/** The file formats a LoRA adapter comes in: safetensors (an 8-byte header length, then JSON) or GGUF. */
+export function adapterFormat(head: Buffer): 'safetensors' | 'gguf' | null {
+  if (head.length >= 4 && head.subarray(0, 4).toString('latin1') === 'GGUF') return 'gguf';
+  if (head.length >= 10) {
+    const n = Number(head.readBigUInt64LE(0));
+    if (n > 1 && n < 100_000_000 && head[8] === 0x7b /* { */) return 'safetensors';
+  }
+  return null;
+}
+
+/**
+ * An adapter the owner trained on their own GPU: stored by ALT under its fingerprint, then it becomes a
+ * trained version ("trained locally") that goes through the same checks as one ALT trained: readiness
+ * on the owner's questions, safety, the owner's approval.
+ */
+export async function importLocalAdapter(
+  ctx: Ctx,
+  aiId: string,
+  userId: string,
+  adapter: { path: string; sha256: string; format: 'safetensors' | 'gguf'; sizeBytes: number; baseModel: string | null },
+  ip: string | null,
+) {
+  const ai = await loadAi(ctx.db, aiId);
+  if (!ai || ai.owner_id !== userId) throw new AppError(404, 'NOT_FOUND', 'AI not found.');
+  assertMutable(ai);
+  await requireConsent(ctx.db, ai.id, 'persona_training');
+  const snap = await currentSnapshot(ctx.db, ai);
+  const uri = `alt://adapters/${adapter.sha256}.${adapter.format}`;
+  const job = await tx(ctx.db, async (client) => {
+    const { rows } = await client.query<TrainingRow>(
+      `INSERT INTO core.training_jobs (ai_id, initiated_by, status, stage, mode, persona_config, dataset_ids, memory_ids, base_model, started_at, adapter_sha256, adapter_uri, scores)
+       VALUES ($1, $2, 'running', 'checking the adapter', 'local', $3, $4, $5, $6, now(), $7, $8, $9) RETURNING *`,
+      [ai.id, userId, snap.persona, snap.datasetIds, snap.memoryIds, adapter.baseModel, adapter.sha256, uri, { format: adapter.format, sizeBytes: adapter.sizeBytes }],
+    );
+    await audit(client, {
+      action: 'ai.adapter_imported',
+      actorUserId: userId,
+      entityType: 'ai',
+      entityId: ai.id,
+      ip,
+      data: { trainingJobId: rows[0]!.id, adapterSha256: adapter.sha256, format: adapter.format, sizeBytes: adapter.sizeBytes, baseModel: adapter.baseModel },
+    });
+    return rows[0]!;
+  });
+  return { job, version: await finishTraining(ctx, job, { sha256: adapter.sha256, uri, readiness: null }) };
+}

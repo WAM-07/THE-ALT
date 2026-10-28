@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:alt_account/alt_account.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -101,6 +103,19 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
         if (job.status == 'failed') return _toast(job.error ?? 'The training did not finish.');
         _toast(job.simulated ? 'Simulated training finished: a trained version is ready' : 'Training finished: a trained version is ready');
       });
+
+  /// E4: an adapter trained on the owner's own GPU becomes a version "trained locally", then ALT checks it.
+  Future<void> _uploadAdapter() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.any, withData: kIsWeb);
+    final file = picked?.files.single;
+    if (file == null) return;
+    final ext = (file.extension ?? '').toLowerCase();
+    if (ext != 'safetensors' && ext != 'gguf') return _toast('Choose a LoRA adapter: a .safetensors or .gguf file.');
+    await _run('Uploading ${file.name}…', () async {
+      await aiApi.uploadAdapter(_ai!.id, path: kIsWeb ? null : file.path, bytes: file.bytes, fileName: file.name);
+      _toast('Adapter added as a version “trained locally”. Check its readiness next.');
+    });
+  }
 
   /// Module 7: the Health Score and what makes it up.
   Future<void> _showHealth() async {
@@ -296,6 +311,13 @@ class _TrainingScreenState extends State<TrainingScreen> with FollowsCurrentAi {
                 title: 'Readiness',
                 subtitle: latest?.readiness == null ? 'Your questions, its answers, your approval' : '${latest!.readiness!.round()}% on your questions',
                 onTap: () => context.push('/ai/readiness'),
+              ),
+              ListRow(
+                icon: Icons.memory_rounded,
+                color: Ds.sky,
+                title: 'Bring an adapter you trained',
+                subtitle: 'Trained on your own GPU? Upload the .safetensors or .gguf file',
+                onTap: _busy || ai.status == 'minting' ? null : _uploadAdapter,
               ),
               ListRow(
                 icon: Icons.favorite_border_rounded,

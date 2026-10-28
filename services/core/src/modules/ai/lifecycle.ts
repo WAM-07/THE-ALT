@@ -195,7 +195,7 @@ export async function clearance(ctx: Ctx, ai: AiRow) {
       id: 'trained',
       label: 'Its latest version was trained on your data',
       passed: latest?.engine === 'adapter',
-      detail: latest?.engine === 'adapter' ? `${latest.training_mode} training` : latest ? 'not trained yet' : undefined,
+      detail: latest?.engine === 'adapter' ? (latest.training_mode === 'local' ? 'trained locally' : `${latest.training_mode} training`) : latest ? 'not trained yet' : undefined,
     },
     { id: 'tested', label: `You tested it in at least ${minChats} chat messages`, passed: Number(chats[0]?.n ?? 0) >= minChats, detail: `${chats[0]?.n ?? 0} so far` },
     {
