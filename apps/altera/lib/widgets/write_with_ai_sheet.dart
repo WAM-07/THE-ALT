@@ -33,6 +33,7 @@ Future<({AccountAi ai, String brief})?> pickAiToWriteWith(
   final brief = TextEditingController();
   final go = await showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true, // above the home screen's frosted bar
     isScrollControlled: true,
     showDragHandle: true,
     builder: (ctx) => StatefulBuilder(

@@ -38,10 +38,13 @@ class HomeShell extends ConsumerWidget {
     final inboxUnread = ref.watch(messagingProvider).totalUnreadCount;
     ref.watch(notificationsProvider);
 
+    // While the keyboard is open the frosted bar steps aside, so it never sits over what is being typed.
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return Scaffold(
       extendBody: true,
       body: child,
-      bottomNavigationBar: Container(
+      bottomNavigationBar: keyboardOpen ? null : Container(
         height: 85, // Fixed height to handle safe area
         decoration: const BoxDecoration(
           color: Colors.transparent,

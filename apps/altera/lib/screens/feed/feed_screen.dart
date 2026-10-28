@@ -505,6 +505,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
   void _handleCreateStory(WidgetRef ref) async {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(

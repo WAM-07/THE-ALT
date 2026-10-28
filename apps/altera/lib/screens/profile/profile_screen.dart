@@ -203,6 +203,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final user = ref.read(authStateProvider).user;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
@@ -249,6 +250,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   void _showLanguageSelector(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(
@@ -282,6 +284,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   void _showStoryUploadSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
@@ -394,6 +397,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
@@ -640,6 +644,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   void _showShareProfileSheet(BuildContext context, dynamic profile) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(
@@ -707,6 +712,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   void _showInsightsSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => SafeArea(
@@ -886,6 +892,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   void _showSettingsSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
@@ -1530,6 +1537,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => StatefulBuilder(

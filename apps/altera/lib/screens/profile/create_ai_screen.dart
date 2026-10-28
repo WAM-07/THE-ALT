@@ -199,6 +199,7 @@ Future<void> showAitIdentity(BuildContext context, WidgetRef ref, String aiProfi
       );
   await showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true, // above the home screen's frosted bar
     isScrollControlled: true,
     builder: (ctx) => SafeArea(
       child: Padding(

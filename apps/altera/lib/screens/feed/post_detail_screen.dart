@@ -277,6 +277,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: BoxDecoration(
@@ -324,6 +325,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     final reasons = ['Spam', 'Harassment', 'Hate Speech', 'Inappropriate', 'Other'];
     final reason = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(

@@ -252,6 +252,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void _showAttachmentSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(
@@ -325,6 +326,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (_isSelectionMode) return;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(

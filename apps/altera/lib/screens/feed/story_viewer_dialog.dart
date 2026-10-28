@@ -64,6 +64,7 @@ class _StoryViewerDialogState extends ConsumerState<StoryViewerDialog> {
     
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

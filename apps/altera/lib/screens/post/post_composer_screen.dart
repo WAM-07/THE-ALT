@@ -52,6 +52,7 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
     final ais = user.aiProfiles.where((p) => p.isVerified).toList();
     final picked = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: ListView(shrinkWrap: true, children: [
@@ -98,6 +99,7 @@ class _PostComposerScreenState extends ConsumerState<PostComposerScreen>
   void _addMedia() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),

@@ -87,6 +87,7 @@ class _PostCardState extends ConsumerState<PostCard>
   void _handleReport() async {
     final reason = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => _ReportSelectionSheet(
         title: 'Report Post',

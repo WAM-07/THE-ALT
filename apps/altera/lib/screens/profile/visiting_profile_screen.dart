@@ -321,6 +321,7 @@ class _VisitingProfileScreenState extends ConsumerState<VisitingProfileScreen> w
     final reasons = ['Spam', 'Impersonation', 'Inappropriate Content', 'Harassment', 'Other'];
     final reason = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(
@@ -402,6 +403,7 @@ class _VisitingProfileScreenState extends ConsumerState<VisitingProfileScreen> w
   void _showMoreOptions(bool isBlocked) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         decoration: BoxDecoration(
@@ -500,6 +502,7 @@ class _VisitingProfileScreenState extends ConsumerState<VisitingProfileScreen> w
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => StatefulBuilder(

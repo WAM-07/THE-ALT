@@ -50,6 +50,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
@@ -195,6 +196,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   void _showConversationOptions(Conversation conversation) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

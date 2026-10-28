@@ -139,6 +139,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   Future<void> _pickConversation() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true, // above the home screen's frosted bar
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: ListView(shrinkWrap: true, children: [
