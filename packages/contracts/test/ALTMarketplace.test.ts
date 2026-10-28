@@ -336,6 +336,23 @@ describe("ALTMarketplace: subscriptions", () => {
     await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") }), market, "NotListed");
   });
 
+  it("refuses suspended AIs and stale offers; anyone may clear an offer whose owner sold the AI elsewhere", async () => {
+    const { market, registry, admin, alice, bob, carol } = await fixture();
+    await viem.assertions.revertWithCustomError(market.write.cancelSubscriptionOffer([1n], as(alice)), market, "NotListed");
+    await market.write.listForSubscription([1n, parseEther("0.1")], as(alice));
+
+    await registry.write.suspend([1n, "abuse"], as(admin));
+    await viem.assertions.revertWithCustomError(market.write.listForSubscription([1n, parseEther("0.1")], as(alice)), market, "TokenSuspended");
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") }), market, "TokenSuspended");
+    await registry.write.unsuspend([1n], as(admin));
+
+    // Alice moves the AI outside the marketplace: her offer is stale and can't be used.
+    await registry.write.transferFrom([alice.account.address, bob.account.address, 1n], as(alice));
+    await viem.assertions.revertWithCustomError(market.write.subscribe([1n, 1], { ...as(carol), value: parseEther("0.1") }), market, "StaleListing");
+    await market.write.cancelSubscriptionOffer([1n], as(carol));
+    assert.deepEqual(await market.read.subscriptionOffers([1n]), [zeroAddress, 0n]);
+  });
+
   it("a sale clears the seller's price, but subscribers keep the time they paid for", async () => {
     const { market, alice, bob, carol } = await fixture();
     await market.write.listForSubscription([1n, parseEther("0.1")], as(alice));
