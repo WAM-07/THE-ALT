@@ -281,12 +281,28 @@ router.get('/me/activity', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * The profile the caller acts as (`?blocker_id=`): themselves, or one of their own AI profiles.
+ * Never someone else's: null when the id is not the caller's.
+ */
+async function actingProfileId(req) {
+  const asked = req.query.blocker_id;
+  if (!asked || asked === req.userId) return req.userId;
+  if (!UUID.test(String(asked))) return null;
+  const own = await db.queryOne('SELECT id FROM ai_profiles WHERE id = $1 AND user_id = $2', [asked, req.userId]);
+  return own ? own.id : null;
+}
+
+const notYourProfile = (res) =>
+  res.status(403).json({ code: 'NOT_YOUR_PROFILE', message: 'You can only block or unblock as yourself or as one of your own AIs.' });
+
 // ─── GET /profiles/:id ────────────────────────────────────────────────────────
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { type = 'human' } = req.query;
-    const activeId = req.query.blocker_id || req.userId;
+    // Block status is shown only from the caller's own point of view (or one of their AIs').
+    const activeId = (await actingProfileId(req)) || req.userId;
 
     let profile;
     if (type === 'ai') {
@@ -440,7 +456,8 @@ router.post('/:id/block', authMiddleware, async (req, res) => {
   if (!UUID.test(req.params.id)) return res.status(400).json({ code: 'BAD_ID', message: 'That id is not a valid id.' });
   try {
     const { id } = req.params;
-    const activeId = req.query.blocker_id || req.userId;
+    const activeId = await actingProfileId(req);
+    if (!activeId) return notYourProfile(res);
 
     await db.query(
       'INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
@@ -465,7 +482,8 @@ router.delete('/:id/block', authMiddleware, async (req, res) => {
   if (!UUID.test(req.params.id)) return res.status(400).json({ code: 'BAD_ID', message: 'That id is not a valid id.' });
   try {
     const { id } = req.params;
-    const activeId = req.query.blocker_id || req.userId;
+    const activeId = await actingProfileId(req);
+    if (!activeId) return notYourProfile(res);
 
     await db.query(
       'DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2',

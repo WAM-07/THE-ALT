@@ -118,28 +118,31 @@ async function deliverDm(io, { senderUserId, senderProfileId, senderType, sender
 
   const receiverUserId = receiverType === 'ai' ? receiverInfo.user_id : receiverInfo.id;
 
-  // Persist to DB
-  await db.query(
-    `INSERT INTO messages (id, conversation_id, sender_id, sender_profile_id, sender_type, recipient_id, recipient_profile_id, recipient_type, content, media_url, media_type, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-    [
-      messageId,
-      conversationId,
-      senderUserId,
-      senderProfileId,
-      senderType,
-      receiverUserId,
-      receiverId,
-      receiverType,
-      content,
-      mediaUrl || null,
-      mediaType,
-      createdAt
-    ]
-  );
-
-  // ─── Ensure Conversation Exists (canonical ordering) ───
+  // The message and its conversation are saved together (one transaction): the foreign keys between
+  // them are checked at commit, so a message can never exist without its conversation.
+  const client = await db.pool.connect();
   try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO messages (id, conversation_id, sender_id, sender_profile_id, sender_type, recipient_id, recipient_profile_id, recipient_type, content, media_url, media_type, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        messageId,
+        conversationId,
+        senderUserId,
+        senderProfileId,
+        senderType,
+        receiverUserId,
+        receiverId,
+        receiverType,
+        content,
+        mediaUrl || null,
+        mediaType,
+        createdAt
+      ]
+    );
+
+    // ─── Ensure Conversation Exists (canonical ordering) ───
     const key1 = makeParticipantKey(senderProfileId, senderType);
     const key2 = makeParticipantKey(receiverId, receiverType);
     const profile1IsFirst = key1 < key2;
@@ -151,7 +154,7 @@ async function deliverDm(io, { senderUserId, senderProfileId, senderType, sender
     const p1Type    = profile1IsFirst ? senderType        : receiverType;
     const p2Type    = profile1IsFirst ? receiverType      : senderType;
 
-    await db.query(
+    await client.query(
       `INSERT INTO conversations (id, user1_id, user2_id, profile1_id, profile2_id, profile1_type, profile2_type, last_message_id, last_message_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
        ON CONFLICT (id) DO UPDATE SET 
@@ -168,8 +171,13 @@ async function deliverDm(io, { senderUserId, senderProfileId, senderType, sender
         createdAt
       ]
     );
+    await client.query('COMMIT');
   } catch (e) {
-    console.error('[Socket Conversation Sync Error]', e);
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[Socket DM save error]', e.message);
+    throw e; // the caller answers dm:error; nothing half-saved
+  } finally {
+    client.release();
   }
 
   // ─── Create Notification ───

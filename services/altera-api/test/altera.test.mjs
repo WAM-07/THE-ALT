@@ -215,6 +215,51 @@ describe('social features on the shared database', () => {
     expect(mine.json().items[0]).toMatchObject({ kind: 'report', title: `Reported post by @${author.handle}` });
   });
 
+  it('blocks only as yourself or your own AI, never in another profile\'s name', async () => {
+    const db = require('../src/db/database.js');
+    const [attacker, b, c] = [await altAccount('altera'), await altAccount('altera'), await altAccount('altera')];
+    expect((await api('POST', '/follows', b.token, { followee_id: c.id, followee_type: 'human' })).status).toBeLessThan(300);
+    const following = async () => (await db.query('SELECT 1 FROM altera.follows WHERE follower_id = $1 AND following_id = $2', [b.id, c.id])).rowCount;
+    expect(await following()).toBe(1);
+
+    // Blocking "as B" would also have deleted B's follow of C. Refused, and nothing changes.
+    const forged = await api('POST', `/profiles/${c.id}/block?blocker_id=${b.id}`, attacker.token);
+    expect(forged.status).toBe(403);
+    expect(forged.body.code).toBe('NOT_YOUR_PROFILE');
+    expect(await following()).toBe(1);
+    expect((await db.query('SELECT 1 FROM altera.blocks WHERE blocker_id = $1', [b.id])).rowCount).toBe(0);
+    expect((await api('DELETE', `/profiles/${c.id}/block?blocker_id=${b.id}`, attacker.token)).status).toBe(403);
+    expect((await api('POST', `/profiles/${c.id}/block?blocker_id=not-an-id`, attacker.token)).status).toBe(403);
+
+    // As yourself it works.
+    expect((await api('POST', `/profiles/${c.id}/block`, attacker.token)).status).toBe(200);
+    expect((await db.query('SELECT 1 FROM altera.blocks WHERE blocker_id = $1 AND blocked_id = $2', [attacker.id, c.id])).rowCount).toBe(1);
+    expect((await api('DELETE', `/profiles/${c.id}/block?blocker_id=${attacker.id}`, attacker.token)).status).toBe(200);
+  });
+
+  it('the database itself refuses comments, likes and messages that point nowhere', async () => {
+    const db = require('../src/db/database.js');
+    const author = await altAccount('altera');
+    const post = await api('POST', '/posts', author.token, { content: 'A post to hang things on' });
+    const postId = post.body.id ?? post.body.post?.id;
+    const nobody = '00000000-0000-4000-8000-000000000000';
+    await expect(db.query('INSERT INTO altera.comments (post_id, user_id, content) VALUES ($1, $2, $3)', [postId, nobody, 'ghost'])).rejects.toThrow(/foreign key/);
+    await expect(db.query('INSERT INTO altera.likes (user_id, post_id) VALUES ($1, $2)', [nobody, postId])).rejects.toThrow(/foreign key/);
+    // A message without its conversation is refused when the transaction commits.
+    await expect(
+      db.query(`INSERT INTO altera.messages (conversation_id, sender_id, content) VALUES ('human:x|human:y', $1, 'orphan')`, [author.id]),
+    ).rejects.toThrow(/foreign key/);
+    const { rows } = await db.query(
+      `SELECT conname, convalidated FROM pg_constraint WHERE conname IN ('comments_user_id_fkey', 'likes_user_id_fkey', 'messages_conversation_id_fkey', 'conversations_last_message_id_fkey') ORDER BY conname`,
+    );
+    expect(rows.map((r) => [r.conname, r.convalidated])).toEqual([
+      ['comments_user_id_fkey', true],
+      ['conversations_last_message_id_fkey', true],
+      ['likes_user_id_fkey', true],
+      ['messages_conversation_id_fkey', true],
+    ]);
+  });
+
   it('answers a malformed id with 400, never a server error', async () => {
     const person = await altAccount('altera');
     for (const [method, path] of [
