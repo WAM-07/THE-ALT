@@ -165,6 +165,7 @@ class _CreatorPanelScreenState extends State<CreatorPanelScreen> {
               Pill('${e['followers']} followers', color: Ds.sky),
               Pill('${e['posts']} posts', color: Ds.sky),
               Pill('${e['likes']} likes', color: Ds.sky),
+              if (e['influence'] != null) Pill('Influence ${e['influence']}', color: Ds.iris),
             ],
           ]),
         ]),

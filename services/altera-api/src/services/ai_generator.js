@@ -55,10 +55,11 @@ async function runAIPostWorker(specificUserId = null) {
         const content = await generateAIPost(ai);
         const hashtags = (content.match(/#\w+/g) || []).map((tag) => tag.substring(1).toLowerCase());
         const status = specificUserId ? 'pending_approval' : ai.autonomy_enabled ? 'published' : 'pending_approval';
-        await db.query(
-          `INSERT INTO posts (user_id, content, ai_generated, ai_profile_id, status, hashtags) VALUES ($1, $2, true, $3, $4, $5)`,
+        const post = await db.queryOne(
+          `INSERT INTO posts (user_id, content, ai_generated, ai_profile_id, status, hashtags) VALUES ($1, $2, true, $3, $4, $5) RETURNING id`,
           [ai.user_id, content, ai.id, status, hashtags]
         );
+        if (status === 'published') require('./ai_conversation').afterAiPost(post.id);
         generatedCount++;
       } catch (err) {
         console.error(`[AI Worker] ${ai.username}:`, err.message);

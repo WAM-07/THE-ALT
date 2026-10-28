@@ -590,6 +590,52 @@ describe('verified AIs from ALTER on ALTERA (Day 5)', () => {
     expect(emitted.some((e) => e.room === `user:${fan.id}` && e.payload.id === reply.id)).toBe(true);
   });
 
+  it('filters the feed by engagement level and by the AI’s real category (M13 FE-4)', async () => {
+    const db = require('../src/db/database.js');
+    const owner = await altAccount('alter');
+    const profile = (await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: (await verifiedAi(owner)).id })).body.profile;
+    await db.query(`UPDATE altera.ai_profiles SET category = 'education', bio = 'technical web3' WHERE id = $1`, [profile.id]);
+    const tag = `t${uniq()}`;
+    const make = async (likes) => {
+      const p = (await api('POST', '/posts', owner.token, { content: `Post #${tag}`, author_type: 'ai', author_id: profile.id, ai_generated: true })).body.post;
+      await db.query(`UPDATE altera.posts SET status = 'published', like_count = $2 WHERE id = $1`, [p.id, likes]);
+      return p.id;
+    };
+    const [quiet, busy] = [await make(1), await make(12)];
+    const ids = async (q) => (await api('GET', `/feed?hashtag=${tag}&${q}`, owner.token)).body.posts.map((p) => p.id);
+    expect(await ids('engagement=high')).toEqual([busy]);
+    expect(await ids('engagement=low')).toEqual([quiet]);
+    expect((await ids('ai_category=education')).sort()).toEqual([quiet, busy].sort());
+    expect(await ids('ai_category=technical')).toEqual([]); // the real category wins over words in the bio
+  });
+
+  it('lets verified AIs comment on each other’s posts, within loop limits (M14 FE-1)', async () => {
+    const db = require('../src/db/database.js');
+    const { replyToAiPost } = require('../src/services/ai_conversation.js');
+    const [ownerA, ownerB] = [await altAccount('alter'), await altAccount('alter')];
+    const link = async (owner) => (await api('POST', '/profiles/ai/link', owner.token, { core_ai_id: (await verifiedAi(owner)).id })).body.profile;
+    const [aiA, aiB] = [await link(ownerA), await link(ownerB)];
+
+    // B's AI follows A's AI, and B gives it autonomy.
+    expect((await api('POST', '/follows', ownerB.token, { followee_id: aiA.id, followee_type: 'ai', follower_id: aiB.id, follower_type: 'ai' })).status).toBeLessThan(300);
+    await api('PATCH', `/profiles/ai/${aiB.id}/autonomy`, ownerB.token, { enabled: true });
+
+    const post = (await api('POST', '/posts', ownerA.token, { content: 'Tonight the Perseids peak.', author_type: 'ai', author_id: aiA.id, ai_generated: true })).body;
+    const postId = post.id ?? post.post?.id;
+    // A's AI has no autonomy, so its post waits for A's approval; publishing it is what lets other AIs answer.
+    expect((await api('POST', `/posts/${postId}/approve`, ownerA.token)).status).toBe(200);
+    const aiComments = async () => (await db.query('SELECT ai_profile_id, content FROM altera.comments WHERE post_id = $1', [postId])).rows;
+    for (let i = 0; i < 50 && (await aiComments()).length === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    const [comment] = await aiComments();
+    expect(comment).toMatchObject({ ai_profile_id: aiB.id, content: expect.stringContaining('Nova says hi about Another AI on ALTERA') });
+    const { rows: trace } = await db.query(`SELECT meta FROM altera.activity_log WHERE action_type = 'ai_comment' AND target_id = $1`, [postId]);
+    expect(trace[0].meta).toMatchObject({ kind: 'ai_to_ai', toAi: aiA.id });
+
+    // Loop limits: one comment per AI per post, and AIs never answer comments, so nothing more happens.
+    expect(await replyToAiPost(postId)).toEqual([]);
+    expect(await aiComments()).toHaveLength(1);
+  });
+
   it('drafts a person’s own post with an AI they may use, tagged “posted with”, and refuses everyone else', async () => {
     const owner = await altAccount('alter');
     const stranger = await altAccount('altera');

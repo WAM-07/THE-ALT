@@ -74,6 +74,9 @@ class FeedNotifier extends StateNotifier<FeedState> {
 
   FeedNotifier(this._feedService, this._ref) : super(const FeedState());
 
+  /// The engagement level the feed is filtered to (low, medium, high), or null for all.
+  String? _engagement;
+
   Future<void> loadFeed({
     String tab = 'feed',
     bool refresh = false,
@@ -81,7 +84,9 @@ class FeedNotifier extends StateNotifier<FeedState> {
     String? topic,
     String? aiCategory,
     String? sortBy,
+    String? engagement,
   }) async {
+    if (refresh) _engagement = engagement;
     if (refresh) {
       state = state.copyWith(
         isLoading: true,
@@ -110,6 +115,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
       topic: topic ?? state.activeTopic,
       aiCategory: aiCategory ?? state.activeAiCategory,
       sortBy: sortBy ?? state.sortBy,
+      engagement: _engagement,
     );
     if (result.success) {
       state = state.copyWith(
@@ -134,6 +140,7 @@ class FeedNotifier extends StateNotifier<FeedState> {
       topic: state.activeTopic,
       aiCategory: state.activeAiCategory,
       sortBy: state.sortBy,
+      engagement: _engagement,
     );
     if (result.success) {
       state = state.copyWith(

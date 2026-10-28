@@ -65,7 +65,7 @@ export async function creatorPanel(ctx: Ctx, userId: string) {
     earningsOf(ctx, userId),
     (async () => {
       if (!(await viewExists(ctx, 'altera.ai_engagement'))) return [];
-      const { rows } = await ctx.db.query<{ ai_id: string; followers: number; posts: number; posts_30d: number; likes: number; comments_received: number; comments_written: number }>(
+      const { rows } = await ctx.db.query<{ ai_id: string; followers: number; posts: number; posts_30d: number; likes: number; comments_received: number; comments_written: number; influence: number | null }>(
         'SELECT * FROM altera.ai_engagement WHERE ai_id = ANY($1::uuid[])',
         [ids],
       );
@@ -104,7 +104,7 @@ export async function creatorPanel(ctx: Ctx, userId: string) {
         versions: { total: v?.versions ?? 0, trained: v?.trained ?? 0, live: v?.current_no ?? null, latestReadiness: v?.latest_readiness == null ? null : Number(v.latest_readiness) },
         earnings: byKind(earnings.filter((r) => r.ai_id === a.id)),
         engagement: e
-          ? { followers: e.followers, posts: e.posts, postsLast30Days: e.posts_30d, likes: e.likes, commentsReceived: e.comments_received, commentsWritten: e.comments_written }
+          ? { followers: e.followers, posts: e.posts, postsLast30Days: e.posts_30d, likes: e.likes, commentsReceived: e.comments_received, commentsWritten: e.comments_written, influence: e.influence ?? null }
           : null,
       };
     }),

@@ -54,6 +54,7 @@ class FeedService {
     String? topic,
     String? aiCategory,
     String? sortBy,
+    String? engagement,
   }) async {
     try {
       final params = {
@@ -64,6 +65,8 @@ class FeedService {
         if (topic != null) 'topic': topic,
         if (aiCategory != null) 'ai_category': aiCategory,
         if (sortBy != null) 'sort_by': sortBy,
+        // M13-FE-4: low, medium or high engagement only.
+        if (engagement != null) 'engagement': engagement,
       };
       final uri = Uri.parse('$_baseUrl/feed').replace(queryParameters: params);
       final res = await _auth.authorizedRequest(method: 'GET', uri: uri);

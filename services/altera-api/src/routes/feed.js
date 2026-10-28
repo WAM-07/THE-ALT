@@ -15,13 +15,16 @@ router.get('/', authMiddleware, async (req, res) => {
       sort_by,
       topic,
       ai_category,
+      engagement,
     } = req.query;
     const lim = Math.min(parseInt(limit, 10) || 20, 50);
     const normalizedTopic = topic?.trim().toLowerCase();
     const normalizedCategory = ai_category?.trim().toLowerCase();
 
+    // The AI's category as set in ALTER (synced from ALT Core); older profiles without one are guessed from their bio.
     const aiCategoryExpression = `
       CASE
+        WHEN ai.category IS NOT NULL AND ai.category <> 'general' THEN LOWER(ai.category)
         WHEN ai.bio ILIKE '%companion%' OR ai.bio ILIKE '%engage%' THEN 'companion'
         WHEN ai.bio ILIKE '%creative%' OR ai.bio ILIKE '%poetry%' OR ai.bio ILIKE '%art%' THEN 'creative'
         WHEN ai.bio ILIKE '%technical%' OR ai.bio ILIKE '%web3%' OR ai.bio ILIKE '%defi%' OR ai.bio ILIKE '%market%' THEN 'technical'
@@ -73,6 +76,12 @@ router.get('/', authMiddleware, async (req, res) => {
       query += ` AND p.ai_generated = TRUE AND ${aiCategoryExpression} = $${params.length}`;
     }
 
+    // M13-FE-4 / M14-FE-6: engagement level (likes count 2, comments 3): low < 5, medium 5–19, high 20+.
+    const engagementScore = '(p.like_count * 2 + p.comment_count * 3)';
+    if (engagement === 'high') query += ` AND ${engagementScore} >= 20`;
+    else if (engagement === 'medium') query += ` AND ${engagementScore} BETWEEN 5 AND 19`;
+    else if (engagement === 'low') query += ` AND ${engagementScore} < 5`;
+
     // Sorting (M13-FE-4: engagement level)
     if (tab === 'trending' || sort_by === 'engagement') {
       query += ` ORDER BY (p.like_count * 2 + p.comment_count * 3) DESC, p.created_at DESC`;
@@ -114,6 +123,7 @@ router.get('/', authMiddleware, async (req, res) => {
       tab,
       topic: normalizedTopic ?? null,
       ai_category: normalizedCategory ?? null,
+      engagement: ['low', 'medium', 'high'].includes(engagement) ? engagement : null,
     });
   } catch (err) {
     console.error('[GET /feed]', err);

@@ -41,7 +41,7 @@ describe('the Creator Control Panel (Module 18)', () => {
       { month: '2026-09', wei: wei('0.975'), pol: '0.975' },
       { month: '2026-10', wei: wei('0.025'), pol: '0.025' },
     ]);
-    expect(a.ais[0]).toMatchObject({ id: ai.id, youOwn: false, youCreated: true, healthScore: 100, engagement: { followers: 1, posts: 1, likes: 1 } });
+    expect(a.ais[0]).toMatchObject({ id: ai.id, youOwn: false, youCreated: true, healthScore: 100, engagement: { followers: 1, posts: 1, likes: 1, influence: 8 } });
     expect(a.transactions.map((x: { as: string }) => x.as)).toEqual(['creator (royalty)', 'seller']);
 
     // Bob, the owner now: the rental minus the royalty and the fee.

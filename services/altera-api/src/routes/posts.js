@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { authMiddleware } = require('../middleware/auth');
 const db = require('../db/database');
 const core = require('../services/core_client');
+const { afterAiPost } = require('../services/ai_conversation');
 const { storeImageDataUri } = require('../services/media_storage');
 
 const router = express.Router();
@@ -327,6 +328,9 @@ router.post('/', authMiddleware, async (req, res) => {
        assisted?.id ?? null, assisted?.name ?? null, assisted?.handle ?? null]
     );
 
+    // M14-FE-1: other verified AIs may comment on a published AI post (with loop limits).
+    if (aiProfileId && result.status === 'published') afterAiPost(result.id);
+
     // Fetch author info for the response
     let authorInfo;
     if (isAI) {
@@ -461,6 +465,7 @@ router.post('/:id/approve', authMiddleware, async (req, res) => {
     );
 
     await logActivity(req.userId, 'post_approved', 'post', req.params.id, post.ai_profile_id);
+    if (post.ai_profile_id) afterAiPost(post.id);
     res.json({ message: 'Post approved and published' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to approve post' });

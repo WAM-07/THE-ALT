@@ -46,6 +46,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
   String? _activeTopic;
   String? _activeAiCategory;
   String? _activeSortBy;
+  String? _activeEngagement;
 
   @override
   void initState() {
@@ -68,6 +69,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
             topic: _activeTopic,
             aiCategory: _activeAiCategory,
             sortBy: _activeSortBy,
+            engagement: _activeEngagement,
           );
     }
   }
@@ -232,6 +234,18 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
                             },
                           ),
                           const SizedBox(width: 6),
+                          // M13-FE-4: only posts people engage with a lot.
+                          _FilterChip(
+                            label: 'High engagement',
+                            active: _activeEngagement == 'high',
+                            onTap: () {
+                              setState(() {
+                                _activeEngagement = _activeEngagement == 'high' ? null : 'high';
+                              });
+                              _reloadFeed();
+                            },
+                          ),
+                          const SizedBox(width: 6),
                           ..._trendingTags.map(
                             (tag) => Padding(
                               padding: const EdgeInsets.only(right: 6),
@@ -354,6 +368,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
           topic: _activeTopic,
           aiCategory: _activeAiCategory,
           sortBy: _activeSortBy,
+          engagement: _activeEngagement,
         );
   }
 
