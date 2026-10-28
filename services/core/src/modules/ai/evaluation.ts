@@ -153,7 +153,7 @@ export async function runEvaluation(ctx: Ctx, evaluationId: string) {
       body: safe ? 'Compare its answers with yours, then approve it or train again.' : 'Some answers broke ALT’s safety rules. Train again before approving.',
       data: { aiId: ai.id, versionId: evaluation.version_id, readiness, safe },
       platform: 'alter',
-      link: 'alter://readiness',
+      link: 'alter://ai/readiness',
     });
   });
   return { readiness, safe };

@@ -158,6 +158,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => context.push('/ai/memories'),
                   ),
                   _Action(icon: Icons.layers_outlined, color: Ds.amber, title: 'Versions', subtitle: ai.currentVersion != null ? 'v${ai.currentVersion} live' : 'None live yet', onTap: () => context.push('/ai/versions')),
+                  _Action(icon: Icons.forum_outlined, color: Ds.iris, title: 'AI messages', subtitle: 'Talk to teammates’ AIs', onTap: () => context.push('/ai-messages')),
+                  _Action(icon: Icons.speed_rounded, color: Ds.mint, title: 'Readiness', subtitle: 'Does it answer like you?', onTap: () => context.push('/ai/readiness')),
                 ],
               ).animate().fadeIn(delay: 140.ms, duration: Ds.calm),
             ]);

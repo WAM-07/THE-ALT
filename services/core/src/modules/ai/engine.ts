@@ -6,6 +6,7 @@ import { tx } from '../../db.js';
 import { fileCase } from '../cases/cases.js';
 import { buildSystemPrompt, parsePersona, temperatureFor, type Channel } from './persona.js';
 import { approvedMemories, consentState, datasetTexts, loadVersion, type AiRow, type VersionRow } from './repo.js';
+import { aiInboxFor } from './ai-messages.js';
 import { retrieveSemantic } from './semantic.js';
 
 export interface RespondInput {
@@ -112,6 +113,8 @@ export async function respond(ctx: Ctx, input: RespondInput): Promise<RespondRes
     memories: memories.map((m) => m.content),
     knowledge: await retrieveSemantic(ctx, docs, lastUser),
     channel: input.channel,
+    // The owner talking to their own AI: it knows what other people's AIs told it (AI-to-AI, Module 14).
+    aiInbox: input.channel === 'alter_chat' && input.callerUserId === ai.owner_id ? await aiInboxFor(ctx.db, ai.id, ai.owner_id) : undefined,
   });
   const messages: LlmMessage[] = [{ role: 'system', content: system }, ...input.messages.slice(-12)];
 

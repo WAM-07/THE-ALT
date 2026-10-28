@@ -18,6 +18,7 @@ import { buildVersion, clearance, requestDeploy, requestPublish } from '../../mo
 import { adapterFormat, importLocalAdapter, listTrainings, MAX_ADAPTER_BYTES, startTraining, trainingOut } from '../../modules/ai/training.js';
 import { HEALTH_WEIGHTS, healthHistory, refreshHealth } from '../../modules/ai/health.js';
 import { consentRecord, consentRecordPdf, versionDiff } from '../../modules/ai/records.js';
+import { aiThread, aiThreads, discardDraft, draftAiMessage, sendAiMessage, setAiMessagesOpen } from '../../modules/ai/ai-messages.js';
 import { addEvalItem, deleteEvalItem, evalItems, evaluationOut, latestEvaluation, requestEvaluation, setVerdict } from '../../modules/ai/evaluation.js';
 import { checkSafety } from '../../modules/ai/moderation.js';
 import { indexItems, searchAis } from '../../modules/ai/semantic.js';
@@ -113,6 +114,8 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       healthScore: Number(ai.health_score),
       // Made by the demo story (labelled in every app; removed once real trained AIs exist).
       demo: ai.is_demo,
+      // Whether other people's AIs may message it (AI-to-AI, Module 14).
+      acceptsAiMessages: ai.ai_messages === 'verified',
       royaltyBps: ai.royalty_bps,
       currentVersion: current?.rows[0] ? { version: current.rows[0].version_no as number, manifestCid: current.rows[0].manifest_cid as string } : null,
       token,
@@ -873,6 +876,54 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
       }
       return versionDiff(ctx, ai, from, req.params.versionId);
     },
+  );
+
+  // ---------------------------------------------------------------- AI-to-AI messages (Module 14 FE-1)
+
+  const MessageParams = z.object({ id: z.uuid(), messageId: z.uuid() });
+
+  r.get('/ais/:id/ai-threads', { preHandler: authed, schema: { tags: ['ai-messages'], summary: 'Your AI’s conversations with other people’s AIs', params: AiId } }, async (req) =>
+    aiThreads(ctx, req.auth!.userId, req.params.id),
+  );
+
+  r.get(
+    '/ais/:id/ai-threads/:threadId',
+    { preHandler: authed, schema: { tags: ['ai-messages'], summary: 'One conversation with another AI (marks it read)', params: z.object({ id: z.uuid(), threadId: z.uuid() }) } },
+    async (req) => aiThread(ctx, req.auth!.userId, req.params.id, req.params.threadId),
+  );
+
+  r.post(
+    '/ais/:id/ai-messages',
+    {
+      preHandler: authed,
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: {
+        tags: ['ai-messages'],
+        summary: 'Your AI writes a message to another AI from your brief; it is saved as a draft for you to check and send',
+        params: AiId,
+        body: z
+          .object({ toHandle: z.string().trim().min(2).max(40).optional(), threadId: z.uuid().optional(), subject: z.string().trim().max(120).optional(), brief: z.string().trim().min(3).max(2000) })
+          .refine((b) => Boolean(b.toHandle) !== Boolean(b.threadId), { message: 'Give either toHandle (a new conversation) or threadId (a reply).' }),
+      },
+    },
+    async (req, reply) => reply.status(201).send(await draftAiMessage(ctx, req.auth!.userId, req.params.id, req.body)),
+  );
+
+  r.post(
+    '/ais/:id/ai-messages/:messageId/send',
+    { preHandler: authed, schema: { tags: ['ai-messages'], summary: 'Send the draft, as written or with your edits', params: MessageParams, body: z.object({ content: z.string().trim().min(1).max(4000).optional() }) } },
+    async (req) => sendAiMessage(ctx, req.auth!.userId, req.params.id, req.params.messageId, req.body.content, req.ip),
+  );
+
+  r.delete('/ais/:id/ai-messages/:messageId', { preHandler: authed, schema: { tags: ['ai-messages'], summary: 'Discard a draft', params: MessageParams } }, async (req, reply) => {
+    await discardDraft(ctx, req.auth!.userId, req.params.id, req.params.messageId);
+    return reply.status(204).send();
+  });
+
+  r.put(
+    '/ais/:id/ai-messages/settings',
+    { preHandler: authed, schema: { tags: ['ai-messages'], summary: 'Let other people’s verified AIs message yours, or not', params: AiId, body: z.object({ accept: z.enum(['verified', 'off']) }) } },
+    async (req) => setAiMessagesOpen(ctx, req.auth!.userId, req.params.id, req.body.accept),
   );
 
   // ---------------------------------------------------------------- Module 7: the Health Score

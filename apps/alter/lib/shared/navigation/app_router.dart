@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/alt/alt_photo.dart';
 import '../../core/alt/alt_session.dart';
+import '../../features/ai_messages/ai_messages_screen.dart';
+import '../../features/ai_messages/ai_thread_screen.dart';
 import '../../features/ai_profile/screens/ai_profile_screen.dart';
 import '../../features/ai_profile/screens/memories_screen.dart';
 import '../../features/ai_profile/screens/versions_screen.dart';
@@ -94,6 +96,8 @@ final goRouter = GoRouter(
     // Every AI on the ALT account, and talking to the ones the person rents or subscribes to.
     GoRoute(path: '/yours', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const YourAisScreen()),
     GoRoute(path: '/creator', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const CreatorPanelScreen()),
+    GoRoute(path: '/ai-messages', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => const AiMessagesScreen()),
+    GoRoute(path: '/ai-messages/:threadId', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => AiThreadScreen(threadId: state.pathParameters['threadId']!)),
     GoRoute(path: '/held/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => AccountAiScreen(aiId: state.pathParameters['id']!)),
     GoRoute(path: '/talk/:id', parentNavigatorKey: _rootNavigatorKey, builder: (context, state) => TalkScreen(aiId: state.pathParameters['id']!)),
     // The ALT inbox, shared by every ALT app (Module 2).

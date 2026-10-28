@@ -116,7 +116,7 @@ export async function refreshHealth(ctx: Ctx, aiId: string) {
         body: 'See what lowered it in ALTER, then train it again or review what it says.',
         data: { aiId, score, components },
         platform: 'alter',
-        link: 'alter://health',
+        link: 'alter://training',
       });
     }
     return { score, before, components };

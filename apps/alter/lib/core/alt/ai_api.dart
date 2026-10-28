@@ -37,6 +37,8 @@ class AltAi {
   double get healthScore => (j['healthScore'] as num?)?.toDouble() ?? 100;
   /// Made by the demo story (labelled; removed once real trained AIs exist).
   bool get demo => j['demo'] == true;
+  /// Whether other people's verified AIs may message it (AI-to-AI).
+  bool get acceptsAiMessages => j['acceptsAiMessages'] != false;
   int? get currentVersion => (j['currentVersion'] as Map?)?['version'] as int?;
   AiToken? get token => j['token'] == null ? null : AiToken(Map<String, dynamic>.from(j['token'] as Map));
   Map<String, dynamic> get persona => Map<String, dynamic>.from(j['persona'] as Map? ?? const {});
@@ -378,6 +380,22 @@ class AiApi {
   /// Module 6: what changed in a version since the previous one.
   Future<Map<String, dynamic>> versionDiff(String id, String versionId) async =>
       Map<String, dynamic>.from(await _call('GET', '/ais/$id/versions/$versionId/diff') as Map);
+
+  // AI-to-AI messages (Module 14): your AI's conversations with other people's AIs.
+  Future<List<Map<String, dynamic>>> aiThreads(String id) async =>
+      (await _call('GET', '/ais/$id/ai-threads') as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  Future<Map<String, dynamic>> aiThread(String id, String threadId) async => Map<String, dynamic>.from(await _call('GET', '/ais/$id/ai-threads/$threadId') as Map);
+  /// Your AI writes a draft from your brief (to a new AI by handle, or in a thread); nothing is sent yet.
+  Future<Map<String, dynamic>> draftAiMessage(String id, {String? toHandle, String? threadId, String? subject, required String brief}) async =>
+      Map<String, dynamic>.from(await _call('POST', '/ais/$id/ai-messages', body: {
+        if (toHandle != null) 'toHandle': toHandle,
+        if (threadId != null) 'threadId': threadId,
+        if (subject != null) 'subject': subject,
+        'brief': brief,
+      }) as Map);
+  Future<void> sendAiMessage(String id, String messageId, {String? content}) => _call('POST', '/ais/$id/ai-messages/$messageId/send', body: {if (content != null) 'content': content});
+  Future<void> discardAiDraft(String id, String messageId) => _call('DELETE', '/ais/$id/ai-messages/$messageId');
+  Future<void> setAiMessagesOpen(String id, bool open) => _call('PUT', '/ais/$id/ai-messages/settings', body: {'accept': open ? 'verified' : 'off'});
 
   Future<AiHealth> health(String id) async => AiHealth(Map<String, dynamic>.from(await _call('GET', '/ais/$id/health') as Map));
   Future<List<EvalItem>> evaluationSet(String id) async =>

@@ -22,6 +22,7 @@ export interface AiRow {
   royalty_bps: number;
   health_score: string;
   is_demo: boolean;
+  ai_messages: 'verified' | 'off';
   owner_confirmed_at: Date | null;
   created_at: Date;
   updated_at: Date;
