@@ -1,5 +1,9 @@
 import 'package:alt_account/alt_account.dart';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
@@ -29,6 +33,22 @@ class _ConsentScreenState extends State<ConsentScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Saves the full consent record (Module 8 FE-4) as a PDF on the phone.
+  Future<void> _downloadRecord(AltAi ai) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final bytes = await aiApi.consentRecordPdf(ai.id);
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/consent-${ai.handle}.pdf');
+      await file.writeAsBytes(bytes);
+      messenger.showSnackBar(SnackBar(content: Text('Consent record saved: ${file.path}')));
+    } on AltApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not save the record. Try again.')));
     }
   }
 
@@ -76,6 +96,10 @@ class _ConsentScreenState extends State<ConsentScreen> {
                     ]),
                   ),
                   const SizedBox(height: 10),
+                ],
+                if (!kIsWeb) ...[
+                  const SizedBox(height: 6),
+                  Btn('Download my consent record', icon: Icons.download_rounded, kind: BtnKind.secondary, expand: true, onTap: () => _downloadRecord(ai)),
                 ],
               ]),
             );

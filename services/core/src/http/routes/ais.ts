@@ -12,6 +12,7 @@ import { respond } from '../../modules/ai/engine.js';
 import { buildVersion, clearance, requestDeploy, requestPublish } from '../../modules/ai/lifecycle.js';
 import { listTrainings, startTraining, trainingOut } from '../../modules/ai/training.js';
 import { HEALTH_WEIGHTS, healthHistory, refreshHealth } from '../../modules/ai/health.js';
+import { consentRecord, consentRecordPdf, versionDiff } from '../../modules/ai/records.js';
 import { addEvalItem, deleteEvalItem, evalItems, evaluationOut, latestEvaluation, requestEvaluation, setVerdict } from '../../modules/ai/evaluation.js';
 import { checkSafety } from '../../modules/ai/moderation.js';
 import { indexItems, searchAis } from '../../modules/ai/semantic.js';
@@ -830,6 +831,40 @@ export async function aiRoutes(app: FastifyInstance, ctx: Ctx) {
     async (req, reply) => {
       const job = await startTraining(ctx, req.params.id, req.auth!.userId, req.ip);
       return reply.status(202).send(trainingOut(job));
+    },
+  );
+
+  // ---------------------------------------------------------------- Module 8 FE-4 and Module 6: records to download and compare
+
+  r.get(
+    '/ais/:id/consents/record',
+    { preHandler: authed, schema: { tags: ['consent'], summary: 'Every consent you gave or withdrew for this AI, as JSON or PDF', params: AiId, querystring: z.object({ format: z.enum(['json', 'pdf']).default('json') }) } },
+    async (req, reply) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      const record = await consentRecord(ctx, ai);
+      if (req.query.format === 'json') return record;
+      return reply.header('content-type', 'application/pdf').header('content-disposition', `attachment; filename="consent-${ai.handle}.pdf"`).send(consentRecordPdf(record));
+    },
+  );
+
+  r.get(
+    '/ais/:id/versions/:versionId/diff',
+    {
+      preHandler: authed,
+      schema: { tags: ['lifecycle'], summary: 'What changed in this version since another (the previous one by default)', params: z.object({ id: z.uuid(), versionId: z.uuid() }), querystring: z.object({ from: z.uuid().optional() }) },
+    },
+    async (req) => {
+      const ai = await requireOwnedAi(ctx.db, req.auth!.userId, req.params.id);
+      let from = req.query.from;
+      if (!from) {
+        const { rows } = await ctx.db.query<{ id: string }>(
+          'SELECT p.id FROM core.ai_versions v JOIN core.ai_versions p ON p.ai_id = v.ai_id AND p.version_no < v.version_no WHERE v.id = $1 ORDER BY p.version_no DESC LIMIT 1',
+          [req.params.versionId],
+        );
+        if (!rows[0]) throw new AppError(409, 'NO_PREVIOUS_VERSION', 'This is the first version; there is nothing to compare it with.');
+        from = rows[0].id;
+      }
+      return versionDiff(ctx, ai, from, req.params.versionId);
     },
   );
 

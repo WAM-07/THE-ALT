@@ -351,6 +351,17 @@ class AiApi {
   // lifecycle
   Future<AiVersionInfo> buildVersion(String id) async => AiVersionInfo(Map<String, dynamic>.from(await _call('POST', '/ais/$id/versions') as Map));
   Future<AiTraining> startTraining(String id) async => AiTraining(Map<String, dynamic>.from(await _call('POST', '/ais/$id/trainings') as Map));
+  /// Module 8: the consent record as a PDF (every consent given or withdrawn).
+  Future<List<int>> consentRecordPdf(String id) async {
+    final res = await altAccount.authorizedSend('GET', Uri.parse('${altAccount.coreUrl}/ais/$id/consents/record?format=pdf'));
+    if (res.statusCode >= 400) throw AltApiException.fromBody(res.statusCode, res.body.isEmpty ? null : jsonDecode(res.body));
+    return res.bodyBytes;
+  }
+
+  /// Module 6: what changed in a version since the previous one.
+  Future<Map<String, dynamic>> versionDiff(String id, String versionId) async =>
+      Map<String, dynamic>.from(await _call('GET', '/ais/$id/versions/$versionId/diff') as Map);
+
   Future<AiHealth> health(String id) async => AiHealth(Map<String, dynamic>.from(await _call('GET', '/ais/$id/health') as Map));
   Future<List<EvalItem>> evaluationSet(String id) async =>
       (await _call('GET', '/ais/$id/evaluation-set') as List).map((e) => EvalItem(Map<String, dynamic>.from(e as Map))).toList();

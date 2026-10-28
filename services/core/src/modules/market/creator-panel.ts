@@ -1,5 +1,6 @@
 import { formatEther } from 'viem';
 import type { Ctx } from '../../context.js';
+import { textPdf } from '../../lib/pdf.js';
 
 /**
  * Module 18: the Creator Control Panel. One place for a creator's AIs: earnings and royalties (ALTAR's
@@ -139,7 +140,7 @@ export function panelCsv(panel: CreatorPanel) {
   return [head.join(','), ...lines].join('\r\n') + '\r\n';
 }
 
-/** A one-page PDF summary (PDF 1.4, Helvetica, text only; no library needed). */
+/** A one-page PDF summary. */
 export function panelPdf(panel: CreatorPanel, person: string) {
   const lines: string[] = [
     'ALT Creator Control Panel',
@@ -158,24 +159,5 @@ export function panelPdf(panel: CreatorPanel, person: string) {
     'Recent earnings',
     ...panel.transactions.slice(0, 25).map((t) => `  ${t.at.slice(0, 10)}  ${t.kind.padEnd(12)} ${(t.aiName ?? '').slice(0, 24).padEnd(24)} ${t.you.pol} POL (${t.as})`),
   ];
-  // Text in a PDF string: escape \ ( ), and keep to the characters Helvetica's standard encoding has.
-  const esc = (s: string) => s.replace(/[\\()]/g, (c) => `\\${c}`).replace(/·/g, '-').replace(/[^\x20-\x7e]/g, '?');
-  const content = ['BT', '/F1 10 Tf', '13 TL', '50 800 Td', ...lines.slice(0, 58).map((l, i) => (i === 0 ? `/F1 14 Tf (${esc(l)}) Tj /F1 10 Tf T*` : `(${esc(l)}) Tj T*`)), 'ET'].join('\n');
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`,
-  ];
-  let out = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  objects.forEach((o, i) => {
-    offsets.push(Buffer.byteLength(out, 'latin1'));
-    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(out, 'latin1');
-  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((n) => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}`;
-  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return Buffer.from(out, 'latin1');
+  return textPdf(lines);
 }

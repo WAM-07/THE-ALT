@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/alt/ai_api.dart';
 import '../../../core/alt/alt_session.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/ds.dart';
 import '../../../core/theme/gradients.dart';
 import '../../../core/theme/typography.dart';
 import '../../../shared/ui/ui.dart';
@@ -75,6 +76,57 @@ class _VersionsScreenState extends State<VersionsScreen> {
 
   static String _short(String s) => s.length <= 20 ? s : '${s.substring(0, 10)}…${s.substring(s.length - 8)}';
 
+  /// Module 6: what changed in this version since the previous one.
+  Future<void> _showDiff(AiVersionInfo v) async {
+    final ai = currentAi.value;
+    if (ai == null) return;
+    Map<String, dynamic> d;
+    try {
+      d = await aiApi.versionDiff(ai.id, v.id);
+    } on AltApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    }
+    if (!mounted) return;
+    final persona = ((d['persona'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final data = Map<String, dynamic>.from(d['data'] as Map);
+    final mem = Map<String, dynamic>.from(d['memories'] as Map);
+    String line(Map<String, dynamic> p) {
+      final added = (p['added'] as List?)?.join(', ');
+      final removed = (p['removed'] as List?)?.join(', ');
+      if (added != null || removed != null) return '${p['field']}: ${[if (added?.isNotEmpty == true) '+ $added', if (removed?.isNotEmpty == true) '− $removed'].join('  ')}';
+      return '${p['field']}: ${p['from'] ?? '—'} → ${p['to'] ?? '—'}';
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Ds.sheet,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('v${(d['from'] as Map)['version']} → v${v.version}', style: Ds.title2),
+            const SizedBox(height: 12),
+            Text('PERSONALITY', style: Ds.overline.copyWith(fontSize: 10)),
+            const SizedBox(height: 4),
+            if (persona.isEmpty) Text('No changes', style: Ds.callout) else for (final p in persona) Text(line(p), style: Ds.callout),
+            const SizedBox(height: 12),
+            Text('DATA', style: Ds.overline.copyWith(fontSize: 10)),
+            const SizedBox(height: 4),
+            Text('${(data['added'] as List).length} added · ${(data['removed'] as List).length} removed · ${data['unchanged']} unchanged', style: Ds.callout),
+            Text('Memories: ${mem['from']} → ${mem['to']}', style: Ds.callout),
+            if (d['engineChanged'] == true) ...[
+              const SizedBox(height: 12),
+              Text('ENGINE', style: Ds.overline.copyWith(fontSize: 10)),
+              Text('${(d['from'] as Map)['engine']} → ${(d['to'] as Map)['engine']}${(d['to'] as Map)['training'] == 'simulated' ? ' (simulated training)' : ''}', style: Ds.callout),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -132,7 +184,7 @@ class _VersionsScreenState extends State<VersionsScreen> {
                         Text(_date(v.createdAt), style: ALTTypography.bodySmall),
                       ]),
                       const SizedBox(height: 6),
-                      Text('${v.datasets} data item${v.datasets == 1 ? '' : 's'} · ${v.memories} memor${v.memories == 1 ? 'y' : 'ies'}', style: ALTTypography.bodySmall),
+                      Text('${v.datasets} data item${v.datasets == 1 ? '' : 's'} · ${v.memories} memor${v.memories == 1 ? 'y' : 'ies'} · ${v.trained ? (v.simulated ? 'simulated training' : 'trained') : 'not trained'}', style: ALTTypography.bodySmall),
                       const SizedBox(height: 6),
                       _CopyRow(label: 'Manifest', value: v.manifestCid, shown: _short(v.manifestCid)),
                       if (v.onchainTx != null && !v.onchainTx!.startsWith('adopted')) _CopyRow(label: 'Transaction', value: v.onchainTx!, shown: _short(v.onchainTx!)),
@@ -142,6 +194,8 @@ class _VersionsScreenState extends State<VersionsScreen> {
                           icon: const Icon(Icons.open_in_new, size: 18),
                           label: const Text('View manifest'),
                         ),
+                        if (v.id != versions?.last.id)
+                          TextButton.icon(onPressed: () => _showDiff(v), icon: const Icon(Icons.compare_arrows_rounded, size: 18), label: const Text('What changed')),
                         const Spacer(),
                         if (publishable?.id == v.id)
                           FilledButton(onPressed: _busy ? null : () => _publish(ai!, v), child: Text('Publish v${v.version}')),
