@@ -13,7 +13,7 @@ only from real runs (the command that produced them is noted).
 | Semantic embeddings, hybrid search (bge-small) | M10, M11 | Pretrained, integrated and evaluated by us | done: nDCG@10 0.677 -> 0.737 |
 | Style match ("sounds like you") | M9, M7 | Logistic regression trained by us (style + embeddings) | done: AUC 0.739 on unseen writers |
 | Abnormal-behaviour detector (Isolation Forest + extremeness) | M16 FE-3, M7 | Retrained daily on ALT's own logs | done: recall 0.915 at 0.5% FPR (simulated) |
-| Personal AI adapter (QLoRA) | M9, M10 | Trained per AI | next phase |
+| Personal AI adapter (QLoRA) | M9, M10 | Trained per AI (`services/trainer`) | code done 2026-11-03; first real run waits for the GPU set-up |
 
 ## Decisions (owner)
 

@@ -1,6 +1,8 @@
 # Progress
 
-The live status of the 60% sprint. Update this whenever work lands. The design is in `ROADMAP.md`; rules for agents are in `AGENTS.md`.
+The live status of The ALT Ecosystem. Update this whenever work lands. The design is in `ROADMAP.md`; rules for agents are in `AGENTS.md`; the owner's own tasks, step by step, are in `docs/owner-guide.md`.
+
+> **Where things stand now: see "Road to 100%" below (overview table first).** The sections in between are the history of the 60% sprint (2026-10-11 to 10-20), kept for the report.
 
 **Sprint:** 7 days, starting 2026-10-11. Target: 12+ complete modules, all running from `npm run dev`.
 
@@ -18,8 +20,9 @@ The live status of the 60% sprint. Update this whenever work lands. The design i
 
 ```bash
 npm install
-npm test                        # contracts 36 · core 101 · gateway 10 · altera-api 17 · altar-api 6 (real PostgreSQL and a real local chain)
-cd packages/alt_account && C:\flutter\bin\flutter test    # 12 tests
+npm test                        # contracts 42 · core 151 · gateway 10 · altera-api 25 · altar-api 6 (real PostgreSQL and a real local chain)
+cd services/trainer && python -m unittest discover -s tests   # 5 tests, no GPU needed
+cd packages/alt_account && C:\flutter\bin\flutter test    # 26 tests
 cd apps/altera && C:\flutter\bin\flutter test             # app boots signed out → onboarding
 cd apps/alter  && C:\flutter\bin\flutter test             # boots signed out → sign-in; tag editor, avatar, offline screen
 cd apps/altar-web && npx eslint . && npx next build   # ALTAR web
@@ -567,38 +570,108 @@ Work one step at a time, then stop for the owner's review before starting the ne
 - **Next, after the 60% evaluation** (`ROADMAP.md` §9, in this order): M9 Training Manager (embeddings, style guide, evaluation set and readiness score; text and PDF reading with BM25 is done), M7 Health Score, M18 Creator Control Panel (replaces the mocked one), M3 Admin & Governance, M12 completion (auctions and licence terms), M5 completion (audit explorer, audit hash anchored on-chain).
 
 ## Road to 100% (owner, 2026-10-28: "complete the 100% of the project")
-One reviewed step at a time. Steps marked (manual) need the owner first; see "Owner's manual list" below.
-- [x] **S1 Hardening (done 2026-10-28):** the ALTERA block/unblock bug fixed (`actingProfileId` in `routes/profiles.js`: `blocker_id` must be the caller or one of their own AIs, else 403 `NOT_YOUR_PROFILE`; the profile page's block status uses the same check); the missing ALTERA foreign keys (`0006_missing_foreign_keys.sql`: comments/likes `user_id` → `core.users`, messages ↔ conversations deferrable, added `NOT VALID` then validated where old rows are clean), with a DM now saved with its conversation in one transaction (`deliverDm`); the report's Unit Tests 01–03 as named tests (`services/core/test/report-unit-tests.test.ts`, `npx vitest run -t "Unit Test 03"`) and Unit Test 04 (`packages/contracts/test/ReportUnitTest04.test.ts`, `--grep "Unit Test 04"`); both contracts at 100% line coverage (new subscription-guard test); GitHub Actions `.github/workflows/ci.yml` (typecheck, every backend test, contract coverage, `flutter analyze` + `flutter test` for alt_account, ALTER, ALTERA). Backend tests now 209 (Core 129, contracts 42, ALTERA 22, gateway 10, ALTAR 6) + Flutter 32 = 241.
-- [x] **ALTERA keyboard fix (2026-10-28, owner's report):** the frosted bottom bar could cover the text being typed. The bar now hides while the keyboard is open (`home_shell.dart`), and every bottom sheet opens above the home screen (`useRootNavigator: true`), so the bar can never sit over a sheet's text box. Test: `apps/altera/test/home_shell_keyboard_test.dart`. To check on the owner's Xiaomi (Android 13).
-- [x] **S2 Engine slot and training gate (E1), done 2026-10-28:** migration `0014_engine_slot.sql` (versions record `engine` base/adapter, `training_mode` cloud/local/simulated, training job, adapter hash and URI, readiness, all immutable; training jobs freeze the consented data when they start and record checkpoints, the claiming trainer, its lease, the adapter, scores and data deletion). `modules/ai/training.ts`: `POST/GET /ais/:id/trainings`; **only a trained version passes clearance** (new check `trained`) and can be published (`VERSION_NOT_TRAINED`); the manifest certifies the engine. `TRAINING_MODE=simulated` (default outside production) runs the labelled simulated training as a job (`simulate_training`, `TRAINING_SIMULATED_SECONDS`, 10 s); `TRAINING_MODE=trainer` queues jobs for the **trainer socket** (`http/routes/trainer.ts`, service key: claim with a 30-minute lease, consented data export, checkpoints, adapter back with `dataDeleted: true`, fail; withdrawn consent stops it). **Inference socket:** a version trained for real answers through `ADAPTER_INFERENCE_URL` (`POST /v1/adapter-chat`), else the base engine. Tests `services/core/test/training.test.ts` (stand-in trainer and adapter server); every deploy in the tests, ALTERA's tests and `seed-demo.mjs` now trains first. ALTER: the clearance check "trained" starts a training and shows its stage (the full Train / Test / Approve screens are S4/E3). Seeded AIs are labelled demo since 2026-10-29: `core/0018_demo_label.sql` (`personal_ais.is_demo`), `PUT /admin/ais/:id/demo` (admin, audited), set by `seed-demo.mjs` at the end of the story through the demo admin; shown as "Demo" in ALTER (identity card), ALTAR (card and details) and ALTERA (a trait, synced into `altera/0009`). The owner's saved demo was made before this, so its AIs stay unlabelled until a fresh demo (or an admin labels them in the API).
-- [ ] **S3 The real trainer (M9, M10 FE-5):** QLoRA in `services/ml` (Python, `transformers`, `peft`, `bitsandbytes`, `trl`) on a 3–4B open base model; adapter serving with multi-LoRA (llama.cpp or vLLM); the persona engine sends `adapter` versions there. (manual: GPU set-up, base-model choice)
-- [x] **S4 Readiness and approval (E2, E3), done 2026-10-28:** migration `0015_readiness.sql`; `modules/ai/evaluation.ts`. The owner's **evaluation set** (questions with their own answers, answers encrypted, owner-only: `GET/POST/DELETE /ais/:id/evaluation-set`); each finished training is **evaluated** at once (job `evaluate_version`; also `POST /ais/:id/versions/:vid/evaluate`): the version answers every question, each answer is moderated and scored on meaning (bge-small embeddings, or shared words without the ML service) and style (the style-match model, once there are 5 writing samples), 0.7 / 0.3; **readiness** = the mean, 0–100, saved on the version. **Approval loop:** `POST /ais/:id/versions/:vid/verdict` (approve, or "train again"); a new version needs a new approval; `/confirm` gives the verdict on the latest trained version. **ALT's system check** (clearance `ready`): `CLEARANCE_MIN_EVAL_ITEMS` questions and `CLEARANCE_MIN_READINESS`, all answers safe. ALTER: **Readiness** screen (questions, its answers next to yours with scores, ask again, approve / train again), reached from Identity. Tests `services/core/test/readiness.test.ts`. **Owner to confirm:** the production defaults (3 questions, 50% readiness) and the 0.7 meaning / 0.3 style weights; in development and the demo they are 0 (shown, not enforced).
-- [x] **S5 Bring a trained AI (E4), adapters done 2026-10-28:** `POST /ais/:id/trainings/local` (multipart, up to 512 MB, streamed to disk while hashed): only real LoRA adapters (safetensors header or GGUF magic) are accepted, stored under `STORAGE_DIR/adapters/<sha256>.<format>`, and become a trained version with training `local` ("trained locally"), which then goes through the same readiness, safety and approval checks; ALT's inference server fetches it from `GET /internal/trainer/adapters/:file` (service key). ALTER: Identity → Bring an adapter you trained. Tests in `services/core/test/training.test.ts`. **Not done, owner's decision:** connecting a company's own hosted AI endpoint (people's messages would leave ALT and Core would call outside servers: needs a consent rule and an allow-list).
-- [x] **S6 M7 Health Score (E5), done 2026-10-28:** `modules/ai/health.ts`, migrations `core/0016_health.sql` (history with its parts) and `altar/0004_ai_ratings_view.sql` (ALTAR's ratings as a view Core reads). One score 0–100 from safe replies (share blocked by moderation, 30 days), reports (Command Centre cases, 90 days, dismissed excluded), readiness of the live version, ALTAR rating and median reply time; parts with no data are left out; readiness lost since the previous version is subtracted (drift). Recomputed hourly for live AIs (`startHealthScores` in `index.ts`) and when the owner opens it (`GET /ais/:id/health`: score, parts, history); ALTERA re-syncs at once (`alt_ai_events`) and ALTAR already ranks and shows it; the owner is told in the ALT inbox when it falls below 60. ALTER: Health row with its breakdown on Identity. Tests `services/core/test/health.test.ts`. **Owner to confirm:** the weights (safety 0.35, reports 0.25, readiness 0.2, rating 0.1, speed 0.1) and the alert line (60).
-- [x] **S7 M18 Creator Control Panel (E6), done 2026-10-28:** `modules/market/creator-panel.ts`, `GET /me/creator-panel` and `GET /me/creator-panel/export?format=csv|pdf`. Earnings as seller or owner and royalties as creator, by kind and by month, from ALTAR's `altar.creator_earnings` view (`altar/0005`, the contract's events); engagement (followers, posts, likes, comments) from ALTERA's `altera.ai_engagement` view (`altera/0007`); health and versions (trained, live, readiness) from Core. CSV (formula-safe) and a one-page PDF written without a library (checked by reading it back with unpdf). ALTER: Settings → **Creator panel** (copy CSV, save PDF on phones). Pricing stays where it is signed: ALTAR's listing (`PUT /ais/:id/market`); licence terms come with M12 (S10, owner's decision). Tests `services/core/test/creator-panel.test.ts`.
-- [x] **AI-to-AI messages (M14 FE-1, owner's request 2026-10-29):** `core/0019_ai_messages.sql`, `modules/ai/ai-messages.ts`, routes `/ais/:id/ai-threads[/:threadId]`, `POST /ais/:id/ai-messages` (your AI writes a draft from your brief, to an AI by handle or in a thread, persona channel `ai_message`), `POST .../:messageId/send` (as written or edited, moderated again), `DELETE` (discard), `PUT /ais/:id/ai-messages/settings` (accept from verified AIs, or off). The recipient's owner is told in the ALT inbox, and **their AI passes the message on** when they chat with it in ALTER (`aiInbox` in the prompt, marked as information, never instructions). Safety: verified AIs on both sides, every message approved by its owner (so AIs never answer each other on their own), moderation, 30 per AI a day, the brief encrypted and seen only by its writer, each owner sees only what their AI sent or received while they owned it, the audit log records who and when, never the words. ALTER: Home → AI messages (conversations, brief → draft → send / edit / discard, the accept switch). ALTERA could show the same conversations later (the API is account-wide). Tests `services/core/test/ai-messages.test.ts`.
-- [x] **ALTERA M13/M14/M15 gaps, done 2026-10-28:** **AI-to-AI** comments (M14 FE-1, `services/ai_conversation.js`): when a verified AI's post is published, verified AIs that follow it and have autonomy may comment through Core's persona engine (moderated), with loop limits (posts only, never comments; 2 AI comments per post; 10 per AI a day; never across a block) and each one traced in `activity_log` (`ai_comment`, FE-4). **Feed:** engagement-level filter `engagement=low|medium|high` (M13 FE-4, M14 FE-6; ALTERA chip "High engagement"), and the AI's real category from ALTER first (the bio guess only for older profiles). **Influence** (M15 FE-4): `altera/0008_ai_influence.sql` adds a 0–100 influence to ALTERA's engagement view, shown in the Creator panel. **Conditional publishing (M15 FE-2), beta since 2026-10-29:** `altera/0010_conditional_posts.sql`, `routes/conditional.js` (`/conditional-posts`: create with 2 to 4 outcomes, each version moderated up front; list; resolve with the outcome that happened, which publishes that version as you or your verified AI and lets other AIs comment; cancel; an optional deadline after which it expires). ALTERA: the composer's split icon → Conditional posts (beta). The owner says what happened (no automatic outcome source yet).
-- [x] **M8 consent record and M6 version diff, done 2026-10-28:** `modules/ai/records.ts`. `GET /ais/:id/consents/record?format=json|pdf`: every consent given or withdrawn, with the words agreed to, policy version and IP (ALTER: Consent → Download my consent record). `GET /ais/:id/versions/:vid/diff[?from=]`: persona changes (private instructions only as set / not set), data added and removed by fingerprint, memories, engine (ALTER: Version history → What changed). Shared text PDF writer `lib/pdf.ts`. Tests `services/core/test/records.test.ts`.
-- [~] **M5 forensics (2026-10-28), backend done:** `modules/ai/forensics.ts`, `GET /admin/ais?q=` (least healthy first) and `GET /admin/ais/:id/timeline?days=` (admin, moderator, auditor): replies, blocked replies and reply time per day, health history, versions with engine/readiness/verdict, cases and audit entries. Test `services/core/test/forensics.test.ts`. Command Centre page **07 AIs** (`apps/command-centre/src/app/ais/page.js`, 2026-10-29): search, then the AI's 30 days, versions, cases and audit trail. **Left:** anchoring the audit hash on-chain (contract change, needs the owner's OK for `npm run demo -- --fresh`).
-- [ ] **S8 M5 completion (E7):** the audit log's latest hash anchored on-chain on a schedule (a new contract or registry function), verification against the anchor; an AI's behaviour over time in the Command Centre (forensics).
-- [~] **S9 M2 and M6 completion (2026-10-28):** done: **notification preferences** (`core/0017_notification_settings.sql`, `modules/notifications/settings.ts`, `GET/PUT /notifications/settings`): mute a category in the inbox or on the phone (`notify` and `PushSender` respect it; security and system notices never muted), and an **e-mail digest** of unread notifications, daily or weekly (`startDigests`, hourly check, one Core at a time); in both apps through `AltInboxScreen` (the tune icon). M6's version diff is done (above). Still needs the owner: **push on** (Firebase) and **Pinata** in production. Tests `services/core/test/notification-settings.test.ts`.
-- [ ] **S10 Remaining features of presented modules:** M12 auctions and licence terms (contract change: redeploy, needs `npm run demo -- --fresh`, owner's OK); M14 AI-to-AI conversation with loop limits; M15 influence metric; M13 engagement-threshold filter; M10 streamed replies; M8 downloadable consent record; M3 staff review before minting (**done 2026-10-29**: `DEPLOY_REVIEW=true` turns it on; a deploy that passes every check opens a `review` case (`core/0020`), moderators approve it in the Command Centre case page, which starts the mint, or reject it with a reason; the owner hears either way in the ALT inbox; ALTER says "sent for review"; tests `deploy-review.test.ts`); M1 Google sign-in buttons (manual: client ids); M16 Urdu / Roman Urdu moderation (manual: data decision).
-- [ ] **S11 Public network and production:** Polygon Amoy deployment and verification (manual: funded keys, RPC), Pinata, production hosting with HTTPS, backups and monitoring (manual: hosting choice).
-- [ ] **S12 The 100% report:** Chapter 4 and 5 for all 18 modules, full test results, ML and training evaluations from `docs/report-log/`.
 
-### Owner's manual list (things only the owner can do)
-1. **Firebase project** (M2 push): add the Android apps `com.altecosystem.alter` and `com.alteraapp.altera_app`, put each `google-services.json` in `apps/<app>/android/app/`, generate a service-account key and set `FCM_SERVICE_ACCOUNT` (steps under C3 above).
-2. **Google sign-in** (M1): Google Cloud OAuth client ids (web + one Android id per app with its SHA-1), then `GOOGLE_CLIENT_IDS` and `GOOGLE_SERVER_CLIENT_ID`.
-3. **Polygon Amoy** (S11): a deployer wallet with faucet POL, separate relayer and governor wallets (funded), an RPC URL (e.g. Alchemy); keys only in your shell or `.env`, never in chat.
-4. **Pinata** (S9, S11): an account and a JWT for `PINATA_JWT`.
-5. **GPU for training** (S3): NVIDIA driver and CUDA on the RTX 3070 PC, or a rented cloud GPU; a Hugging Face account (and accepting the licence if the base model is Llama). Choose the base model with Wamiq's recommendation.
-6. **Real training and evaluation data** (S3, S4): each team member chats with their AI and writes 20–30 question-and-answer pairs in their own words (the evaluation set).
-7. **Urdu / Roman Urdu moderation data** (S10): approve a public dataset or label a few hundred messages.
-8. **Decisions:** auction type and licence terms (M12), health-score weights (M7), production hosting and budget (S11), whether to keep the beta running.
-9. **Approve `npm run demo -- --fresh`** after the contract changes (M12 auctions, M5 anchoring): it replaces the saved demo.
-10. **Phone checks** after each app step, and screenshots for the report.
-11. **The report:** writing review, Turnitin, supervisor meetings, each member's contribution section.
-12. **Security housekeeping:** revoke the old Groq key (still pending).
+**Updated 2026-11-03.** One reviewed step at a time. ✅ done · 🟡 partly done · ⛔ waiting for the owner (see `docs/owner-guide.md` for exactly how). Every step below lists what was built, where, how it is tested and what is left.
+
+### Overview
+
+| Step | What | Status | What is left, and who |
+|---|---|---|---|
+| S1 | Hardening: bugs, foreign keys, report unit tests, 100% contract coverage, CI | ✅ 2026-10-28 | – |
+| – | ALTERA keyboard fix | ✅ 2026-10-28 | Owner: check on the Xiaomi phone (guide §B1) |
+| S2 | Engine slot and training gate (only trained AIs are verified) | ✅ 2026-10-28 | – |
+| S3 | The real trainer (QLoRA) and adapter inference | 🟡 code done 2026-11-03, not yet run on a GPU | Owner: set up the RTX 3070 and run it (guide §A1); then I check the first real training |
+| S4 | Readiness, approval loop, ALTER Readiness screen | ✅ 2026-10-28 | Owner: confirm the defaults (guide §D1); each member writes questions (guide §C1) |
+| S5 | Bring a trained AI: adapter upload | ✅ 2026-10-28 | Company endpoints on hold (owner, 2026-10-29) |
+| S6 | M7 Health Score | ✅ 2026-10-28 | Owner: confirm weights (guide §D1) |
+| S7 | M18 Creator Control Panel, CSV/PDF | ✅ 2026-10-28 | – |
+| S8 | M5: forensics view ✅; audit hash anchored on-chain | 🟡 | ⛔ contract change: owner's OK to replace the saved demo (guide §D3) |
+| S9 | M2 notification settings and digests ✅, M6 version diff ✅; push; Pinata | 🟡 | ⛔ Firebase (guide §A3), Pinata (guide §A5) |
+| S10 | Remaining features of presented modules | 🟡 see the list in S10 below | ⛔ auctions/licences (guide §D2), Google sign-in (guide §A4), Urdu data (guide §C2) |
+| S11 | Polygon Amoy, production hosting | ⛔ | Owner: wallets and RPC (guide §A6), a server (guide §A7) |
+| S12 | The 100% report | ⬜ not started | After S3 runs for real; owner: writing review, Turnitin (guide §E) |
+| – | AI-to-AI messages (owner's request) | ✅ 2026-10-29 | Optional later: show them in ALTERA too |
+| – | Conditional posts (beta) | ✅ 2026-10-29 | Optional later: an automatic outcome source |
+| – | Demo AIs labelled "demo" | ✅ 2026-10-29 | The saved demo stays unlabelled until a fresh demo |
+| – | Dependencies (Next.js critical fix) | ✅ 2026-10-29 | Hardhat tooling advisories need a Hardhat major upgrade (later) |
+
+**Tests (2026-11-03):** backend 234 (Core 151, contracts 42, ALTERA 25, gateway 10, ALTAR 6) · Flutter 34 (alt_account 26, ALTER 5, ALTERA 3) · trainer 5 (Python, no GPU) = **273**, all passing. CI on GitHub runs all of them on every push (first green run 2026-10-28).
+
+### S1 Hardening ✅ (2026-10-28)
+- ALTERA block/unblock bug fixed: `actingProfileId` in `services/altera-api/src/routes/profiles.js`; `blocker_id` must be the caller or one of their own AIs (else 403 `NOT_YOUR_PROFILE`); the profile page's block status uses the same check.
+- ALTERA's missing foreign keys: `altera/0006_missing_foreign_keys.sql` (comments/likes `user_id` → `core.users`; messages ↔ conversations, deferrable), added `NOT VALID` then validated where old rows are clean. A DM and its conversation are saved in one transaction (`deliverDm`).
+- The report's Unit Tests 01–03 as named tests: `services/core/test/report-unit-tests.test.ts` (`npx vitest run -t "Unit Test 03"`); Unit Test 04: `packages/contracts/test/ReportUnitTest04.test.ts` (`--grep "Unit Test 04"`).
+- Both contracts at 100% line coverage.
+- GitHub Actions `.github/workflows/ci.yml`: typecheck, every backend test, contract coverage, `flutter analyze` (errors only) and `flutter test` for alt_account, ALTER, ALTERA, and the trainer's Python tests.
+
+### ALTERA keyboard fix ✅ (2026-10-28)
+The frosted bottom bar hides while the keyboard is open (`apps/altera/lib/screens/home/home_shell.dart`) and every bottom sheet opens above the home screen (`useRootNavigator: true`). Test: `apps/altera/test/home_shell_keyboard_test.dart`. **To check on the owner's Xiaomi (Android 13).**
+
+### S2 Engine slot and training gate ✅ (2026-10-28)
+- `core/0014_engine_slot.sql`: versions record `engine` (base/adapter), `training_mode` (cloud/local/simulated), training job, adapter hash and URI, readiness, all immutable. Training jobs freeze the consented data when they start and record checkpoints, the claiming trainer and its lease, the adapter, scores and data deletion.
+- `services/core/src/modules/ai/training.ts`: `POST/GET /ais/:id/trainings`. **Only a trained version passes clearance** (check `trained`) and can be published (`VERSION_NOT_TRAINED`); the manifest certifies the engine.
+- `TRAINING_MODE=simulated` (default outside production): ALT's labelled simulated training (job `simulate_training`, `TRAINING_SIMULATED_SECONDS`, 10 s). `TRAINING_MODE=trainer`: trainings wait for a real trainer at the **trainer socket** (`http/routes/trainer.ts`, service key): claim (30-minute lease), consented data export, checkpoints, adapter upload, complete with `dataDeleted: true`, fail; withdrawn consent stops it.
+- **Inference socket:** a version trained for real answers through `ADAPTER_INFERENCE_URL` (`POST /v1/adapter-chat`, with the service key), otherwise the base engine.
+- Tests: `services/core/test/training.test.ts` (stand-in trainer and adapter server). Every deploy in the tests, ALTERA's tests and `scripts/seed-demo.mjs` trains first. ALTER: the clearance check "trained" starts a training and shows its progress.
+
+### S3 The real trainer 🟡 (code 2026-11-03; waiting for the GPU)
+- `services/trainer/` (Python; README with the full set-up): `trainer.py` (takes trainings from Core, `--check`, `--once`), `qlora.py` (QLoRA: base model in 4-bit NF4, LoRA rank 16 on attention and MLP layers, 3 epochs, lr 2e-4, cosine, paged AdamW 8-bit, only assistant turns learned), `dataset.py` (examples from the owner's writing samples, documents in passages and memories), `adapter_file.py` (one file per adapter: weights with the PEFT config in the safetensors header), `alt_client.py` (the socket, standard library), `inference.py` (FastAPI, base model loaded once, adapters fetched from Core, checked by SHA-256, switched per request).
+- Default base model **Qwen/Qwen2.5-3B-Instruct** (Apache-2.0, no sign-up, fits 8 GB in 4-bit); `TRAINER_BASE_MODEL` changes it.
+- Core changes: the data export adds the owner's **writing samples** (their chat messages and "communication style" items); `POST /internal/trainer/jobs/:id/adapter` stores the trainer's adapter under its fingerprint (`alt://adapters/<sha256>.safetensors`); the version records the open **base model** it was trained on; inference calls carry the service key.
+- Tests: `services/trainer/tests/test_trainer.py` (dataset, adapter file round trip, the whole claim → train → upload → complete loop against a stand-in Core, failures reported) and the Core trainer-socket test (upload, samples, base model).
+- **Left:** run it on the RTX 3070 (owner: guide §A1); then measure a real training (time, loss, readiness before/after) for the report.
+
+### S4 Readiness and approval ✅ (2026-10-28)
+- `core/0015_readiness.sql`, `modules/ai/evaluation.ts`. The owner's **evaluation set** (questions with their own answers; answers encrypted; owner-only: `GET/POST/DELETE /ais/:id/evaluation-set`).
+- Every finished training is **evaluated** (job `evaluate_version`; also `POST /ais/:id/versions/:vid/evaluate`): each answer moderated and scored on meaning (bge-small embeddings, or shared words without the ML service) and style (style-match model once there are 5 writing samples), 0.7 / 0.3. **Readiness** = the mean, 0–100.
+- **Approval loop:** `POST /ais/:id/versions/:vid/verdict` (approve, or train again); a new version needs a new approval.
+- **ALT's system check** (clearance `ready`): `CLEARANCE_MIN_EVAL_ITEMS` and `CLEARANCE_MIN_READINESS` (production 3 and 50; development 0 and 0), all answers safe.
+- ALTER: **Readiness** screen (Home → Readiness, or Identity). Tests `services/core/test/readiness.test.ts`.
+
+### S5 Bring a trained AI ✅ (2026-10-28)
+`POST /ais/:id/trainings/local` (multipart, up to 512 MB, streamed and hashed): only real LoRA adapters (safetensors header or GGUF magic), stored under `STORAGE_DIR/adapters/`, become a version "trained locally" with the same checks. The inference server fetches it from `GET /internal/trainer/adapters/:file`. ALTER: Identity → Bring an adapter you trained. **On hold (owner, 2026-10-29):** company AI endpoints (messages would leave ALT; needs a consent rule and an allow-list).
+
+### S6 M7 Health Score ✅ (2026-10-28)
+`modules/ai/health.ts`, `core/0016_health.sql`, `altar/0004_ai_ratings_view.sql`. 0–100 from safe replies (30 days), reports (90 days, dismissed excluded), readiness, ALTAR rating, median reply time; missing parts left out; drift subtracted. Hourly (`startHealthScores`) and on `GET /ais/:id/health`; ALTERA re-syncs at once; ALTAR ranks by it; inbox alert below 60. ALTER: Identity → Health. Tests `health.test.ts`. Weights: safety 0.35, reports 0.25, readiness 0.2, rating 0.1, speed 0.1 (**owner to confirm**).
+
+### S7 M18 Creator Control Panel ✅ (2026-10-28)
+`modules/market/creator-panel.ts`, `GET /me/creator-panel`, `GET /me/creator-panel/export?format=csv|pdf`. Earnings and royalties from ALTAR's `altar.creator_earnings` view (`altar/0005`), engagement and influence from ALTERA's `altera.ai_engagement` view (`altera/0007`, `0008`), health and versions from Core. ALTER: Settings → Creator panel. Tests `creator-panel.test.ts`.
+
+### S8 M5 completion 🟡
+- ✅ Forensics (2026-10-28/29): `modules/ai/forensics.ts`, `GET /admin/ais?q=`, `GET /admin/ais/:id/timeline`; Command Centre page **07 AIs**. Test `forensics.test.ts`.
+- ⛔ The audit log's latest hash recorded on-chain on a schedule: a contract change, which replaces the saved demo (`npm run demo -- --fresh`). Needs the owner's OK (guide §D3).
+
+### S9 M2 and M6 completion 🟡
+- ✅ Notification settings (`core/0017`, `modules/notifications/settings.ts`, `GET/PUT /notifications/settings`): mute a category in the inbox or on the phone (never security/system), e-mail digest daily or weekly (`startDigests`); both apps through `AltInboxScreen` (tune icon). Tests `notification-settings.test.ts`.
+- ✅ M8 consent record (`GET /ais/:id/consents/record?format=json|pdf`) and M6 version diff (`GET /ais/:id/versions/:vid/diff`): `modules/ai/records.ts`, `lib/pdf.ts`; ALTER: Consent → Download, Version history → What changed. Tests `records.test.ts`.
+- ⛔ Push notifications on (Firebase, guide §A3). ⛔ Pinata in production (guide §A5).
+
+### S10 Remaining features of presented modules 🟡
+| Item | Status |
+|---|---|
+| M14 AI-to-AI comments with loop limits (`services/altera-api/src/services/ai_conversation.js`) | ✅ 2026-10-28 |
+| M14 AI-to-AI messages between people's AIs (`core/0019`, `modules/ai/ai-messages.ts`, ALTER Home → AI messages) | ✅ 2026-10-29 |
+| M15 influence metric (`altera/0008`) | ✅ 2026-10-28 |
+| M15 conditional posts, beta (`altera/0010`, `routes/conditional.js`, ALTERA composer split icon) | ✅ 2026-10-29 |
+| M13 engagement-level filter, real AI category | ✅ 2026-10-28 |
+| M8 downloadable consent record | ✅ 2026-10-28 |
+| M3 staff review before minting (`DEPLOY_REVIEW=true`, `core/0020`, Command Centre case page) | ✅ 2026-10-29 |
+| M10 streamed replies | ⏸ owner's decision 2026-10-29: not streamed, because moderation checks the whole reply first |
+| M12 auctions and licence terms | ⛔ owner's decision on the rules (guide §D2), then a contract change (guide §D3) |
+| M1 Google sign-in buttons | ⛔ client ids (guide §A4) |
+| M16 Urdu / Roman Urdu moderation | ⛔ data decision (guide §C2) |
+
+### S11 Public network and production ⛔
+Polygon Amoy deployment and verification (guide §A6), Pinata (§A5), a server with HTTPS, backups and monitoring (§A7). The beta server (friend's AWS, 2026-10-20) has expired: it no longer answers (checked 2026-10-29).
+
+### S12 The 100% report ⬜
+Chapters 4 and 5 for all 18 modules, the full test results above, the ML and training evaluations (`docs/report-log/`). Starts after S3 has run for real.
+
+### The owner's tasks
+Everything only the owner can do, with exact steps, is in **`docs/owner-guide.md`**: A accounts and keys (GPU, Firebase, Google, Pinata, Amoy, a server, the old Groq key), B checks on the phone, C data (evaluation questions, Urdu), D decisions (defaults, auctions, the saved demo), E the report.
+
+### New settings since 2026-10-28 (all in `.env.example`)
+`TRAINING_MODE` (simulated | trainer), `TRAINING_SIMULATED_SECONDS`, `ADAPTER_INFERENCE_URL`, `CLEARANCE_MIN_EVAL_ITEMS`, `CLEARANCE_MIN_READINESS`, `DEPLOY_REVIEW`; the trainer's own: `CORE_URL`, `TRAINER_NAME`, `TRAINER_BASE_MODEL`, `TRAINER_EPOCHS`, `POLL_SECONDS`, `ADAPTER_CACHE`.
 
 ## Known bugs (found 2026-10-21; both fixed 2026-10-28 in S1 above, kept here for the record)
 - **ALTERA block/unblock trusts a client-sent id (security).** `POST` and `DELETE /profiles/:id/block` in `services/altera-api/src/routes/profiles.js` (around lines 439 and 464) use `req.query.blocker_id || req.userId` without checking that `blocker_id` is the caller or one of the caller's own AI profiles (the follow route in `routes/follows.js` does check this). Any signed-in person could block or unblock in another profile's name and, because blocking also deletes follows both ways, remove the follows between any two profiles. Fix: accept `blocker_id` only if it equals `req.userId` or is an `ai_profiles.id` with `user_id = req.userId` (403 otherwise), plus an ALTERA test.
@@ -608,8 +681,8 @@ One reviewed step at a time. Steps marked (manual) need the owner first; see "Ow
 - Next.js 16.4.0 → **16.4.3** in both websites (critical advisory), DiceBear 9.4.3 (SVG injection), and every semver-compatible fix from `npm audit fix` (body-parser, fast-uri, fastify, ip-address, nodemailer, qs, undici…). Left on purpose: `uuid` 10 in ALTERA (the advisory covers v3/v5/v6 with a buffer; ALTERA uses only v4) and zod 3 inside Hardhat's own test tooling (development only; the fix is a Hardhat major change). Core runs zod 4.6.7.
 
 ## Known mocks / not real yet
-- **Simulated training (`TRAINING_MODE=simulated`, development and the demo):** `modules/ai/training.ts` `runSimulatedTraining` walks labelled checkpoints and trains no weights; its "adapter" is a fingerprint of the data it would have used. The version's manifest says `"training": "simulated"` with the note "Simulated training: no model weights were trained.", the API returns `simulated: true`, and ALTER says "Simulated training". Replaced by the real trainer (S3) through `/internal/trainer`.
-- **Beta server:** its blockchain is ALT's private test chain (31337), not Polygon Amoy, and the 100 POL each account starts with is test POL on it (real transactions, no value, not on polygonscan).
+- **Simulated training (`TRAINING_MODE=simulated`, development and the demo):** `modules/ai/training.ts` `runSimulatedTraining` walks labelled checkpoints and trains no weights; its "adapter" is a fingerprint of the data it would have used. The version's manifest says `"training": "simulated"` with the note "Simulated training: no model weights were trained.", the API returns `simulated: true`, and ALTER says "Simulated training". The real trainer (`services/trainer`, S3) replaces it with `TRAINING_MODE=trainer`; it is written and tested without a GPU but has not run a real training yet.
+- **Beta server (expired):** it ran 2026-10-20 to about 10-27 on a friend's AWS and no longer answers. Its blockchain was ALT's private test chain (31337), not Polygon Amoy; the 100 POL each account started with was test POL (no value).
 - **ALTAR:**
   - Renters and subscribers talk to the AI in all three apps; on ALTERA it drafts posts, comments and replies (DM replies stay the person's own).
   - Subscriptions are not replayed when the local dev chain restarts (like rentals).
@@ -623,7 +696,7 @@ One reviewed step at a time. Steps marked (manual) need the owner first; see "Ow
 - **Persona engine:** Groq first, then Gemini, then DeepSeek, using keys from the root `.env`. DeepSeek's account has no balance, so it answers 402 and is skipped. With no keys at all, development falls back to a labelled `[mock]` reply. The owner also needs the `third_party_processing` consent switched on.
 - **The ALT sign-in card:** "Continue with ALTER/ALTERA" can't show the other app's account name before you tap it (apps can't read each other's data); it says which app, and that app shows the account when it asks you to confirm. Remembered accounts are per app (name, handle, email, picture in encrypted storage). The apps target Android only (owner, 2026-10-15); iOS is out of scope.
 - **Push notifications need the owner's Firebase project** (see C3: `google-services.json` for each app and `FCM_SERVICE_ACCOUNT`). Until then the ALT inbox is live only while an app is open. One Core instance sends the pushes (each instance listens, so several would send duplicates).
-- **"Training" means building a version:** persona, consented data and approved memories, frozen and hashed. Text files and PDFs are read, with hybrid retrieval over passages (embeddings + BM25 with the ML service, BM25 alone without it). Images, voice notes and scanned PDFs (no text layer) are stored but not read yet. PDFs uploaded before 2026-10-15 need uploading again to be read.
+- **A base version ("Build a new version") is not training:** persona, consented data and approved memories, frozen and hashed; it can be tested but not verified (see S2). Text files and PDFs are read, with hybrid retrieval over passages (embeddings + BM25 with the ML service, BM25 alone without it). Images, voice notes and scanned PDFs (no text layer) are stored but not read yet. PDFs uploaded before 2026-10-15 need uploading again to be read.
 - **The demo keeps its chain; `npm run dev` doesn't.** `npm run demo` saves every block of its local chain (`.data/demo-chain.json` + `.jsonl`, `scripts/chain/journal.mjs`) and replays them on the next start, on the original dates, so tokens, balances, listings, rentals and subscriptions survive with the database (checked: all 47 blocks replayed with identical state roots). Changing the smart contracts needs `npm run demo -- --fresh`. **The local chain resets on every `npm run dev`.** Core re-mints the tokens recorded in the database onto it, so verified AIs stay verified. Token transfers and rentals on the old chain are not replayed. Use `npm run dev -- --reset-db` for a clean slate, or `CHAIN_MODE=amoy` for a persistent chain.
 - **Google sign-in** works in Core but the apps hide the button until `GOOGLE_CLIENT_IDS` (Core) and `GOOGLE_SERVER_CLIENT_ID` (app) are configured and the `google_sign_in` plugin is added.
 
