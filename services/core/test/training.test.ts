@@ -88,6 +88,9 @@ describe('the trainer socket (TRAINING_MODE=trainer)', () => {
   it('a trainer claims the job, gets the consented data, reports checkpoints and returns the adapter', async () => {
     const u = await signUp(real);
     const ai = await newAi(real, u.accessToken);
+    // The owner talks to it in ALTER: their own messages are writing samples.
+    const session = (await real.app.inject({ method: 'POST', url: `/ais/${ai.id}/chat/sessions`, headers: auth(u.accessToken), payload: {} })).json();
+    await real.app.inject({ method: 'POST', url: `/ais/${ai.id}/chat/sessions/${session.id}/messages`, headers: auth(u.accessToken), payload: { content: 'Honestly I think BFS is the easiest graph search to explain.' } });
     const start = (await real.app.inject({ method: 'POST', url: `/ais/${ai.id}/trainings`, headers: auth(u.accessToken) })).json();
     expect(start).toMatchObject({ status: 'queued', mode: 'cloud', simulated: false, stage: 'waiting for a trainer' });
     await real.app.jobs.drain(); // nothing simulated runs
@@ -107,7 +110,9 @@ describe('the trainer socket (TRAINING_MODE=trainer)', () => {
     // Another trainer can't touch it.
     expect((await real.app.inject({ method: 'GET', url: claimed!.dataUrl, headers: OTHER_TRAINER })).json().error.code).toBe('NOT_YOUR_TRAINING');
     const data = (await real.app.inject({ method: 'GET', url: claimed!.dataUrl, headers: SERVICE })).json();
-    expect(data).toMatchObject({ aiId: ai.id, documents: [{ title: 'Lecture notes', text: 'Graphs: BFS visits level by level.' }] });
+    expect(data).toMatchObject({ aiId: ai.id, ai: { name: 'Tutor' }, documents: [{ title: 'Lecture notes', text: 'Graphs: BFS visits level by level.' }] });
+    // The owner's own writing, which teaches the adapter their style.
+    expect(data.samples).toContain('Honestly I think BFS is the easiest graph search to explain.');
 
     const cp = await real.app.inject({ method: 'POST', url: `/internal/trainer/jobs/${start.id}/checkpoints`, headers: SERVICE, payload: { stage: 'epoch 1', progress: 40, step: 120, loss: 1.82 } });
     expect(cp.statusCode).toBe(200);
@@ -115,7 +120,19 @@ describe('the trainer socket (TRAINING_MODE=trainer)', () => {
     expect(progress).toMatchObject({ status: 'running', stage: 'epoch 1', progress: 40, checkpoints: [{ stage: 'epoch 1', loss: 1.82 }] });
 
     // The trainer must state it deleted the data.
-    const adapter = { adapterSha256: 'a'.repeat(64), adapterUri: 's3://alt-adapters/tutor-1.safetensors', scores: { readiness: 87.5, loss: 0.9 } };
+    // The trainer hands the adapter to Core, then reports it with the fingerprint Core computed.
+    const lenBuf = Buffer.alloc(8);
+    const header = Buffer.from('{"__metadata__":{"format":"pt"}}');
+    lenBuf.writeBigUInt64LE(BigInt(header.length));
+    const bytes = Buffer.concat([lenBuf, header, Buffer.alloc(4, 7)]);
+    const put = (h: Record<string, string>, body: Buffer) =>
+      real.app.inject({ method: 'POST', url: `/internal/trainer/jobs/${start.id}/adapter`, headers: { ...h, 'content-type': 'application/octet-stream' }, payload: body });
+    expect((await put(OTHER_TRAINER, bytes)).json().error.code).toBe('NOT_YOUR_TRAINING');
+    expect((await put(SERVICE, Buffer.from('not an adapter'))).json().error.code).toBe('ADAPTER_FORMAT');
+    const stored = (await put(SERVICE, bytes)).json();
+    const { createHash } = await import('node:crypto');
+    expect(stored).toEqual({ adapterSha256: createHash('sha256').update(bytes).digest('hex'), adapterUri: `alt://adapters/${createHash('sha256').update(bytes).digest('hex')}.safetensors`, sizeBytes: bytes.length });
+    const adapter = { adapterSha256: stored.adapterSha256, adapterUri: stored.adapterUri, baseModel: 'Qwen/Qwen2.5-3B-Instruct', scores: { readiness: 87.5, loss: 0.9 } };
     expect((await real.app.inject({ method: 'POST', url: `/internal/trainer/jobs/${start.id}/complete`, headers: SERVICE, payload: adapter })).statusCode).toBe(400);
     const done = await real.app.inject({ method: 'POST', url: `/internal/trainer/jobs/${start.id}/complete`, headers: SERVICE, payload: { ...adapter, dataDeleted: true } });
     expect(done.statusCode).toBe(200);
@@ -123,7 +140,8 @@ describe('the trainer socket (TRAINING_MODE=trainer)', () => {
     const [version] = (await real.app.inject({ method: 'GET', url: `/ais/${ai.id}/versions`, headers: auth(u.accessToken) })).json();
     expect(version).toMatchObject({ id: done.json().versionId, engine: 'adapter', training: 'cloud', simulated: false, readiness: 87.5 });
     const manifest = (await real.app.inject({ method: 'GET', url: `/ipfs/${version.manifestCid}` })).json();
-    expect(manifest.engine).toEqual({ type: 'adapter', training: 'cloud', adapterSha256: 'a'.repeat(64) });
+    expect(manifest.engine).toEqual({ type: 'adapter', training: 'cloud', adapterSha256: stored.adapterSha256 });
+    expect(manifest.baseModel).toBe('Qwen/Qwen2.5-3B-Instruct');
     expect(JSON.stringify(manifest)).not.toContain('BFS visits'); // hashes only
     const job = (await real.app.ctx.db.query('SELECT status, data_deleted_at FROM core.training_jobs WHERE id = $1', [start.id])).rows[0];
     expect(job.status).toBe('completed');

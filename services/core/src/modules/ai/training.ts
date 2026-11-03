@@ -9,6 +9,7 @@ import { countEvalItems, requestEvaluation } from './evaluation.js';
 import { currentSnapshot, writeVersion, type VersionSnapshot } from './lifecycle.js';
 import { parsePersona } from './persona.js';
 import { approvedMemories, assertMutable, consentState, datasetTexts, loadAi, requireConsent } from './repo.js';
+import { writingSamples } from './style.js';
 
 /**
  * Training (Module 9; owner's plan "the engine and the car", 2026-10-16). Training is the only way into
@@ -120,7 +121,7 @@ export async function startTraining(ctx: Ctx, aiId: string, userId: string, ip: 
 }
 
 /** Closes a training with a new trained version (the adapter engine). */
-async function finishTraining(ctx: Ctx, job: TrainingRow, adapter: { sha256: string; uri: string | null; readiness: number | null }) {
+async function finishTraining(ctx: Ctx, job: TrainingRow, adapter: { sha256: string; uri: string | null; readiness: number | null; baseModel?: string | null }) {
   const ai = await loadAi(ctx.db, job.ai_id);
   if (!ai) throw new AppError(404, 'NOT_FOUND', 'AI not found.');
   const mode = job.mode === 'base' ? 'cloud' : job.mode;
@@ -128,7 +129,7 @@ async function finishTraining(ctx: Ctx, job: TrainingRow, adapter: { sha256: str
     ctx,
     ai,
     snapshotOf(job),
-    { type: 'adapter', mode, jobId: job.id, adapterSha256: adapter.sha256, adapterUri: adapter.uri, readiness: adapter.readiness },
+    { type: 'adapter', mode, jobId: job.id, adapterSha256: adapter.sha256, adapterUri: adapter.uri, readiness: adapter.readiness, baseModel: adapter.baseModel ?? null },
     job.id,
     job.initiated_by,
   );
@@ -231,18 +232,44 @@ export async function exportTrainingData(ctx: Ctx, jobId: string, trainer: strin
     await failTrainingJob(ctx, job, 'CONSENT_WITHDRAWN', 'The owner withdrew consent to train on their data.', trainer);
     throw forbidden('CONSENT_WITHDRAWN', 'The owner withdrew consent to train on their data.');
   }
-  const [documents, memories] = await Promise.all([datasetTexts(ctx, ctx.db, job.ai_id, job.dataset_ids), approvedMemories(ctx.db, job.ai_id, job.memory_ids)]);
+  const ai = await loadAi(ctx.db, job.ai_id);
+  if (!ai) throw new AppError(404, 'NOT_FOUND', 'AI not found.');
+  // The owner's own writing (their messages in test chats and "communication style" items) is what
+  // teaches the adapter to sound like them; the documents and memories teach it what they know.
+  const [documents, memories, samples] = await Promise.all([
+    datasetTexts(ctx, ctx.db, job.ai_id, job.dataset_ids),
+    approvedMemories(ctx.db, job.ai_id, job.memory_ids),
+    writingSamples(ctx, ai),
+  ]);
   await tx(ctx.db, (client) =>
-    audit(client, { action: 'training.data_exported', actorService: trainer, entityType: 'ai', entityId: job.ai_id, data: { trainingJobId: job.id, documents: documents.length, memories: memories.length } }),
+    audit(client, {
+      action: 'training.data_exported',
+      actorService: trainer,
+      entityType: 'ai',
+      entityId: job.ai_id,
+      data: { trainingJobId: job.id, documents: documents.length, memories: memories.length, samples: samples.length },
+    }),
   );
   return {
     trainingJobId: job.id,
     aiId: job.ai_id,
     baseModel: job.base_model,
     persona: parsePersona(job.persona_config),
+    ai: { name: ai.name, handle: ai.handle },
     documents: documents.map((d) => ({ title: d.title, text: d.text })),
     memories: memories.map((m) => m.content),
+    samples,
   };
+}
+
+/** Where a trainer's adapter is kept until ALT's inference server fetches it (alt://adapters/<sha256>.<format>). */
+export function adapterUri(sha256: string, format: 'safetensors' | 'gguf') {
+  return `alt://adapters/${sha256}.${format}`;
+}
+
+/** The trainer hands the adapter it trained to Core (it must hold the training's claim). */
+export async function requireTrainerClaim(ctx: Ctx, jobId: string, trainer: string) {
+  return requireClaim(ctx, jobId, trainer);
 }
 
 export async function reportCheckpoint(ctx: Ctx, jobId: string, trainer: string, point: Omit<Checkpoint, 'at'>) {
@@ -256,7 +283,12 @@ export async function reportCheckpoint(ctx: Ctx, jobId: string, trainer: string,
 }
 
 /** The trainer returns the adapter (its hash and where it is kept) and states that it deleted the data. */
-export async function completeTraining(ctx: Ctx, jobId: string, trainer: string, result: { adapterSha256: string; adapterUri: string; scores?: Record<string, number>; dataDeleted: true }) {
+export async function completeTraining(
+  ctx: Ctx,
+  jobId: string,
+  trainer: string,
+  result: { adapterSha256: string; adapterUri: string; baseModel?: string; scores?: Record<string, number>; dataDeleted: true },
+) {
   const job = await requireClaim(ctx, jobId, trainer);
   await tx(ctx.db, async (client) => {
     await client.query(`UPDATE core.training_jobs SET adapter_sha256 = $2, adapter_uri = $3, scores = $4, data_deleted_at = now(), claimed_by = $5 WHERE id = $1`, [
@@ -265,7 +297,7 @@ export async function completeTraining(ctx: Ctx, jobId: string, trainer: string,
     await audit(client, { action: 'training.adapter_returned', actorService: trainer, entityType: 'ai', entityId: job.ai_id, data: { trainingJobId: job.id, adapterSha256: result.adapterSha256, dataDeleted: true } });
   });
   const readiness = typeof result.scores?.readiness === 'number' ? result.scores.readiness : null;
-  return finishTraining(ctx, job, { sha256: result.adapterSha256, uri: result.adapterUri, readiness });
+  return finishTraining(ctx, job, { sha256: result.adapterSha256, uri: result.adapterUri, readiness, baseModel: result.baseModel ?? null });
 }
 
 export async function failTraining(ctx: Ctx, jobId: string, trainer: string, reason: { code: string; message: string }) {
@@ -311,7 +343,7 @@ export async function importLocalAdapter(
   assertMutable(ai);
   await requireConsent(ctx.db, ai.id, 'persona_training');
   const snap = await currentSnapshot(ctx.db, ai);
-  const uri = `alt://adapters/${adapter.sha256}.${adapter.format}`;
+  const uri = adapterUri(adapter.sha256, adapter.format);
   const job = await tx(ctx.db, async (client) => {
     const { rows } = await client.query<TrainingRow>(
       `INSERT INTO core.training_jobs (ai_id, initiated_by, status, stage, mode, persona_config, dataset_ids, memory_ids, base_model, started_at, adapter_sha256, adapter_uri, scores)
@@ -328,5 +360,5 @@ export async function importLocalAdapter(
     });
     return rows[0]!;
   });
-  return { job, version: await finishTraining(ctx, job, { sha256: adapter.sha256, uri, readiness: null }) };
+  return { job, version: await finishTraining(ctx, job, { sha256: adapter.sha256, uri, readiness: null, baseModel: adapter.baseModel }) };
 }

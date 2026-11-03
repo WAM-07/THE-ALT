@@ -43,7 +43,8 @@ async function speak(ctx: Ctx, version: VersionRow | null, messages: LlmMessage[
     try {
       const res = await fetch(`${url}/v1/adapter-chat`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        // Only ALT Core may use ALT's inference server: the same service key as every internal call.
+        headers: { 'content-type': 'application/json', 'x-alt-service-key': ctx.config.internalServiceKey, 'x-alt-service': 'core' },
         body: JSON.stringify({ baseModel: version.base_model, adapterUri: version.adapter_uri, adapterSha256: version.adapter_sha256, messages, ...options }),
         signal: AbortSignal.timeout(60_000),
       });

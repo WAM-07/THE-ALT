@@ -23,7 +23,7 @@ export interface VersionSnapshot {
 /** The engine that speaks for a version: the base model, or an adapter trained on the owner's data. */
 export type VersionEngine =
   | { type: 'base' }
-  | { type: 'adapter'; mode: 'cloud' | 'local' | 'simulated'; jobId: string; adapterSha256: string; adapterUri: string | null; readiness?: number | null };
+  | { type: 'adapter'; mode: 'cloud' | 'local' | 'simulated'; jobId: string; adapterSha256: string; adapterUri: string | null; readiness?: number | null; baseModel?: string | null };
 
 /** The AI's consented data right now: the persona draft, included items and approved memories. */
 export async function currentSnapshot(q: pg.Pool | pg.PoolClient, ai: AiRow): Promise<VersionSnapshot> {
@@ -59,7 +59,8 @@ export async function writeVersion(ctx: Ctx, ai: AiRow, snap: VersionSnapshot, e
     version: versionNo,
     parent: previous ? { version: previous.version_no, cid: previous.manifest_cid } : null,
     creator: { altUserId: ai.creator_id, wallet: wallets[0]?.address ?? null },
-    baseModel: ctx.llm.names[0],
+    // A trained version names the open model its adapter was trained on; a base one, the cloud model.
+    baseModel: adapter?.baseModel || ctx.llm.names[0],
     engine: adapter
       ? {
           type: 'adapter',

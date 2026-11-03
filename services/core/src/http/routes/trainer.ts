@@ -1,12 +1,25 @@
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, rename, rm, stat } from 'node:fs/promises';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Ctx } from '../../context.js';
 import { AppError } from '../../lib/errors.js';
-import { claimTraining, completeTraining, exportTrainingData, failTraining, reportCheckpoint } from '../../modules/ai/training.js';
+import {
+  adapterFormat,
+  adapterUri,
+  claimTraining,
+  completeTraining,
+  exportTrainingData,
+  failTraining,
+  MAX_ADAPTER_BYTES,
+  reportCheckpoint,
+  requireTrainerClaim,
+} from '../../modules/ai/training.js';
 import { requireService } from '../auth-guard.js';
 
 const JobId = z.object({ id: z.uuid() });
@@ -19,6 +32,8 @@ const JobId = z.object({ id: z.uuid() });
 export async function trainerRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const guard = requireService(ctx);
+  // Adapters arrive as raw bytes (application/octet-stream), streamed to disk; only in this plugin.
+  app.addContentTypeParser('application/octet-stream', (_req, payload, done) => done(null, payload));
 
   r.post('/internal/trainer/claim', { preHandler: guard, schema: { tags: ['internal'], summary: 'Take the oldest waiting training (204 when there is none)' } }, async (req, reply) => {
     const job = await claimTraining(ctx, req.service!);
@@ -45,6 +60,42 @@ export async function trainerRoutes(app: FastifyInstance, ctx: Ctx) {
   );
 
   r.post(
+    '/internal/trainer/jobs/:id/adapter',
+    {
+      preHandler: guard,
+      schema: { tags: ['internal'], summary: 'Upload the trained adapter (raw .safetensors or .gguf bytes); returns its fingerprint and alt:// address', params: JobId },
+    },
+    async (req, reply) => {
+      await requireTrainerClaim(ctx, req.params.id, req.service!);
+      const dir = join(ctx.config.storageDir, 'adapters');
+      await mkdir(dir, { recursive: true });
+      const tmp = join(dir, `trainer-${randomUUID()}`);
+      const hash = createHash('sha256');
+      let head = Buffer.alloc(0);
+      let size = 0;
+      const count = new Transform({
+        transform(chunk: Buffer, _enc, next) {
+          size += chunk.length;
+          if (size > MAX_ADAPTER_BYTES) return next(new AppError(413, 'FILE_TOO_LARGE', 'Adapters can be up to 512 MB.'));
+          hash.update(chunk);
+          if (head.length < 16) head = Buffer.concat([head, chunk.subarray(0, 16 - head.length)]);
+          next(null, chunk);
+        },
+      });
+      try {
+        await pipeline(req.body as NodeJS.ReadableStream, count, createWriteStream(tmp));
+        const format = adapterFormat(head);
+        if (!format) throw new AppError(400, 'ADAPTER_FORMAT', 'That is not a .safetensors or .gguf adapter.');
+        const sha = hash.digest('hex');
+        await rename(tmp, join(dir, `${sha}.${format}`));
+        return reply.status(201).send({ adapterSha256: sha, adapterUri: adapterUri(sha, format), sizeBytes: size });
+      } finally {
+        await rm(tmp, { force: true });
+      }
+    },
+  );
+
+  r.post(
     '/internal/trainer/jobs/:id/complete',
     {
       preHandler: guard,
@@ -55,6 +106,8 @@ export async function trainerRoutes(app: FastifyInstance, ctx: Ctx) {
         body: z.object({
           adapterSha256: z.string().regex(/^[0-9a-f]{64}$/),
           adapterUri: z.string().min(1).max(500),
+          // The open model the adapter was trained on, e.g. Qwen/Qwen2.5-3B-Instruct.
+          baseModel: z.string().min(1).max(100).optional(),
           scores: z.record(z.string(), z.number().finite()).optional(),
           dataDeleted: z.literal(true),
         }),
